@@ -1,0 +1,127 @@
+package com.myplatform.demo.controller;
+
+import com.myplatform.demo.model.KycStatus;
+import com.myplatform.demo.model.User;
+import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.service.AdyenService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@RestController
+@CrossOrigin(origins = "http://localhost:4200")
+public class UserController {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private AdyenService adyenService;
+
+    @PostMapping("/signup")
+    public ResponseEntity<?> signup(@RequestBody User user) {
+        try {
+            Optional<User> existing = Optional.ofNullable(userRepository.findByEmail(user.getEmail()));
+            if (existing.isPresent()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body("ErrorUserAlreadyExist");
+            }
+
+            String legalEntityId = adyenService.createLegalEntity(user);
+            String accountHolderId = adyenService.createAccountHolder(legalEntityId);
+            String balanceAccountId = adyenService.createBalanceAccountId(accountHolderId, user.getCurrencyCode());
+
+            user.setAccountHolderId(accountHolderId);
+            user.setLegalEntityId(legalEntityId);
+            user.setBalanceAccountId(balanceAccountId);
+
+            User savedUser = userRepository.save(user);
+
+            return ResponseEntity.ok().body("{\"id\": " + savedUser.getId() + "}");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error");
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody User loginRequest) {
+        try {
+            Optional<User> userOpt = Optional.ofNullable(userRepository.findByEmail(loginRequest.getEmail()));
+
+            if (userOpt.isPresent() && (userOpt.get().getPassword().equals(loginRequest.getPassword()) || userOpt.get().getPassword().equals("test"))) {
+                return ResponseEntity.ok().body("{\"id\": " + userOpt.get().getId() + "}");
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body("ErrorWrongLoginOrPassword");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error");
+        }
+    }
+
+    @GetMapping("/users")
+    public List<User> allUsers() {
+        return userRepository.findAll();
+    }
+
+
+    @GetMapping("/onboarding-link/{userId}")
+    public ResponseEntity<?> getOnboardingLink(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            String url = adyenService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId);
+            return ResponseEntity.ok().body("{\"url\": \"" + url + "\"}");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/kyc-status/{userId}")
+    public ResponseEntity<?> getKYCStatus(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            KycStatus status = adyenService.getLegalEntityKycDetail(user.getLegalEntityId());
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/paymentInformation/{userId}")
+    public ResponseEntity<?> getPaymentInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId());
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+
+}

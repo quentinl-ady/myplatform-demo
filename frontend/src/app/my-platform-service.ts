@@ -1,0 +1,55 @@
+import {inject, Injectable} from '@angular/core';
+import {HttpClient} from "@angular/common/http";
+import {Observable} from "rxjs";
+
+
+interface AuthPayload {
+  email: string;
+  password: string;
+}
+
+export type VerificationStatus = 'invalid' | 'pending' | 'reject' | 'valid';
+
+export interface OnboardingPart {
+  allowed: boolean;
+  verificationStatus: VerificationStatus;
+}
+
+export interface OnboardingResponse {
+  acquiringStatus: OnboardingPart;
+  payoutStatus: OnboardingPart;
+}
+
+export interface PaymentInformation {
+  id: string;
+  token: string;
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class MyPlatformService {
+  private readonly baseUrl = 'http://localhost:8080';
+  private readonly http = inject(HttpClient);
+
+
+  login(payload: AuthPayload): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/login`, payload, { responseType: 'json'});
+  }
+
+  signup(payload: AuthPayload): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/signup`, payload, { responseType: 'json'});
+  }
+
+  getOnboardingLink(userId: number): Observable<{ url: string }> {
+    return this.http.get<{ url: string }>(`${this.baseUrl}/onboarding-link/${userId}`);
+  }
+
+  getOnboardingStatus(userId: number): Observable<OnboardingResponse> {
+    return this.http.get<OnboardingResponse>(`${this.baseUrl}/kyc-status/${userId}`);
+  }
+
+  getPaymentInformation(userId: string): Observable<PaymentInformation> {
+    return this.http.get<PaymentInformation>(`${this.baseUrl}/paymentInformation/${userId}`);
+  }
+}

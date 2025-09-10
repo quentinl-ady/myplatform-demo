@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  background: #fff;
+  color: #00112C;
+  margin: 0;
+  padding: 0;
+}
+
+.main-container {
+  max-width: 400px;
+  margin: 48px auto;
+  padding: 32px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,17,44,0.08);
+}
+
+#adyen-component.main-container {
+  max-width: 1000px;
+}
+
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+}
+
+nav {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+button {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  background: #0A6EFF;
+  color: #fff;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: none;
+  outline: none;
+}
+
+button.active, button:focus, button:hover {
+  background: #0057C1;
+}
+
+button:disabled {
+  background: #e0e7ef;
+  color: #b5bac6;
+  cursor: not-allowed;
+}
+
+button.check-status {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  background: #FF9800;
+  color: #fff;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button.check-status:hover,
+button.check-status:focus {
+  background: #e68900;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+label {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #d3d6dd;
+  background: #f8fafc;
+  color: #00112C;
+  outline: none;
+  transition: border 0.2s;
+}
+
+input:focus {
+  border-color: #0A6EFF;
+  background: #fff;
+}
+
+.error {
+  color: #D32F2F;
+  font-size: 0.95rem;
+  margin-top: -12px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.auth-root {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .main-container {
+    padding: 16px;
+    max-width: 100vw;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #00112C;
+  margin-bottom: 24px;
+}
+
+select {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #d3d6dd;
+  background: #f8fafc;
+  color: #00112C;
+  outline: none;
+  transition: border 0.2s, background 0.2s;
+  cursor: pointer;
+}
+
+select:focus {
+  border-color: #0A6EFF;
+  background: #fff;
+}
+
+option {
+  padding: 8px;
+}
+
+
+/*
+Layout Menu
+ */
+
+.mat-sidenav-container {
+  height: 100vh;
+  background: #fff !important;
+  color: #00112C !important;
+}
+
+.mat-drawer {
+  background: #fff !important;
+  color: #00112C !important;
+  border-right: 1px solid #e0e7ef;
+  width: 240px;
+}
+
+.mat-toolbar {
+  background: #fff !important;
+  color: #00112C !important;
+  font-family: 'Inter', Arial, sans-serif;
+  font-weight: 600;
+  font-size: 1.2rem;
+  box-shadow: none;
+  border-bottom: 1px solid #e0e7ef;
+}
+
+.menu-link {
+  display: block;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #00112C !important;
+  border-radius: 8px;
+  margin: 4px 8px;
+  padding: 10px 16px;
+  transition: background 0.2s, color 0.2s;
+  text-decoration: none;
+}
+
+.menu-link:hover {
+  background: #f0f4f8;
+}
+
+.menu-link.active {
+  background: #0A6EFF !important;
+  color: #fff !important;
+}
+
+.mat-sidenav-content {
+  background: #fff !important;
+  padding: 24px;
+  color: #00112C !important;
+}
+
+.mat-mdc-list-item,
+.mat-mdc-list-item .mdc-list-item__primary-text {
+  color: #00112C !important;
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+}
