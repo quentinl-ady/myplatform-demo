@@ -1,0 +1,59 @@
+# ========================
+# Backend (Spring Boot)
+# ========================
+
+# Compiled class files
+/backend/target/
+/backend/bin/
+/backend/build/
+
+# Maven
+/backend/pom.xml.tag
+/backend/pom.xml.releaseBackup
+/backend/pom.xml.versionsBackup
+/backend/.mvn/timing.properties
+
+# Logs
+/backend/logs/
+/backend/*.log
+
+# OS generated files
+/.DS_Store
+Thumbs.db
+
+# Application properties
+/backend/src/main/resources/application.properties
+
+# ========================
+# Frontend (Angular)
+# ========================
+
+# Node modules
+/frontend/node_modules/
+
+# Angular build output
+/frontend/dist/
+/frontend/out-tsc/
+/frontend/.angular/cache/
+
+# IDE / Editor files
+/frontend/.idea/
+/frontend/.vscode/
+/frontend/*.suo
+/frontend/*.ntvs*
+/frontend/*.njsproj
+/frontend/*.log
+
+# Environment files (if any)
+# /frontend/src/environments/environment*.ts
+
+# OS generated files
+/.DS_Store
+Thumbs.db
+
+# ========================
+# Databases
+# ========================
+/backend/users.db
+/frontend/users.db
+users.db
