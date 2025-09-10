@@ -7,8 +7,8 @@ import {
 } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import {Router} from "@angular/router";
-import {MyPlatformService} from "../my-platform-service";
+import { Router } from "@angular/router";
+import { MyPlatformService } from "../my-platform-service";
 
 @Component({
     selector: 'app-signup',
@@ -17,40 +17,54 @@ import {MyPlatformService} from "../my-platform-service";
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
-    
-    <div class="form-group">
+
+      <div class="form-group">
         <label for="userType">Type</label>
         <select id="userType" formControlName="userType" required>
-          <option value="organization">Organization</option>
-          <option value="individual">Individual</option>
-          <option value="soleProprietorship">SoleProprietorship</option>
+          <option *ngFor="let type of userTypes" [value]="type.value" [disabled]="type.disabled">
+            {{ type.label }}
+          </option>
+        </select>
+        <div *ngIf="individualDisabledMessage" class="info">{{ individualDisabledMessage }}</div>
+      </div>
+
+      <div class="form-group">
+        <label for="activityReason">Reason of activity</label>
+        <select id="activityReason" formControlName="activityReason" required>
+          <option value="" disabled selected>Select one reason</option>
+          <option value="marketplace">Marketplace</option>
+          <option value="embeddedPayment">Embedded Payment</option>
+          <option value="financialProduct">Financial Product</option>
         </select>
       </div>
-      
-  <div class="form-group" *ngIf="form.get('legalEntityName')">
-    <label for="companyName">Company name</label>
-    <input id="companyName" formControlName="legalEntityName" type="text" required
-      [class.invalid]="companyNameInvalid()" />
-    <div *ngIf="companyNameInvalid()" class="error">
-      Company name required (min 3 characters).
-    </div>
-  </div>
-  <div class="form-group" *ngIf="form.get('firstName')">
-    <label for="firstName">First name</label>
-    <input id="firstName" formControlName="firstName" type="text" required
-      [class.invalid]="firstNameInvalid()" />
-    <div *ngIf="firstNameInvalid()" class="error">
-      First name required.
-    </div>
-  </div>
-  <div class="form-group" *ngIf="form.get('lastName')">
-    <label for="lastName">Last name</label>
-    <input id="lastName" formControlName="lastName" type="text" required
-      [class.invalid]="lastNameInvalid()" />
-    <div *ngIf="lastNameInvalid()" class="error">
-      Last name required.
-    </div>
-  </div>
+
+      <div class="form-group" *ngIf="form.get('legalEntityName')">
+        <label for="companyName">Company name</label>
+        <input id="companyName" formControlName="legalEntityName" type="text" required
+          [class.invalid]="companyNameInvalid()" />
+        <div *ngIf="companyNameInvalid()" class="error">
+          Company name required (min 3 characters).
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="form.get('firstName')">
+        <label for="firstName">First name</label>
+        <input id="firstName" formControlName="firstName" type="text" required
+          [class.invalid]="firstNameInvalid()" />
+        <div *ngIf="firstNameInvalid()" class="error">
+          First name required.
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="form.get('lastName')">
+        <label for="lastName">Last name</label>
+        <input id="lastName" formControlName="lastName" type="text" required
+          [class.invalid]="lastNameInvalid()" />
+        <div *ngIf="lastNameInvalid()" class="error">
+          Last name required.
+        </div>
+      </div>
+
       <div class="form-group">
         <label for="country">Country</label>
         <select id="country" formControlName="countryCode" required>
@@ -61,6 +75,7 @@ import {MyPlatformService} from "../my-platform-service";
           <option value="US">United States</option>
         </select>
       </div>
+
       <div class="form-group">
         <label for="currency">Currency</label>
         <select id="currency" formControlName="currencyCode" required>
@@ -69,6 +84,7 @@ import {MyPlatformService} from "../my-platform-service";
           <option value="USD">USD</option>
         </select>
       </div>
+
       <div class="form-group">
         <label for="email">Email</label>
         <input id="email" formControlName="email" type="email" required
@@ -77,6 +93,7 @@ import {MyPlatformService} from "../my-platform-service";
           Input valid email.
         </div>
       </div>
+
       <div class="form-group">
         <label for="password">Password</label>
         <input id="password" formControlName="password" type="password" required
@@ -85,8 +102,10 @@ import {MyPlatformService} from "../my-platform-service";
           Password required (min 4 characters).
         </div>
       </div>
+
       <button type="submit" [disabled]="form.invalid">Signup</button>
       <div *ngIf="error" class="error">{{ error }}</div>
+
     </form>
   `,
     host: {
@@ -96,6 +115,14 @@ import {MyPlatformService} from "../my-platform-service";
 export class SignupComponent {
     form: FormGroup;
     error: string | null = null;
+
+    userTypes = [
+        { value: 'organization', label: 'Organization', disabled: false },
+        { value: 'individual', label: 'Individual', disabled: false },
+        { value: 'soleProprietorship', label: 'SoleProprietorship', disabled: false }
+    ];
+
+    individualDisabledMessage: string | null = null;
 
     @Output() signupSuccess = new EventEmitter<unknown>();
 
@@ -111,21 +138,45 @@ export class SignupComponent {
             password: ['', [Validators.required, Validators.minLength(4)]],
             countryCode: ['NL'],
             currencyCode: ['EUR'],
-            userType: ['organization']
+            userType: ['organization'],
+            activityReason: ['marketplace', Validators.required] // Sélection unique
         });
 
-        this.form.get('userType')!.valueChanges.subscribe(type => {
-            if (type === 'individual') {
-                this.form.removeControl('legalEntityName');
-                this.form.addControl('firstName', this.fb.control('', Validators.required));
-                this.form.addControl('lastName', this.fb.control('', Validators.required));
-            } else {
-                this.form.addControl('legalEntityName', this.fb.control('', [Validators.required, Validators.minLength(4)]));
-                this.form.removeControl('firstName');
-                this.form.removeControl('lastName');
-            }
-            this.cdr.markForCheck();
-        });
+        this.form.get('userType')!.valueChanges.subscribe(type => this.updateUserTypeControls(type));
+        this.form.get('activityReason')!.valueChanges.subscribe(value => this.updateUserTypeOptions(value));
+    }
+
+    updateUserTypeControls(type: string) {
+        if (type === 'individual') {
+            this.form.removeControl('legalEntityName');
+            this.form.addControl('firstName', this.fb.control('', Validators.required));
+            this.form.addControl('lastName', this.fb.control('', Validators.required));
+        } else {
+            this.form.addControl('legalEntityName', this.fb.control('', [Validators.required, Validators.minLength(3)]));
+            this.form.removeControl('firstName');
+            this.form.removeControl('lastName');
+        }
+        this.cdr.markForCheck();
+    }
+
+    updateUserTypeOptions(selectedActivity: string) {
+        const restrictIndividual = selectedActivity === 'embeddedPayment' || selectedActivity === 'financialProduct';
+        this.userTypes = this.userTypes.map(type => ({
+            ...type,
+            disabled: type.value === 'individual' && restrictIndividual
+        }));
+
+        // Message explicatif
+        this.individualDisabledMessage = restrictIndividual
+            ? "You cannot select 'Individual' if activity is Embedded Payment or Financial Product."
+            : null;
+
+        // Si current userType est individual et devient interdit, on reset
+        if (restrictIndividual && this.form.get('userType')!.value === 'individual') {
+            this.form.get('userType')!.setValue('organization');
+        }
+
+        this.cdr.markForCheck();
     }
 
     companyNameInvalid() {
@@ -163,10 +214,10 @@ export class SignupComponent {
                 delete payload.firstName;
                 delete payload.lastName;
             }
-            this.authService.signup(this.form.value).subscribe({
+
+            this.authService.signup(payload).subscribe({
                 next: (res) => {
                     if (res.id) {
-                        console.log('Signup success');
                         this.router.navigate([`/${res.id}/dashboard`]);
                         this.signupSuccess.emit(res);
                     }
