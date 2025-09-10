@@ -15,28 +15,6 @@ import { MatToolbarModule } from '@angular/material/toolbar';
         MatListModule,
         MatToolbarModule
     ],
-/*    template: `
-    <mat-sidenav-container class="sidenav-container">
-      <mat-sidenav mode="side" opened>
-        <mat-toolbar color="primary">Menu</mat-toolbar>
-        <mat-nav-list>
-          <a mat-list-item [routerLink]="['/', userId, 'dashboard']" routerLinkActive="active">
-            Dashboard
-          </a>
-          <a mat-list-item [routerLink]="['/', userId, 'payment']" routerLinkActive="active">
-            Payment
-          </a>
-        </mat-nav-list>
-      </mat-sidenav>
-
-      <mat-sidenav-content>
-        <mat-toolbar color="primary">Application {{ userId }}</mat-toolbar>
-        <div class="content">
-          <router-outlet></router-outlet>
-        </div>
-      </mat-sidenav-content>
-    </mat-sidenav-container>
-  `,*/
     template: `
     <mat-sidenav-container class="sidenav-container">
   <mat-sidenav mode="side" opened>
@@ -51,6 +29,26 @@ import { MatToolbarModule } from '@angular/material/toolbar';
          routerLinkActive="active"
          class="menu-link">
         Payment
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'report']"
+         routerLinkActive="active"
+         class="menu-link">
+        Report
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'payout']"
+         routerLinkActive="active"
+         class="menu-link">
+        Payout
+      </a>
+       <a mat-list-item [routerLink]="['/', userId, 'dispute']"
+         routerLinkActive="active"
+         class="menu-link">
+        Dispute
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'businessloans']"
+         routerLinkActive="active"
+         class="menu-link">
+        Business Loans
       </a>
     </mat-nav-list>
   </mat-sidenav>

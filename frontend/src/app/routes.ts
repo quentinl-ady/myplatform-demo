@@ -4,26 +4,10 @@ import {MainComponent} from "./main/main.component";
 import {DashboardComponent} from "./dashboard/dashboard.component";
 import {LayoutComponent} from "./layout/layout.component";
 import {PaymentComponent} from "./payment/payment.component";
-
-// const routeConfig: Routes = [
-//   {
-//     path: '',
-//     component: MainComponent,
-//     title: 'Homepage'
-//   },
-//   {
-//     path: 'login',
-//     component: LoginComponent,
-//     title: 'Login'
-//   },
-//   { path: ':id/dashboard',
-//     component: DashboardComponent,
-//     title: 'Dashboard'
-//   }
-//
-// ];
-
-
+import {ReportComponent} from "./report/report.component";
+import {PayoutComponent} from "./payout/payout.component";
+import {DisputeComponent} from "./dispute/dispute.component";
+import {BusinessLoansComponent} from "./business-loans/business-loans.component";
 
 const routeConfig: Routes = [
   {
@@ -49,6 +33,26 @@ const routeConfig: Routes = [
         path: 'payment',
         component: PaymentComponent,
         title: 'Payment'
+      },
+      {
+        path: 'report',
+        component: ReportComponent,
+        title: 'Report'
+      },
+      {
+        path: 'payout',
+        component: PayoutComponent,
+        title: 'Payout'
+      },
+      {
+        path: 'dispute',
+        component: DisputeComponent,
+        title: 'Dispute'
+      },
+      {
+        path: 'businessloans',
+        component: BusinessLoansComponent,
+        title: 'BusinessLoans'
       }
     ]
   }

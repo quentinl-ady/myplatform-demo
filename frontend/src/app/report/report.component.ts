@@ -2,21 +2,21 @@ import {Component, ElementRef, ViewChild} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {CommonModule} from "@angular/common";
-import { AdyenPlatformExperience, TransactionsOverview, TransactionDetails } from '@adyen/adyen-platform-experience-web';
+import { AdyenPlatformExperience, ReportsOverview } from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
 import {MyPlatformService} from "../my-platform-service";
 
 @Component({
-    selector: 'app-payment',
+    selector: 'app-report',
     standalone: true,
     template: `
     <div id="adyen-component" class="main-container">
-      <div id="transactions-overview-container"></div>
+      <div id="report-overview-container"></div>
     </div>
   `,
     imports: [MatSnackBarModule, CommonModule]
 })
-export class PaymentComponent {
+export class ReportComponent {
 
     userId = '';
 
@@ -37,9 +37,9 @@ export class PaymentComponent {
     private async initAdyenComponents() {
         const core = await AdyenPlatformExperience({
             onSessionCreate: async () => {
-                const sessionToken = await this.authService.getPaymentInformation(this.userId).toPromise();
+                const sessionToken = await this.authService.getReportInformation(this.userId).toPromise();
                 if (!sessionToken) {
-                    throw new Error('Impossible to get payment information');
+                    throw new Error('Impossible to get report information');
                 }
                 return {
                     token: sessionToken.token,
@@ -47,8 +47,8 @@ export class PaymentComponent {
                 };
             }
         });
-        const transactionsOverview = new TransactionsOverview({core});
-        transactionsOverview.mount('#transactions-overview-container');
+        const reportsOverview = new ReportsOverview({core});
+        reportsOverview.mount('#report-overview-container');
     }
 
 

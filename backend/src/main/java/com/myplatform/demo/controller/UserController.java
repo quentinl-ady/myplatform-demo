@@ -115,7 +115,86 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
             }
 
-            String status = adyenService.createSession(user.getAccountHolderId());
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Transactions Overview Component: View",
+                    "Transactions Overview Component: Manage Refunds"
+            });
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/reportInformation/{userId}")
+    public ResponseEntity<?> getReportInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Reports Overview Component: View"
+            });
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/payoutInformation/{userId}")
+    public ResponseEntity<?> getPayoutInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Payouts Overview Component: View"
+            });
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/disputeInformation/{userId}")
+    public ResponseEntity<?> getDisputeInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Disputes Component: Manage"
+            });
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/businessLoans/{userId}")
+    public ResponseEntity<?> getBusinessLoansInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Capital Component: Manage"
+            });
             return ResponseEntity.ok(status);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");

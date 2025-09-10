@@ -20,7 +20,7 @@ export interface OnboardingResponse {
   payoutStatus: OnboardingPart;
 }
 
-export interface PaymentInformation {
+export interface SessionToken {
   id: string;
   token: string;
 }
@@ -49,7 +49,23 @@ export class MyPlatformService {
     return this.http.get<OnboardingResponse>(`${this.baseUrl}/kyc-status/${userId}`);
   }
 
-  getPaymentInformation(userId: string): Observable<PaymentInformation> {
-    return this.http.get<PaymentInformation>(`${this.baseUrl}/paymentInformation/${userId}`);
+  getPaymentInformation(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/paymentInformation/${userId}`);
+  }
+
+  getReportInformation(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/reportInformation/${userId}`);
+  }
+
+  getPayoutInformation(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/payoutInformation/${userId}`);
+  }
+
+  getDisputeInformation(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/disputeInformation/${userId}`);
+  }
+
+  getBusinessLoans(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/businessLoans/${userId}`);
   }
 }

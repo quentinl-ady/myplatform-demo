@@ -168,7 +168,7 @@ public class AdyenService {
     }
 
 
-    public String createSession(String accountHolderId) throws Exception {
+    public String createSession(String accountHolderId, String[] v2) throws Exception {
         Map<String, Object> requestBody = Map.of(
                 "allowOrigin", "http://localhost",
                 "product", "platform",
@@ -177,10 +177,7 @@ public class AdyenService {
                                 "accountHolderId", accountHolderId,
                                 "type", "accountHolder"
                         )},
-                        "roles", new String[]{
-                                "Transactions Overview Component: View",
-                                "Transactions Overview Component: Manage Refunds"
-                        }
+                        "roles", v2
                 )
         );
 
