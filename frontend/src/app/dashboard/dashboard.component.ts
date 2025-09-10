@@ -1,48 +1,79 @@
-import {Component, signal} from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import {CommonModule} from "@angular/common";
-import {MyPlatformService, OnboardingPart, OnboardingResponse} from "../my-platform-service";
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CommonModule } from "@angular/common";
+import { MyPlatformService, OnboardingPart, OnboardingResponse } from "../my-platform-service";
+import {MaterialModule} from "../material.module";
 
 @Component({
     selector: 'app-dashboard',
     standalone: true,
+    imports: [CommonModule, MaterialModule],
     template: `
-    <div class="main-container">
+    <div class="dashboard-container">
       <h1>Dashboard</h1>
-      <div class="button-group">
-      
-      <button (click)="openHostedOnboarding()">
-        Go to Onboarding
-        </button>
-                
-        <button class="check-status" (click)="checkOnboarding()">Check Onboarding Status</button>
-        
-      </div>
-      
-        <div *ngIf="loading()">Loading...</div>
 
-      <div *ngIf="status() as s">
-        <div *ngIf="allValid(s); else details">
+      <div class="button-group">
+        <button mat-raised-button color="primary" (click)="openHostedOnboarding()">
+          Go to Onboarding
+        </button>
+        <button mat-flat-button color="accent" (click)="checkOnboarding()">
+          Check Onboarding Status
+        </button>
+      </div>
+
+      <div class="loading-container" *ngIf="loading()">
+        <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+        <span>Loading...</span>
+      </div>
+
+      <mat-card *ngIf="status() as s" class="status-card">
+        <ng-container *ngIf="allValid(s); else details">
           ✅ All services are validated. You can now use the platform without restrictions.
-        </div>
+        </ng-container>
 
         <ng-template #details>
           <ul>
             <li>
-              <strong>Acquiring:</strong>
-              {{ getMessage(s.acquiringStatus) }}
+              <strong>Acquiring:</strong> {{ getMessage(s.acquiringStatus) }}
             </li>
             <li>
-              <strong>Payout:</strong>
-              {{ getMessage(s.payoutStatus) }}
+              <strong>Payout:</strong> {{ getMessage(s.payoutStatus) }}
             </li>
           </ul>
         </ng-template>
-      </div>
+      </mat-card>
     </div>
   `,
-    imports: [MatSnackBarModule, CommonModule]
+    styles: [`
+    .dashboard-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .loading-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .status-card {
+      padding: 1rem;
+      font-size: 1rem;
+    }
+  `]
 })
 export class DashboardComponent {
     userId = '';
@@ -51,8 +82,7 @@ export class DashboardComponent {
 
     constructor(private route: ActivatedRoute,
                 private authService: MyPlatformService,
-                private matSnackBar: MatSnackBar) {
-    }
+                private matSnackBar: MatSnackBar) {}
 
     ngOnInit() {
         this.route.parent?.paramMap.subscribe(params => {
@@ -62,10 +92,8 @@ export class DashboardComponent {
 
     openHostedOnboarding() {
         this.authService.getOnboardingLink(Number(this.userId)).subscribe({
-            next: (res) => {
-                window.open(res.url, '_blank');
-            },
-            error: () => this.matSnackBar.open('Error', 'Close', { duration: 3000 })
+            next: (res) => window.open(res.url, '_blank'),
+            error: () => this.matSnackBar.open('Error fetching onboarding link', 'Close', { duration: 3000 })
         });
     }
 
@@ -78,7 +106,7 @@ export class DashboardComponent {
             },
             error: () => {
                 this.loading.set(false);
-                alert('Error while fetching onboarding status');
+                this.matSnackBar.open('Error while fetching onboarding status', 'Close', { duration: 3000 });
             }
         });
     }
@@ -88,19 +116,12 @@ export class DashboardComponent {
     }
 
     getMessage(part: OnboardingPart): string {
-        if (part.allowed) {
-            return '✅ Validated';
-        }
-
+        if (part.allowed) return '✅ Validated';
         switch (part.verificationStatus) {
-            case 'invalid':
-                return '❌ Missing or incorrect information. Please complete onboarding form.';
-            case 'pending':
-                return '⏳ Verification in progress. Please check back later.';
-            case 'reject':
-                return '🚫 Rejected. Please contact support@platform.com.';
-            default:
-                return 'ℹ️ Unknown status.';
+            case 'invalid': return '❌ Missing or incorrect information. Please complete onboarding form.';
+            case 'pending': return '⏳ Verification in progress. Please check back later.';
+            case 'reject': return '🚫 Rejected. Please contact support@platform.com.';
+            default: return 'ℹ️ Unknown status.';
         }
     }
 }

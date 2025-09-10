@@ -1,116 +1,102 @@
-import {
-    Component,
-    ChangeDetectionStrategy,
-    Output,
-    EventEmitter,
-    ChangeDetectorRef
-} from '@angular/core';
+import { Component, ChangeDetectionStrategy, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { FormGroup, FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from "@angular/router";
+import { MaterialModule } from '../material.module';
 import { MyPlatformService } from "../my-platform-service";
+import {MatSelectModule} from "@angular/material/select";
 
 @Component({
     selector: 'app-signup',
     standalone: true,
-    imports: [CommonModule, ReactiveFormsModule],
+    imports: [CommonModule, ReactiveFormsModule, MaterialModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
 
-      <div class="form-group">
-        <label for="userType">Type</label>
-        <select id="userType" formControlName="userType" required>
-          <option *ngFor="let type of userTypes" [value]="type.value" [disabled]="type.disabled">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Type</mat-label>
+        <mat-select formControlName="userType">
+          <mat-option *ngFor="let type of userTypes" [value]="type.value" [disabled]="type.disabled">
             {{ type.label }}
-          </option>
-        </select>
-        <div *ngIf="individualDisabledMessage" class="info">{{ individualDisabledMessage }}</div>
-      </div>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+      <div *ngIf="individualDisabledMessage" class="info">{{ individualDisabledMessage }}</div>
 
-      <div class="form-group">
-        <label for="activityReason">Reason of activity</label>
-        <select id="activityReason" formControlName="activityReason" required>
-          <option value="" disabled selected>Select one reason</option>
-          <option value="marketplace">Marketplace</option>
-          <option value="embeddedPayment">Embedded Payment</option>
-          <option value="financialProduct">Financial Product</option>
-        </select>
-      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Reason of activity</mat-label>
+        <mat-select formControlName="activityReason">
+          <mat-option value="marketplace">Marketplace</mat-option>
+          <mat-option value="embeddedPayment">Embedded Payment</mat-option>
+          <mat-option value="financialProduct">Financial Product</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-      <div class="form-group" *ngIf="form.get('legalEntityName')">
-        <label for="companyName">Company name</label>
-        <input id="companyName" formControlName="legalEntityName" type="text" required
-          [class.invalid]="companyNameInvalid()" />
-        <div *ngIf="companyNameInvalid()" class="error">
-          Company name required (min 3 characters).
-        </div>
-      </div>
+      <mat-form-field *ngIf="form.get('legalEntityName')" appearance="outline" class="full-width">
+        <mat-label>Company name</mat-label>
+        <input matInput formControlName="legalEntityName" />
+        <mat-error *ngIf="companyNameInvalid()">Company name required (min 3 characters).</mat-error>
+      </mat-form-field>
 
-      <div class="form-group" *ngIf="form.get('firstName')">
-        <label for="firstName">First name</label>
-        <input id="firstName" formControlName="firstName" type="text" required
-          [class.invalid]="firstNameInvalid()" />
-        <div *ngIf="firstNameInvalid()" class="error">
-          First name required.
-        </div>
-      </div>
+      <mat-form-field *ngIf="form.get('firstName')" appearance="outline" class="full-width">
+        <mat-label>First name</mat-label>
+        <input matInput formControlName="firstName" />
+        <mat-error *ngIf="firstNameInvalid()">First name required.</mat-error>
+      </mat-form-field>
 
-      <div class="form-group" *ngIf="form.get('lastName')">
-        <label for="lastName">Last name</label>
-        <input id="lastName" formControlName="lastName" type="text" required
-          [class.invalid]="lastNameInvalid()" />
-        <div *ngIf="lastNameInvalid()" class="error">
-          Last name required.
-        </div>
-      </div>
+      <mat-form-field *ngIf="form.get('lastName')" appearance="outline" class="full-width">
+        <mat-label>Last name</mat-label>
+        <input matInput formControlName="lastName" />
+        <mat-error *ngIf="lastNameInvalid()">Last name required.</mat-error>
+      </mat-form-field>
 
-      <div class="form-group">
-        <label for="country">Country</label>
-        <select id="country" formControlName="countryCode" required>
-          <option value="NL">Netherlands</option>
-          <option value="FR">France</option>
-          <option value="GB">United Kingdom</option>
-          <option value="DE">Germany</option>
-          <option value="US">United States</option>
-        </select>
-      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Country</mat-label>
+        <mat-select formControlName="countryCode">
+          <mat-option value="NL">Netherlands</mat-option>
+          <mat-option value="FR">France</mat-option>
+          <mat-option value="GB">United Kingdom</mat-option>
+          <mat-option value="DE">Germany</mat-option>
+          <mat-option value="US">United States</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-      <div class="form-group">
-        <label for="currency">Currency</label>
-        <select id="currency" formControlName="currencyCode" required>
-          <option value="EUR">EUR</option>
-          <option value="GBP">GBP</option>
-          <option value="USD">USD</option>
-        </select>
-      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Currency</mat-label>
+        <mat-select formControlName="currencyCode">
+          <mat-option value="EUR">EUR</mat-option>
+          <mat-option value="GBP">GBP</mat-option>
+          <mat-option value="USD">USD</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input id="email" formControlName="email" type="email" required
-          [class.invalid]="emailInvalid()" />
-        <div *ngIf="emailInvalid()" class="error">
-          Input valid email.
-        </div>
-      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email" />
+        <mat-error *ngIf="emailInvalid()">Input valid email.</mat-error>
+      </mat-form-field>
 
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input id="password" formControlName="password" type="password" required
-          [class.invalid]="passwordInvalid()" />
-        <div *ngIf="passwordInvalid()" class="error">
-          Password required (min 4 characters).
-        </div>
-      </div>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Password</mat-label>
+        <input matInput type="password" formControlName="password" />
+        <mat-error *ngIf="passwordInvalid()">Password required (min 4 characters).</mat-error>
+      </mat-form-field>
 
-      <button type="submit" [disabled]="form.invalid">Signup</button>
+      <button mat-raised-button color="accent" class="full-width" [disabled]="form.invalid">Sign Up</button>
       <div *ngIf="error" class="error">{{ error }}</div>
-
     </form>
   `,
-    host: {
-        class: 'auth-root'
+    styles: [`
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
+    .full-width { width: 100%; }
+    .info { font-size: 0.9rem; color: #555; margin-bottom: 0.5rem; }
+    .error { color: red; margin-top: 0.5rem; text-align: center; }
+  `]
 })
 export class SignupComponent {
     form: FormGroup;
@@ -139,7 +125,7 @@ export class SignupComponent {
             countryCode: ['NL'],
             currencyCode: ['EUR'],
             userType: ['organization'],
-            activityReason: ['marketplace', Validators.required] // Sélection unique
+            activityReason: ['marketplace', Validators.required]
         });
 
         this.form.get('userType')!.valueChanges.subscribe(type => this.updateUserTypeControls(type));
@@ -166,12 +152,10 @@ export class SignupComponent {
             disabled: type.value === 'individual' && restrictIndividual
         }));
 
-        // Message explicatif
         this.individualDisabledMessage = restrictIndividual
             ? "You cannot select 'Individual' if activity is Embedded Payment or Financial Product."
             : null;
 
-        // Si current userType est individual et devient interdit, on reset
         if (restrictIndividual && this.form.get('userType')!.value === 'individual') {
             this.form.get('userType')!.setValue('organization');
         }
@@ -179,60 +163,41 @@ export class SignupComponent {
         this.cdr.markForCheck();
     }
 
-    companyNameInvalid() {
-        const control = this.form.get('legalEntityName');
-        return control && control.invalid && (control.dirty || control.touched);
-    }
-
-    firstNameInvalid() {
-        const control = this.form.get('firstName');
-        return control && control.invalid && (control.dirty || control.touched);
-    }
-
-    lastNameInvalid() {
-        const control = this.form.get('lastName');
-        return control && control.invalid && (control.dirty || control.touched);
-    }
-
-    emailInvalid() {
-        const control = this.form.get('email');
-        return control && control.invalid && (control.dirty || control.touched);
-    }
-
-    passwordInvalid() {
-        const control = this.form.get('password');
-        return control && control.invalid && (control.dirty || control.touched);
-    }
+    companyNameInvalid() { const c = this.form.get('legalEntityName'); return c && c.invalid && (c.dirty || c.touched); }
+    firstNameInvalid() { const c = this.form.get('firstName'); return c && c.invalid && (c.dirty || c.touched); }
+    lastNameInvalid() { const c = this.form.get('lastName'); return c && c.invalid && (c.dirty || c.touched); }
+    emailInvalid() { const c = this.form.get('email'); return c && c.invalid && (c.dirty || c.touched); }
+    passwordInvalid() { const c = this.form.get('password'); return c && c.invalid && (c.dirty || c.touched); }
 
     onSubmit() {
-        if (this.form.valid) {
-            this.error = null;
-            let payload = { ...this.form.value };
-            if (payload.userType === 'individual') {
-                delete payload.legalEntityName;
-            } else {
-                delete payload.firstName;
-                delete payload.lastName;
-            }
+        if (!this.form.valid) return;
+        this.error = null;
 
-            this.authService.signup(payload).subscribe({
-                next: (res) => {
-                    if (res.id) {
-                        this.router.navigate([`/${res.id}/dashboard`]);
-                        this.signupSuccess.emit(res);
-                    }
-                },
-                error: (err) => {
-                    if (err.status === 409 || err.error === 'ErrorEmailAlreadyExists') {
-                        this.error = 'Email already exists';
-                    } else if (err.status === 400) {
-                        this.error = 'Invalid signup data';
-                    } else {
-                        this.error = 'Signup failed. Please retry.';
-                    }
-                    this.cdr.markForCheck();
-                }
-            });
+        let payload = { ...this.form.value };
+        if (payload.userType === 'individual') {
+            delete payload.legalEntityName;
+        } else {
+            delete payload.firstName;
+            delete payload.lastName;
         }
+
+        this.authService.signup(payload).subscribe({
+            next: (res) => {
+                if (res.id) {
+                    this.router.navigate([`/${res.id}/dashboard`]);
+                    this.signupSuccess.emit(res);
+                }
+            },
+            error: (err) => {
+                if (err.status === 409 || err.error === 'ErrorEmailAlreadyExists') {
+                    this.error = 'Email already exists';
+                } else if (err.status === 400) {
+                    this.error = 'Invalid signup data';
+                } else {
+                    this.error = 'Signup failed. Please retry.';
+                }
+                this.cdr.markForCheck();
+            }
+        });
     }
 }
