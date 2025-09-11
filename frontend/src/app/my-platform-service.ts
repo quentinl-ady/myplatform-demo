@@ -31,6 +31,24 @@ export interface BusinessLine {
   salesChannels: string[];
 }
 
+export interface User {
+  id: number;
+  email: string;
+  legalEntityName: string;
+  countryCode: string;
+  userType: string;
+  legalEntityId: string;
+  firstName: string | null;
+  lastName: string | null;
+  accountHolderId: string;
+  currencyCode: string;
+  balanceAccountId: string;
+  activityReason: string;
+  bank: boolean;
+  capital: boolean;
+  issuing: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -83,6 +101,10 @@ export class MyPlatformService {
     return this.http.post<BusinessLine>(`${this.baseUrl}/activity/${userId}`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
+  }
+
+  getUserById(userId: number): Observable<User> {
+    return this.http.get<User>(`${this.baseUrl}/user/${userId}`);
   }
 
 }

@@ -11,7 +11,7 @@ import {MatInputModule} from '@angular/material/input';
 import {MatBadgeModule} from '@angular/material/badge';
 import {CommonModule} from "@angular/common";
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
-import {MyPlatformService, OnboardingPart, OnboardingResponse} from "../my-platform-service";
+import {MyPlatformService, OnboardingPart, OnboardingResponse, User} from "../my-platform-service";
 import {MaterialModule} from "../material.module";
 import {INDUSTRY_CODES} from "../industry-codes";
 
@@ -74,7 +74,8 @@ export interface BusinessLine {
     </mat-card>
 
     <!-- BUSINESS LINES -->
-    <mat-card class="business-card">
+    <mat-card class="business-card"
+          *ngIf="user() && !(user()?.activityReason === 'marketplace' && user()?.bank === false)">
       <h2>Business Activity</h2>
 
       <!-- Existing Business Lines -->
@@ -179,6 +180,7 @@ export class DashboardComponent {
     readonly status = signal<OnboardingResponse | null>(null);
     readonly loading = signal(false);
     readonly businessLines = signal<BusinessLine[]>([]);
+    readonly user = signal<User | null>(null);
     submitting = false;
 
     readonly INDUSTRY_CODES = INDUSTRY_CODES;
@@ -202,7 +204,20 @@ export class DashboardComponent {
     ngOnInit() {
         this.route.parent?.paramMap.subscribe(params => {
             this.userId = params.get('id') || '';
-            this.loadBusinessLines();
+            this.authService.getUserById(Number(this.userId)).subscribe({
+                next: (u) => {
+                    this.user.set(u);
+
+                    // 👉 Charger les business lines uniquement si
+                    // ce n’est pas un marketplace sans bank
+                    if (!(u.activityReason === 'marketplace' && u.bank === false)) {
+                        this.loadBusinessLines();
+                    }
+                },
+                error: () => {
+                    this.matSnackBar.open('Error fetching user data', 'Close', {duration: 3000});
+                }
+            });
         });
     }
 
