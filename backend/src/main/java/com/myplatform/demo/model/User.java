@@ -22,4 +22,8 @@ public class User {
     private String accountHolderId; //mapping 1-1 AH <-> LE <-> BA
     private String currencyCode;
     private String balanceAccountId; //mapping 1-1 AH <-> LE <-> BA
+    private String activityReason;
+    private Boolean bank;
+    private Boolean capital;
+    private Boolean issuing;
 }

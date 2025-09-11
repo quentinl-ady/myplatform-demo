@@ -25,6 +25,12 @@ export interface SessionToken {
   token: string;
 }
 
+export interface BusinessLine {
+  id:string;
+  industryCode: string;
+  salesChannels: string[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -68,4 +74,15 @@ export class MyPlatformService {
   getBusinessLoans(userId: string): Observable<SessionToken> {
     return this.http.get<SessionToken>(`${this.baseUrl}/businessLoans/${userId}`);
   }
+
+  getBusinessLines(userId: number): Observable<BusinessLine[]> {
+    return this.http.get<BusinessLine[]>(`${this.baseUrl}/activity/${userId}`);
+  }
+
+  addBusinessLine(userId: number, payload: { industryCode: string; salesChannels: string[] }): Observable<BusinessLine> {
+    return this.http.post<BusinessLine>(`${this.baseUrl}/activity/${userId}`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
 }

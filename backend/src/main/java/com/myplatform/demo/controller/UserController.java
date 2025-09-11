@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.model.Activity;
 import com.myplatform.demo.model.KycStatus;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
@@ -68,6 +69,20 @@ public class UserController {
     @GetMapping("/users")
     public List<User> allUsers() {
         return userRepository.findAll();
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<?> user(@PathVariable Long userId){
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            user.setPassword("****");
+
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
     }
 
 
@@ -196,6 +211,41 @@ public class UserController {
                     "Capital Component: Manage"
             });
             return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/activity/{userId}")
+    public ResponseEntity<?> createActivity(@PathVariable Long userId, @RequestBody Activity activity) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            Activity activityResponse = adyenService.createBusinessLine(activity, user.getLegalEntityId());
+            return ResponseEntity.ok(activityResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @GetMapping("/activity/{userId}")
+    public ResponseEntity<?> getActivity(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            List<Activity> activities = adyenService.getBusinessLine(user.getLegalEntityId());
+            return ResponseEntity.ok(activities);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }
