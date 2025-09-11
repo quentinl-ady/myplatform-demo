@@ -208,8 +208,6 @@ export class DashboardComponent {
                 next: (u) => {
                     this.user.set(u);
 
-                    // 👉 Charger les business lines uniquement si
-                    // ce n’est pas un marketplace sans bank
                     if (!(u.activityReason === 'marketplace' && u.bank === false)) {
                         this.loadBusinessLines();
                     }
