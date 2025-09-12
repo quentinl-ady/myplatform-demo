@@ -1,0 +1,26 @@
+export const INDUSTRY_CODES = [
+    { code: '23', label: 'Construction & installation' },
+    { code: '311', label: 'Food manufacturing' },
+    { code: '4451', label: 'Grocery stores, Supermarkets' },
+    { code: '722511', label: 'Full-service restaurants' },
+    { code: '722513', label: 'Limited-service restaurants (Fast food)' },
+    { code: '8111', label: 'Automotive repair and maintenance' },
+    { code: '81211', label: 'Hair, nail, and skin care services' },
+    { code: '541211', label: 'Offices of certified public accountants' },
+    { code: '541213', label: 'Tax preparation services' },
+    { code: '5413', label: 'Architectural, engineering, and related services' },
+    { code: '5415', label: 'Computer systems design and related services' },
+    { code: '5416', label: 'Management, scientific, and technical consulting services' },
+    { code: '4238', label: 'Machinery, equipment, and supplies merchant wholesalers' },
+    { code: '4244', label: 'Grocery and related products merchant wholesalers' },
+    { code: '44811', label: "Men's clothing stores" },
+    { code: '44812', label: "Women's clothing stores" },
+    { code: '44814', label: 'Family clothing stores' },
+    { code: '443142', label: 'Electronics stores' },
+    { code: '442A', label: 'Furniture stores' },
+    { code: '493', label: 'Warehousing and storage' },
+    { code: '484', label: 'Truck transportation' },
+    { code: '72111', label: 'Hotels (except casino hotels) and motels' },
+    { code: '6244', label: 'Child day care services' }
+];
+

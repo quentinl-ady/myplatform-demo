@@ -16,5 +16,5 @@ public class RequestStore {
     String reference;
     String phoneNumber;
     String balanceAccountId; //BA3296H223229L5N5M6TCG6PF
-    List<String> paymentMethodRequest; //visa //mc //cartesBancaire
+    List<String> paymentMethodRequest; //visa //mc //cartebancaire //amex
 }
