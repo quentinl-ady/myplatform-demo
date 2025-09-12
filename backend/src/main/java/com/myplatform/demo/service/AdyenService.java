@@ -2,20 +2,21 @@ package com.myplatform.demo.service;
 
 import com.adyen.Client;
 import com.adyen.enums.Environment;
-import com.adyen.model.balanceplatform.AccountHolder;
-import com.adyen.model.balanceplatform.AccountHolderInfo;
-import com.adyen.model.balanceplatform.BalanceAccount;
-import com.adyen.model.balanceplatform.BalanceAccountInfo;
+import com.adyen.model.balanceplatform.*;
 import com.adyen.model.legalentitymanagement.*;
+import com.adyen.model.legalentitymanagement.Address;
+import com.adyen.model.legalentitymanagement.Name;
+import com.adyen.model.management.*;
 import com.adyen.service.balanceplatform.AccountHoldersApi;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.BusinessLinesApi;
 import com.adyen.service.legalentitymanagement.HostedOnboardingApi;
 import com.adyen.service.legalentitymanagement.LegalEntitiesApi;
-import com.myplatform.demo.model.Activity;
-import com.myplatform.demo.model.KycStatus;
-import com.myplatform.demo.model.Status;
+import com.adyen.service.management.AccountStoreLevelApi;
+import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
+import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
+import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,7 +30,8 @@ import java.net.http.HttpResponse.BodyHandlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +45,10 @@ public class AdyenService {
     private final String balancePlatformApiKey;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final AccountStoreLevelApi accountStoreLevelApi;
+    private final PaymentMethodsMerchantLevelApi paymentMethodsMerchantLevelApi;
+    private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
+    private final String merchantAccount;
 
     Map<String, String> languageMap = Map.of(
             "FR", "fr-FR",
@@ -53,14 +59,24 @@ public class AdyenService {
     );
 
 
-    public AdyenService(@Value("${adyen.lemApiKey}") String apiKey) {
-        Client client = new Client(apiKey, Environment.TEST);
-        lem = new LegalEntitiesApi(client);
-        hop = new HostedOnboardingApi(client);
-        accountHoldersApi = new AccountHoldersApi(client);
-        balanceAccountsApi = new BalanceAccountsApi(client);
-        businessLinesApi = new BusinessLinesApi(client);
-        balancePlatformApiKey = apiKey;
+    public AdyenService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
+                        @Value("${adyen.pspApiKey") String pspApiKey,
+                        @Value("${adyen.merchantAccount}") String merchantAccount) {
+        Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
+        Client pspClient = new Client(pspApiKey,Environment.TEST);
+
+        lem = new LegalEntitiesApi(balancePlatformClient);
+        hop = new HostedOnboardingApi(balancePlatformClient);
+        accountHoldersApi = new AccountHoldersApi(balancePlatformClient);
+        balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
+        businessLinesApi = new BusinessLinesApi(balancePlatformClient);
+        this.balancePlatformApiKey = balancePlatformApiKey;
+
+        accountStoreLevelApi = new AccountStoreLevelApi(pspClient);
+        paymentMethodsMerchantLevelApi = new PaymentMethodsMerchantLevelApi(pspClient);
+        splitConfigurationMerchantLevelApi = new SplitConfigurationMerchantLevelApi(pspClient);
+        this.merchantAccount = merchantAccount;
+
         httpClient = HttpClient.newHttpClient();
         objectMapper = new ObjectMapper();
     }
@@ -167,7 +183,8 @@ public class AdyenService {
     public String createBalanceAccountId(String accountHolderId, String currencyCode) throws IOException, ApiException {
         BalanceAccountInfo balanceAccountInfo = new BalanceAccountInfo()
                 .accountHolderId(accountHolderId)
-                .defaultCurrencyCode(currencyCode);
+                .defaultCurrencyCode(currencyCode)
+                .description("Main Balance Account");
 
         BalanceAccount balanceAccount = balanceAccountsApi.createBalanceAccount(balanceAccountInfo);
         return balanceAccount.getId();
@@ -237,5 +254,162 @@ public class AdyenService {
         } else {
             throw new RuntimeException("Error create session: " + response.body());
         }
+    }
+
+    public List<BalanceAccountInfoCustomer> getBalanceAccount(String accountHolderId) throws IOException, ApiException {
+       PaginatedBalanceAccountsResponse paginatedBalanceAccountsResponse = accountHoldersApi.getAllBalanceAccountsOfAccountHolder(accountHolderId);
+       List<BalanceAccountBase> balanceAccounts = paginatedBalanceAccountsResponse.getBalanceAccounts();
+
+
+        return balanceAccounts.stream()
+                .map(account -> {
+                    BalanceAccountInfoCustomer customer = new BalanceAccountInfoCustomer();
+                    customer.setCurrencyCode(account.getDefaultCurrencyCode());
+                    customer.setDescription(account.getDescription());
+                    customer.setBalanceAccountId(account.getId());
+                    return customer;
+                })
+                .toList();
+    }
+
+
+    public StoreCustomer createStore(String legalEntityId, List<String> businessLineId, String city, String country, String postalCode, String lineAdresse1, String storeReference, String legalEntityName, String phoneNumber, String balanceAccountId, List<String> paymentMethodRequest) throws IOException, ApiException {
+        StoreCreationRequest storeCreationRequest = new StoreCreationRequest();
+
+
+        storeCreationRequest.setBusinessLineIds(businessLineId);
+        StoreLocation storeLocation = new StoreLocation()
+                .city(city)
+                .country(country)
+                .postalCode(postalCode)
+                .line1(lineAdresse1);
+
+        if(country.equals("US")) {
+            storeLocation.setPostalCode("NY"); //workaround, keep the UI simple.
+        }
+
+        storeCreationRequest.address(storeLocation);
+        storeCreationRequest.setDescription("MyPlatform " + storeReference);
+        storeCreationRequest.setReference(storeReference);
+        storeCreationRequest.setShopperStatement(legalEntityName);
+        storeCreationRequest.setPhoneNumber(phoneNumber);
+        StoreSplitConfiguration storeSplitConfiguration = new StoreSplitConfiguration();
+        storeSplitConfiguration.setBalanceAccountId(balanceAccountId);
+        storeSplitConfiguration.setSplitConfigurationId(createSplitConfiguration(balanceAccountId).getSplitConfigurationId());
+
+        storeCreationRequest.setSplitConfiguration(storeSplitConfiguration);
+
+        Store store = accountStoreLevelApi.createStoreByMerchantId(merchantAccount, storeCreationRequest);
+
+        requestPaymentMethod(paymentMethodRequest, legalEntityId, store.getId());
+        StoreCustomer storeCustomer = new StoreCustomer();
+        storeCustomer.setStoreRef(storeReference);
+        storeCustomer.setCity(city);
+        storeCustomer.setCountry(country);
+        storeCustomer.setLineAdresse(lineAdresse1);
+        storeCustomer.setPhoneNumber(phoneNumber);
+
+        return storeCustomer;
+    }
+
+    public SplitConfiguration createSplitConfiguration(String balanceAccountId) throws IOException, ApiException {
+        String currencyCode = balanceAccountsApi.getBalanceAccount(balanceAccountId).getDefaultCurrencyCode();
+
+        List<SplitConfiguration> splitConfigurationList = splitConfigurationMerchantLevelApi.listSplitConfigurations(merchantAccount).getData();
+        String description = "DEFAULT CONTRACT myPlatform.com " + currencyCode;
+
+        SplitConfiguration splitConfiguration1 = splitConfigurationList.stream()
+                .filter(sc -> description.equals(sc.getDescription()))
+                .findFirst()
+                .orElse(null);
+
+        if (splitConfiguration1 == null) {
+            SplitConfiguration splitConfiguration = new SplitConfiguration();
+            splitConfiguration.setDescription(description);
+            List<SplitConfigurationRule> rules = new ArrayList<>();
+            rules.add(new SplitConfigurationRule()
+                    .currency(currencyCode)
+                    .fundingSource(SplitConfigurationRule.FundingSourceEnum.ANY)
+                    .paymentMethod("ANY")
+                    .shopperInteraction(SplitConfigurationRule.ShopperInteractionEnum.ANY)
+                    .splitLogic(new SplitConfigurationLogic()
+                            .commission(new Commission()
+                                    .variablePercentage(1000L))
+                            .paymentFee(SplitConfigurationLogic.PaymentFeeEnum.DEDUCTFROMLIABLEACCOUNT)));
+            splitConfiguration.setRules(rules);
+
+            return splitConfigurationMerchantLevelApi.createSplitConfiguration(merchantAccount, splitConfiguration);
+        } else {
+            return splitConfiguration1;
+        }
+    }
+
+    public void requestPaymentMethod(List<String> paymentMethodRequest, String legalEntityId, String storeId)
+            throws IOException, ApiException {
+
+        List<BusinessLine> businessLines =
+                lem.getAllBusinessLinesUnderLegalEntity(legalEntityId).getBusinessLines();
+
+        for (BusinessLine businessLine : businessLines) {
+            for (String paymentMethod : paymentMethodRequest) {
+
+                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
+                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
+                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
+                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue(paymentMethod));
+
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            }
+        }
+
+        if (paymentMethodRequest.contains("cartebancaire")) {
+            for (BusinessLine businessLine : businessLines) {
+
+                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
+                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
+                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
+                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("cartebancaire"));
+                paymentMethodSetupInfo.cartesBancaires(new CartesBancairesInfo().siret("54205118000066"));
+
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            }
+        }
+
+        if (paymentMethodRequest.contains("amex")) {
+            for (BusinessLine businessLine : businessLines) {
+
+                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
+                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
+                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
+                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("amex"));
+                paymentMethodSetupInfo.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
+
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            }
+        }
+    }
+
+    public List<PaymentMethodCustomer> getAllPaymentMethod(String storeId) throws IOException, ApiException {
+
+        PaymentMethodResponse paymentMethodResponse = paymentMethodsMerchantLevelApi.getAllPaymentMethods(merchantAccount, storeId, null, 100, 1, null);
+        List<PaymentMethod> paymentMethods = paymentMethodResponse.getData();
+
+        return paymentMethods.stream()
+                .map(paymentMethod -> {
+                    PaymentMethodCustomer paymentMethodCustomer = new PaymentMethodCustomer();
+                    paymentMethodCustomer.setType(paymentMethod.getType());
+                    paymentMethodCustomer.setVerificationStatus(paymentMethod.getVerificationStatus().getValue());
+                    return paymentMethodCustomer;
+                })
+                .toList();
+    }
+
+    public BalanceAccountInfoCustomer getOneBalanceAccount(String balanceAccountId) throws IOException, ApiException {
+        BalanceAccount balanceAccount = balanceAccountsApi.getBalanceAccount(balanceAccountId);
+        BalanceAccountInfoCustomer balanceAccountInfoCustomer = new BalanceAccountInfoCustomer();
+        balanceAccountInfoCustomer.setCurrencyCode(balanceAccount.getDefaultCurrencyCode());
+        balanceAccountInfoCustomer.setDescription(balanceAccount.getDescription());
+        balanceAccountInfoCustomer.setBalanceAccountId(balanceAccount.getId());
+        return balanceAccountInfoCustomer;
     }
 }

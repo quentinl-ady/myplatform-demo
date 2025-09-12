@@ -2,4 +2,8 @@ spring.datasource.url=jdbc:sqlite:users.db
 spring.datasource.driver-class-name=org.sqlite.JDBC
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect
-adyen.lemApiKey=
+adyen.balancePlatformApiKey=
+adyen.merchantAccount=
+adyen.pspApiKey=
+
+#Rename me application.properties

@@ -1,8 +1,8 @@
 package com.myplatform.demo.controller;
 
-import com.myplatform.demo.model.Activity;
-import com.myplatform.demo.model.KycStatus;
-import com.myplatform.demo.model.User;
+import com.adyen.service.exception.ApiException;
+import com.myplatform.demo.model.*;
+import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.AdyenService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,6 +20,9 @@ public class UserController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private StoreCustomerRepository storeCustomerRepository;
 
     @Autowired
     private AdyenService adyenService;
@@ -251,6 +255,86 @@ public class UserController {
         }
     }
 
+    @GetMapping("/accounts/{userId}")
+    public ResponseEntity<?> getAllAccountsOfUser(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            List<BalanceAccountInfoCustomer> balanceAccountInfoCustomers = adyenService.getBalanceAccount(user.getAccountHolderId());
+            return ResponseEntity.ok(balanceAccountInfoCustomers);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/account/{balanceAccountId}")
+    public ResponseEntity<?> getAccount(@PathVariable String balanceAccountId) {
+        BalanceAccountInfoCustomer balanceAccountInfoCustomer = null;
+        try {
+            balanceAccountInfoCustomer = adyenService.getOneBalanceAccount(balanceAccountId);
+            return ResponseEntity.ok(balanceAccountInfoCustomer);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @PostMapping("/store/{userId}")
+    public ResponseEntity<?> createStore(@PathVariable Long userId, @RequestBody RequestStore requestStore) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            StoreCustomer storeCustomer = adyenService.createStore(
+                    user.getLegalEntityId(),
+                    requestStore.getBusinessLineId(),
+                    requestStore.getCity(),
+                    requestStore.getCountry(),
+                    requestStore.getPostalCode(),
+                    requestStore.getLineAdresse1(),
+                    requestStore.getReference(),
+                    user.getLegalEntityName(),
+                    requestStore.getPhoneNumber(),
+                    requestStore.getBalanceAccountId(),
+                    requestStore.getPaymentMethodRequest()
+            );
+
+            storeCustomer.setBalanceAccountInfoCustomer(adyenService.getOneBalanceAccount(requestStore.getBalanceAccountId()));
+            storeCustomer.setPaymentMethodCustomer(adyenService.getAllPaymentMethod(requestStore.getReference()));
+            storeCustomer.setUser(user);
+
+            storeCustomerRepository.save(storeCustomer);
+
+            return ResponseEntity.ok(storeCustomer);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/stores/{userId}")
+    public ResponseEntity<?> getAllStore(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+
+            if (user.getStoresCustomer() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no store");
+            }
+
+            return ResponseEntity.ok(user.getStoresCustomer());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
 
 }
