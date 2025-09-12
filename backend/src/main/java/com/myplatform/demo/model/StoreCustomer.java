@@ -17,6 +17,8 @@ public class StoreCustomer {
 
     String storeRef;
 
+    String storeId;
+
     @Embedded
     BalanceAccountInfoCustomer balanceAccountInfoCustomer;
 

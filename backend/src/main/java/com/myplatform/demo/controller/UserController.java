@@ -1,6 +1,7 @@
 package com.myplatform.demo.controller;
 
-import com.adyen.service.exception.ApiException;
+import com.myplatform.demo.dto.*;
+import com.myplatform.demo.dto.StoreCustomerDTO;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
@@ -10,7 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -81,9 +82,8 @@ public class UserController {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            user.setPassword("****");
-
-            return ResponseEntity.ok(user);
+            UserDTO dto = DTOMapper.toUserDTO(user);
+            return ResponseEntity.ok(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }
@@ -310,14 +310,16 @@ public class UserController {
 
             storeCustomer.setBalanceAccountInfoCustomer(adyenService.getOneBalanceAccount(requestStore.getBalanceAccountId()));
 
-            List<PaymentMethodCustomer> paymentMethodCustomer = adyenService.getAllPaymentMethod(requestStore.getReference());
+            List<PaymentMethodCustomer> paymentMethodCustomer = adyenService.getAllPaymentMethod(storeCustomer.getStoreId());
 
             storeCustomer.setPaymentMethodCustomers(paymentMethodCustomer);
             storeCustomer.setUser(user);
 
-            storeCustomerRepository.save(storeCustomer);
+            StoreCustomer savedStoreCustomer = storeCustomerRepository.save(storeCustomer);
 
-            return ResponseEntity.ok(storeCustomer);
+            StoreCustomerDTO dto = DTOMapper.toStoreCustomerDTO(savedStoreCustomer);
+
+            return ResponseEntity.ok(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }
@@ -329,12 +331,28 @@ public class UserController {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-
             if (user.getStoresCustomer() == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no store");
             }
 
-            return ResponseEntity.ok(user.getStoresCustomer());
+            //Refresh database
+            List<StoreCustomer> stores = new ArrayList<>(user.getStoresCustomer());
+
+            for (StoreCustomer storeCustomer : stores) {
+                List<PaymentMethodCustomer> paymentMethods = adyenService.getAllPaymentMethod(storeCustomer.getStoreId());
+                storeCustomer.getPaymentMethodCustomers().clear();
+                for (PaymentMethodCustomer pm : paymentMethods) {
+                    pm.setStoreCustomer(storeCustomer);
+                    storeCustomer.getPaymentMethodCustomers().add(pm);
+                }
+            }
+            storeCustomerRepository.saveAll(stores);
+
+            List<StoreCustomerDTO> storeDTOs = stores.stream()
+                    .map(DTOMapper::toStoreCustomerDTO)
+                    .toList();
+
+            return ResponseEntity.ok(storeDTOs);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }

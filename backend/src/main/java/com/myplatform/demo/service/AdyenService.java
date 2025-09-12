@@ -60,7 +60,7 @@ public class AdyenService {
 
 
     public AdyenService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
-                        @Value("${adyen.pspApiKey") String pspApiKey,
+                        @Value("${adyen.pspApiKey}") String pspApiKey,
                         @Value("${adyen.merchantAccount}") String merchantAccount) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         Client pspClient = new Client(pspApiKey,Environment.TEST);
@@ -308,6 +308,7 @@ public class AdyenService {
         storeCustomer.setCountry(country);
         storeCustomer.setLineAdresse(lineAdresse1);
         storeCustomer.setPhoneNumber(phoneNumber);
+        storeCustomer.setStoreId(store.getId());
 
         return storeCustomer;
     }
@@ -315,7 +316,7 @@ public class AdyenService {
     public SplitConfiguration createSplitConfiguration(String balanceAccountId) throws IOException, ApiException {
         String currencyCode = balanceAccountsApi.getBalanceAccount(balanceAccountId).getDefaultCurrencyCode();
 
-        List<SplitConfiguration> splitConfigurationList = splitConfigurationMerchantLevelApi.listSplitConfigurations(merchantAccount).getData();
+        List<SplitConfiguration> splitConfigurationList = splitConfigurationMerchantLevelApi.listSplitConfigurations(this.merchantAccount).getData();
         String description = "DEFAULT CONTRACT myPlatform.com " + currencyCode;
 
         SplitConfiguration splitConfiguration1 = splitConfigurationList.stream()
@@ -350,15 +351,18 @@ public class AdyenService {
         List<BusinessLine> businessLines =
                 lem.getAllBusinessLinesUnderLegalEntity(legalEntityId).getBusinessLines();
 
+        List<String> specificPM = new ArrayList<>(List.of("cartebancaire", "amex"));
+
         for (BusinessLine businessLine : businessLines) {
             for (String paymentMethod : paymentMethodRequest) {
 
-                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
-                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
-                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
-                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue(paymentMethod));
-
-                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+                if (!specificPM.contains(paymentMethod)) {
+                    PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
+                    paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
+                    paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
+                    paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue(paymentMethod));
+                    paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+                }
             }
         }
 
