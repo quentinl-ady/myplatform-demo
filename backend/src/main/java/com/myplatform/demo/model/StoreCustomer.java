@@ -16,8 +16,14 @@ public class StoreCustomer {
     private Long id;
 
     String storeRef;
+
+    @Embedded
     BalanceAccountInfoCustomer balanceAccountInfoCustomer;
-    List<PaymentMethodCustomer> paymentMethodCustomer;
+
+
+    @OneToMany(mappedBy = "storeCustomer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<PaymentMethodCustomer> paymentMethodCustomers;
+
     String country;
     String city;
     String lineAdresse;

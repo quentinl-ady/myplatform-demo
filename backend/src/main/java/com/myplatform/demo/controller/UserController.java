@@ -309,7 +309,10 @@ public class UserController {
             );
 
             storeCustomer.setBalanceAccountInfoCustomer(adyenService.getOneBalanceAccount(requestStore.getBalanceAccountId()));
-            storeCustomer.setPaymentMethodCustomer(adyenService.getAllPaymentMethod(requestStore.getReference()));
+
+            List<PaymentMethodCustomer> paymentMethodCustomer = adyenService.getAllPaymentMethod(requestStore.getReference());
+
+            storeCustomer.setPaymentMethodCustomers(paymentMethodCustomer);
             storeCustomer.setUser(user);
 
             storeCustomerRepository.save(storeCustomer);
