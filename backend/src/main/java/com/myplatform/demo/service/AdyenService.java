@@ -387,6 +387,7 @@ public class AdyenService {
                 paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
                 paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("amex"));
                 paymentMethodSetupInfo.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
+                paymentMethodSetupInfo.setCurrencies(new ArrayList<>(List.of("EUR")));
 
                 paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
             }

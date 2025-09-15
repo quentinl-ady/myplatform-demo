@@ -49,6 +49,35 @@ export interface User {
   issuing: boolean;
 }
 
+export interface BalanceAccount {
+  currencyCode: string;
+  description: string;
+  balanceAccountId: string;
+}
+
+export interface StorePayload {
+  businessLineId: string[];
+  city: string;
+  country: string;
+  postalCode: string;
+  lineAdresse1: string;
+  reference: string;
+  phoneNumber: string;
+  balanceAccountId: string;
+  paymentMethodRequest: string[]; //visa //mc //cartebancaire //amex
+}
+
+export interface Store {
+  storeId: string;
+  storeRef: string;
+  city: string;
+  country: string;
+  lineAdresse: string;
+  phoneNumber: string;
+  balanceAccountInfoCustomer: BalanceAccount;
+  paymentMethods: { type: string; verificationStatus: VerificationStatus }[];
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -105,6 +134,20 @@ export class MyPlatformService {
 
   getUserById(userId: number): Observable<User> {
     return this.http.get<User>(`${this.baseUrl}/user/${userId}`);
+  }
+
+  getBalanceAccounts(userId: number): Observable<BalanceAccount[]> {
+    return this.http.get<BalanceAccount[]>(`${this.baseUrl}/accounts/${userId}`);
+  }
+
+  createStore(userId: number, payload: StorePayload): Observable<Store> {
+    return this.http.post<Store>(`${this.baseUrl}/store/${userId}`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  getStores(userId: number): Observable<Store[]> {
+    return this.http.get<Store[]>(`${this.baseUrl}/stores/${userId}`);
   }
 
 }

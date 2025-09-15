@@ -8,6 +8,7 @@ import {ReportComponent} from "./report/report.component";
 import {PayoutComponent} from "./payout/payout.component";
 import {DisputeComponent} from "./dispute/dispute.component";
 import {BusinessLoansComponent} from "./business-loans/business-loans.component";
+import {StoreComponent} from "./store/store.component";
 
 const routeConfig: Routes = [
   {
@@ -53,6 +54,11 @@ const routeConfig: Routes = [
         path: 'businessloans',
         component: BusinessLoansComponent,
         title: 'BusinessLoans'
+      },
+      {
+        path: 'store',
+        component: StoreComponent,
+        title: 'Store'
       }
     ]
   }

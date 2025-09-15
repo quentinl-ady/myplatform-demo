@@ -40,7 +40,7 @@ export interface BusinessLine {
     ],
     template: `
   <div class="dashboard-container">
-    <h1>Dashboard</h1>
+    <h1>Onboarding</h1>
 
     <div class="button-group">
       <button mat-raised-button color="primary" (click)="openHostedOnboarding()">

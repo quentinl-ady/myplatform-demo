@@ -22,8 +22,12 @@ import {MaterialModule} from "../material.module";
         <mat-toolbar color="primary" class="toolbar-logo">Menu</mat-toolbar>
         <mat-nav-list>
           <a mat-list-item [routerLink]="['/', userId, 'dashboard']" routerLinkActive="active">
-            <mat-icon>dashboard</mat-icon>
-            <span>Dashboard</span>
+            <mat-icon>verified_user</mat-icon>
+            <span>Onboarding</span>
+          </a>
+           <a mat-list-item [routerLink]="['/', userId, 'store']" routerLinkActive="active">
+            <mat-icon>store</mat-icon>
+            <span>Store</span>
           </a>
           <a mat-list-item [routerLink]="['/', userId, 'payment']" routerLinkActive="active">
             <mat-icon>payment</mat-icon>
