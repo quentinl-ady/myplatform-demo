@@ -53,6 +53,9 @@ public class DTOMapper {
         dto.setCurrencyCode(user.getCurrencyCode());
         dto.setCountryCode(user.getCountryCode());
         dto.setUserType(user.getUserType());
+        dto.setCapital(user.getCapital());
+        dto.setIssuing(user.getIssuing());
+        dto.setBank(user.getBank());
         return dto;
     }
 }

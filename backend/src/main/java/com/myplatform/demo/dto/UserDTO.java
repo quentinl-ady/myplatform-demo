@@ -21,4 +21,7 @@ public class UserDTO {
     private String currencyCode;
     private String countryCode;
     private String userType;
+    private Boolean bank;
+    private Boolean capital;
+    private Boolean issuing;
 }
