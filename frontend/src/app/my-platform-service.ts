@@ -93,6 +93,8 @@ export interface SendPaymentPayload {
 export interface SendPaymentResponse {
   id: string;
   sessionData: string;
+  amount: number;
+  currency: string;
 }
 
 @Injectable({

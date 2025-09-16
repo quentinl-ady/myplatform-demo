@@ -523,10 +523,11 @@ public class AdyenService {
             createCheckoutSessionRequest.setStore(storeRef);
             StoreCustomer storeCustomer = this.storeCustomerRepository.findByStoreRef(storeRef);
             createCheckoutSessionRequest.setCountryCode(storeCustomer.getCountry());
-        } else {
+        }
+        { // marketplace
             List<Split> splits = new ArrayList<>();
 
-            long commissionAmount = Math.round(amount * 0.10);
+            long commissionAmount = Math.round(amount * 0.10); // 10% commission
             long sellerAmount = amount - commissionAmount;
 
             Split sellerSplit = new Split();
@@ -536,7 +537,7 @@ public class AdyenService {
             sellerSplit.setReference("SELLER_" + reference);
 
             Split platformSplit = new Split();
-            sellerSplit.setAmount(new SplitAmount().currency(currencyCode).value(commissionAmount));
+            platformSplit.setAmount(new SplitAmount().currency(currencyCode).value(commissionAmount));
             platformSplit.setType(Split.TypeEnum.COMMISSION);
             platformSplit.setReference("PLATFORM_FEE_" + reference);
 
@@ -544,6 +545,11 @@ public class AdyenService {
             splits.add(platformSplit);
 
             createCheckoutSessionRequest.setSplits(splits);
+
+            long totalSplits = splits.stream().mapToLong(s -> s.getAmount().getValue()).sum();
+            if (totalSplits != amount) {
+                throw new IllegalStateException("The sum of the splits (" + totalSplits + ") does not match the total amount (" + amount + ")");
+            }
         }
 
         CreateCheckoutSessionResponse response = paymentsApi.sessions(createCheckoutSessionRequest);
@@ -551,6 +557,8 @@ public class AdyenService {
         PaymentSessionResponse paymentSessionResponse = new PaymentSessionResponse();
         paymentSessionResponse.setId(response.getId());
         paymentSessionResponse.setSessionData(response.getSessionData());
+        paymentSessionResponse.setAmount(amount);
+        paymentSessionResponse.setCurrency(currencyCode);
         return paymentSessionResponse;
     }
 }

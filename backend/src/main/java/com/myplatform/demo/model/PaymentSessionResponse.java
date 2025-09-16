@@ -9,4 +9,6 @@ import lombok.Setter;
 public class PaymentSessionResponse {
     String id;
     String sessionData;
+    Long amount;
+    String currency;
 }
