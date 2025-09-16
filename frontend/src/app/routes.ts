@@ -9,6 +9,7 @@ import {PayoutComponent} from "./payout/payout.component";
 import {DisputeComponent} from "./dispute/dispute.component";
 import {BusinessLoansComponent} from "./business-loans/business-loans.component";
 import {StoreComponent} from "./store/store.component";
+import {CheckoutComponent} from "./checkout/checkout.component";
 
 const routeConfig: Routes = [
   {
@@ -59,6 +60,11 @@ const routeConfig: Routes = [
         path: 'store',
         component: StoreComponent,
         title: 'Store'
+      },
+      {
+        path: 'checkout',
+        component: CheckoutComponent,
+        title: 'Checkout'
       }
     ]
   }

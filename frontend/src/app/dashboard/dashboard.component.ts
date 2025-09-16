@@ -263,8 +263,15 @@ export class DashboardComponent {
         );
     }
 
-    getMessage(part: OnboardingPart): string {
-        if (part.allowed) return '✅ Validated';
+    getMessage(part: OnboardingPart | undefined): string {
+        if (!part) {
+            return 'ℹ️ No information available.';
+        }
+
+        if (part.allowed) {
+            return '✅ Validated';
+        }
+
         switch (part.verificationStatus) {
             case 'invalid':
                 return '❌ Missing or incorrect information. Please complete onboarding form.';

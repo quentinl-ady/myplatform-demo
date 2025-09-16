@@ -49,6 +49,10 @@ import {MaterialModule} from "../material.module";
             <mat-icon>attach_money</mat-icon>
             <span>Business Loans</span>
           </a>
+          <a mat-list-item [routerLink]="['/', userId, 'checkout']" routerLinkActive="active">
+            <mat-icon>shop</mat-icon>
+            <span>Checkout</span>
+          </a>
         </mat-nav-list>
       </mat-sidenav>
 
