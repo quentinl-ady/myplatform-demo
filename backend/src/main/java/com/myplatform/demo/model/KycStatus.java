@@ -9,5 +9,8 @@ import lombok.Setter;
 public class KycStatus {
     private Status acquiringStatus;
     private Status payoutStatus;
+    private Status capitalStatus;
+    private Status bankingStatus;
+    private Status issuingStatus;
 }
 

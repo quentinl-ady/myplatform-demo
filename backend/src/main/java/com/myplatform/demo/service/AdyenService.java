@@ -30,10 +30,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class AdyenService {
@@ -149,15 +146,62 @@ public class AdyenService {
     }
 
 
-    public String createAccountHolder(String legalEntityId) throws IOException, ApiException {
+    public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing) throws IOException, ApiException {
         AccountHolderInfo accountHolderInfo = new AccountHolderInfo()
                 .legalEntityId(legalEntityId)
                         .reference(String.valueOf(System.currentTimeMillis()));
+
+        Map<String, AccountHolderCapability> capabilities = new HashMap<>(Map.of(
+                "receiveFromBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),
+                "sendToBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),
+                "sendToTransferInstrument", new AccountHolderCapability().enabled(true).requested(true),
+                "receiveFromPlatformPayments", new AccountHolderCapability().enabled(true).requested(true)
+
+        ));
+
+        if (activityReason.equals("marketplace")){
+            capabilities.put("receivePayments", new AccountHolderCapability().enabled(false).requested(false));
+        } else {
+            capabilities.put("receivePayments", new AccountHolderCapability().enabled(true).requested(true));
+        }
+
+        if (capital){
+            capabilities.put("receiveGrants", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("getGrantOffers", new AccountHolderCapability().enabled(true).requested(true));
+        } else {
+            capabilities.put("receiveGrants", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("getGrantOffers", new AccountHolderCapability().enabled(false).requested(false));
+        }
+
+        if (bank) {
+            capabilities.put("issueBankAccount", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("sendToThirdParty", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("receiveFromThirdParty", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("receiveFromTransferInstrument", new AccountHolderCapability().enabled(true).requested(true));
+        } else {
+            capabilities.put("issueBankAccount", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("sendToThirdParty", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("receiveFromThirdParty", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("receiveFromTransferInstrument", new AccountHolderCapability().enabled(false).requested(false));
+        }
+
+        if (issuing) {
+            capabilities.put("issueCard", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("useCard", new AccountHolderCapability().enabled(true).requested(true));
+            capabilities.put("useCardInRestrictedCountries", new AccountHolderCapability().enabled(true).requested(true).requestedLevel(AccountHolderCapability.RequestedLevelEnum.MEDIUM));
+        } else {
+            capabilities.put("issueCard", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("useCard", new AccountHolderCapability().enabled(false).requested(false));
+            capabilities.put("useCardInRestrictedCountries", new AccountHolderCapability().enabled(false).requested(false));
+        }
+
+        accountHolderInfo.setCapabilities(capabilities);
+
         AccountHolder accountHolder = accountHoldersApi.createAccountHolder(accountHolderInfo);
         return accountHolder.getId();
     }
 
-    public KycStatus getLegalEntityKycDetail(String legalEntityId) throws IOException, ApiException {
+    public KycStatus getLegalEntityKycDetail(String legalEntityId, String activityReason, Boolean bank, Boolean capital, Boolean issuing) throws IOException, ApiException {
         KycStatus kycStatus = new KycStatus();
         Status acquiring = new Status();
         Status payout = new Status();
@@ -165,11 +209,39 @@ public class AdyenService {
         LegalEntity legalEntity = lem.getLegalEntity(legalEntityId);
         Map<String, LegalEntityCapability> map = legalEntity.getCapabilities();
 
-        LegalEntityCapability receivePayment = map.get("receivePayments");
+        LegalEntityCapability acquiringCapability;
+
+        if(activityReason.equals("embeddedPayment")){
+            acquiringCapability = map.get("receivePayments");
+        } else {
+            acquiringCapability = map.get("receiveFromPlatformPayments");
+        }
         LegalEntityCapability sendToTransferInstrument = map.get("sendToTransferInstrument");
 
-        acquiring.setAllowed(receivePayment.getAllowed());
-        acquiring.setVerificationStatus(receivePayment.getVerificationStatus());
+        if(bank){
+            LegalEntityCapability issueBankAccountCapability = map.get("issueBankAccount");
+            Status issueBankAccount = new Status();
+            issueBankAccount.setAllowed(issueBankAccountCapability.getAllowed());
+            issueBankAccount.setVerificationStatus(issueBankAccountCapability.getVerificationStatus());
+            kycStatus.setBankingStatus(issueBankAccount);
+        }
+        if(capital){
+            LegalEntityCapability receiveGrantsCapability = map.get("receiveGrants");
+            Status receiveGrants = new Status();
+            receiveGrants.setAllowed(receiveGrantsCapability.getAllowed());
+            receiveGrants.setVerificationStatus(receiveGrantsCapability.getVerificationStatus());
+            kycStatus.setCapitalStatus(receiveGrants);
+        }
+        if(issuing){
+            LegalEntityCapability issueCardCapability = map.get("issueCardCommercial");
+            Status issueCard = new Status();
+            issueCard.setAllowed(issueCardCapability.getAllowed());
+            issueCard.setVerificationStatus(issueCardCapability.getVerificationStatus());
+            kycStatus.setIssuingStatus(issueCard);
+        }
+
+        acquiring.setAllowed(acquiringCapability.getAllowed());
+        acquiring.setVerificationStatus(acquiringCapability.getVerificationStatus());
 
         payout.setAllowed(sendToTransferInstrument.getAllowed());
         payout.setVerificationStatus(sendToTransferInstrument.getVerificationStatus());

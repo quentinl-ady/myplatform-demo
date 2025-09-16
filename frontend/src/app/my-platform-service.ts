@@ -18,6 +18,9 @@ export interface OnboardingPart {
 export interface OnboardingResponse {
   acquiringStatus: OnboardingPart;
   payoutStatus: OnboardingPart;
+  capitalStatus?: OnboardingPart;
+  bankingStatus?: OnboardingPart;
+  issuingStatus?: OnboardingPart;
 }
 
 export interface SessionToken {

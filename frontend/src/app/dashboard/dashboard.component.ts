@@ -69,13 +69,22 @@ export interface BusinessLine {
           <li>
             <strong>Payout:</strong> {{ getMessage(s.payoutStatus) }}
           </li>
+          <li *ngIf="user() && user()?.capital">
+            <strong>Business Loans:</strong> {{ getMessage(s.capitalStatus) }}
+          </li>
+           <li *ngIf="user() && user()?.bank">
+            <strong>Bank Account:</strong> {{ getMessage(s.bankingStatus) }}
+          </li>
+           <li *ngIf="user() && user()?.issuing">
+            <strong>Issuing:</strong> {{ getMessage(s.issuingStatus) }}
+          </li>
         </ul>
       </ng-template>
     </mat-card>
 
     <!-- BUSINESS LINES -->
     <mat-card class="business-card"
-          *ngIf="user() && !(user()?.activityReason === 'marketplace' && user()?.bank === false)">
+          *ngIf="user() && user()?.activityReason === 'embeddedPayment' ">
       <h2>Business Activity</h2>
 
       <!-- Existing Business Lines -->
@@ -208,7 +217,11 @@ export class DashboardComponent {
                 next: (u) => {
                     this.user.set(u);
 
-                    if (!(u.activityReason === 'marketplace' && u.bank === false)) {
+                    //for bank it could be
+                    // if (!(u.activityReason === 'marketplace' && u.bank === false)) {
+                    //     this.loadBusinessLinesBanking();
+                    // }
+                    if (u.activityReason === 'embeddedPayment') {
                         this.loadBusinessLines();
                     }
                 },
@@ -241,7 +254,13 @@ export class DashboardComponent {
     }
 
     allValid(s: OnboardingResponse): boolean {
-        return s.acquiringStatus.allowed && s.payoutStatus.allowed;
+        return (
+            s.acquiringStatus.allowed &&
+            s.payoutStatus.allowed &&
+            (s.capitalStatus ? s.capitalStatus.allowed : true) &&
+            (s.bankingStatus ? s.bankingStatus.allowed : true) &&
+            (s.issuingStatus ? s.issuingStatus.allowed : true)
+        );
     }
 
     getMessage(part: OnboardingPart): string {

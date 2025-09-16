@@ -56,6 +56,7 @@ public class DTOMapper {
         dto.setCapital(user.getCapital());
         dto.setIssuing(user.getIssuing());
         dto.setBank(user.getBank());
+        dto.setActivityReason(user.getActivityReason());
         return dto;
     }
 }

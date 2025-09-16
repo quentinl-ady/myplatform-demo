@@ -24,4 +24,5 @@ public class UserDTO {
     private Boolean bank;
     private Boolean capital;
     private Boolean issuing;
+    private String activityReason;
 }

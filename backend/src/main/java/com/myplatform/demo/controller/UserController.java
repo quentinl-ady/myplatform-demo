@@ -38,7 +38,7 @@ public class UserController {
             }
 
             String legalEntityId = adyenService.createLegalEntity(user);
-            String accountHolderId = adyenService.createAccountHolder(legalEntityId);
+            String accountHolderId = adyenService.createAccountHolder(legalEntityId, user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
             String balanceAccountId = adyenService.createBalanceAccountId(accountHolderId, user.getCurrencyCode());
 
             user.setAccountHolderId(accountHolderId);
@@ -117,7 +117,7 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
             }
 
-            KycStatus status = adyenService.getLegalEntityKycDetail(user.getLegalEntityId());
+            KycStatus status = adyenService.getLegalEntityKycDetail(user.getLegalEntityId(), user.getActivityReason(), user.getBank(), user.getCapital(), user.getIssuing());
             return ResponseEntity.ok(status);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
