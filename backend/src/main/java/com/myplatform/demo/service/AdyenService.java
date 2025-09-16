@@ -3,12 +3,16 @@ package com.myplatform.demo.service;
 import com.adyen.Client;
 import com.adyen.enums.Environment;
 import com.adyen.model.balanceplatform.*;
+import com.adyen.model.checkout.*;
+import com.adyen.model.checkout.Amount;
 import com.adyen.model.legalentitymanagement.*;
 import com.adyen.model.legalentitymanagement.Address;
 import com.adyen.model.legalentitymanagement.Name;
 import com.adyen.model.management.*;
+import com.adyen.model.management.PaymentMethod;
 import com.adyen.service.balanceplatform.AccountHoldersApi;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
+import com.adyen.service.checkout.PaymentsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.BusinessLinesApi;
 import com.adyen.service.legalentitymanagement.HostedOnboardingApi;
@@ -18,6 +22,7 @@ import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
+import com.myplatform.demo.repository.StoreCustomerRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +35,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -45,7 +51,10 @@ public class AdyenService {
     private final AccountStoreLevelApi accountStoreLevelApi;
     private final PaymentMethodsMerchantLevelApi paymentMethodsMerchantLevelApi;
     private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
+    private final PaymentsApi paymentsApi;
     private final String merchantAccount;
+
+    private final StoreCustomerRepository storeCustomerRepository;
 
     Map<String, String> languageMap = Map.of(
             "FR", "fr-FR",
@@ -58,7 +67,8 @@ public class AdyenService {
 
     public AdyenService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
                         @Value("${adyen.pspApiKey}") String pspApiKey,
-                        @Value("${adyen.merchantAccount}") String merchantAccount) {
+                        @Value("${adyen.merchantAccount}") String merchantAccount,
+                        StoreCustomerRepository storeCustomerRepository) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         Client pspClient = new Client(pspApiKey,Environment.TEST);
 
@@ -74,8 +84,12 @@ public class AdyenService {
         splitConfigurationMerchantLevelApi = new SplitConfigurationMerchantLevelApi(pspClient);
         this.merchantAccount = merchantAccount;
 
+        paymentsApi = new PaymentsApi(pspClient);
+
         httpClient = HttpClient.newHttpClient();
         objectMapper = new ObjectMapper();
+
+        this.storeCustomerRepository = storeCustomerRepository;
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -488,5 +502,55 @@ public class AdyenService {
         balanceAccountInfoCustomer.setDescription(balanceAccount.getDescription());
         balanceAccountInfoCustomer.setBalanceAccountId(balanceAccount.getId());
         return balanceAccountInfoCustomer;
+    }
+
+    public PaymentSessionResponse createPaymentSession(String currencyCode, Long amount, String reference, Long userId, String storeRef, String activityReason, String balanceAccountId) throws IOException, ApiException {
+
+        CreateCheckoutSessionRequest createCheckoutSessionRequest = new CreateCheckoutSessionRequest()
+                .reference(reference)
+                .amount(new Amount().currency(currencyCode).value(amount))
+                .merchantAccount(this.merchantAccount)
+                .channel(CreateCheckoutSessionRequest.ChannelEnum.WEB)
+                .shopperEmail("john.doe@gmail.com")
+                .shopperIP("192.168.1.1")
+                .shopperName(new com.adyen.model.checkout.Name().firstName("John").lastName("Doe"))
+                .dateOfBirth(LocalDate.of(1990, 1,1))
+                .captureDelayHours(0) //force autocapture
+                .telephoneNumber("+33610101010")
+                .returnUrl("http://localhost:4000/" + userId + "/payment");
+
+        if (activityReason.equals("embeddedPayment")){
+            createCheckoutSessionRequest.setStore(storeRef);
+            StoreCustomer storeCustomer = this.storeCustomerRepository.findByStoreRef(storeRef);
+            createCheckoutSessionRequest.setCountryCode(storeCustomer.getCountry());
+        } else {
+            List<Split> splits = new ArrayList<>();
+
+            long commissionAmount = Math.round(amount * 0.10);
+            long sellerAmount = amount - commissionAmount;
+
+            Split sellerSplit = new Split();
+            sellerSplit.setAmount(new SplitAmount().currency(currencyCode).value(sellerAmount));
+            sellerSplit.setType(Split.TypeEnum.BALANCEACCOUNT);
+            sellerSplit.setAccount(balanceAccountId);
+            sellerSplit.setReference("SELLER_" + reference);
+
+            Split platformSplit = new Split();
+            sellerSplit.setAmount(new SplitAmount().currency(currencyCode).value(commissionAmount));
+            platformSplit.setType(Split.TypeEnum.COMMISSION);
+            platformSplit.setReference("PLATFORM_FEE_" + reference);
+
+            splits.add(sellerSplit);
+            splits.add(platformSplit);
+
+            createCheckoutSessionRequest.setSplits(splits);
+        }
+
+        CreateCheckoutSessionResponse response = paymentsApi.sessions(createCheckoutSessionRequest);
+
+        PaymentSessionResponse paymentSessionResponse = new PaymentSessionResponse();
+        paymentSessionResponse.setId(response.getId());
+        paymentSessionResponse.setSessionData(response.getSessionData());
+        return paymentSessionResponse;
     }
 }

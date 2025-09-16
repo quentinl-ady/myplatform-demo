@@ -81,6 +81,20 @@ export interface Store {
   paymentMethods: { type: string; verificationStatus: VerificationStatus }[];
 }
 
+
+export interface SendPaymentPayload {
+  amount: number;
+  currencyCode: string;
+  storeReference: string;
+  userId: number;
+  reference: string;
+}
+
+export interface SendPaymentResponse {
+  id: string;
+  sessionData: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -152,5 +166,12 @@ export class MyPlatformService {
   getStores(userId: number): Observable<Store[]> {
     return this.http.get<Store[]>(`${this.baseUrl}/stores/${userId}`);
   }
+
+  sendPayment(payload: SendPaymentPayload): Observable<SendPaymentResponse> {
+    return this.http.post<SendPaymentResponse>(`${this.baseUrl}/sendPayment/`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
 
 }

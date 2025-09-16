@@ -358,4 +358,30 @@ public class UserController {
         }
     }
 
+
+    @PostMapping("/sendPayment/")
+    public ResponseEntity<?> sendPayment(@RequestBody RequestPayment requestPayment) {
+        try {
+            User user = userRepository.findById(requestPayment.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            PaymentSessionResponse paymentSessionResponse = adyenService.createPaymentSession(
+                    requestPayment.getCurrencyCode(),
+                    requestPayment.getAmount(),
+                    requestPayment.getReference(),
+                    user.getId(),
+                    requestPayment.getStoreReference(),
+                    user.getActivityReason() ,
+                    user.getBalanceAccountId());
+
+            return ResponseEntity.ok(paymentSessionResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
 }
