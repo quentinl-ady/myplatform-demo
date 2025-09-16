@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+
 
 @RestController
 @CrossOrigin(origins = "http://localhost:4200")
@@ -71,10 +73,10 @@ public class UserController {
         }
     }
 
-    @GetMapping("/users")
-    public List<User> allUsers() {
-        return userRepository.findAll();
-    }
+//    @GetMapping("/users")
+//    public List<User> allUsers() {
+//        return userRepository.findAll();
+//    }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> user(@PathVariable Long userId){
@@ -379,6 +381,18 @@ public class UserController {
                     user.getBalanceAccountId());
 
             return ResponseEntity.ok(paymentSessionResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @GetMapping("/clientKey")
+    public ResponseEntity<?> getClientKey() {
+        try {
+            String clientKey = adyenService.getClientKey();
+            Map<String, String> response = Map.of("key", clientKey);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }

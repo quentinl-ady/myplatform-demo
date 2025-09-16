@@ -175,5 +175,9 @@ export class MyPlatformService {
     });
   }
 
+  getClientKey(): Observable<{ key: string }> {
+    return this.http.get<{ key: string }>(`${this.baseUrl}/clientKey`);
+  }
+
 
 }

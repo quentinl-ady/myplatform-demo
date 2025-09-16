@@ -23,6 +23,7 @@ import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,8 @@ public class AdyenService {
     private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
     private final PaymentsApi paymentsApi;
     private final String merchantAccount;
+    @Getter
+    private final String clientKey;
 
     private final StoreCustomerRepository storeCustomerRepository;
 
@@ -68,6 +71,7 @@ public class AdyenService {
     public AdyenService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
                         @Value("${adyen.pspApiKey}") String pspApiKey,
                         @Value("${adyen.merchantAccount}") String merchantAccount,
+                        @Value("${adyen.clientKey}") String clientKey,
                         StoreCustomerRepository storeCustomerRepository) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         Client pspClient = new Client(pspApiKey,Environment.TEST);
@@ -90,6 +94,8 @@ public class AdyenService {
         objectMapper = new ObjectMapper();
 
         this.storeCustomerRepository = storeCustomerRepository;
+
+        this.clientKey = clientKey;
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -561,4 +567,5 @@ public class AdyenService {
         paymentSessionResponse.setCurrency(currencyCode);
         return paymentSessionResponse;
     }
+
 }

@@ -116,6 +116,7 @@ export class CheckoutComponent {
     private dropin: Dropin | null = null;
 
     countryCode = 'FR';
+    clientKey = '';
 
     constructor() {
         this.checkoutForm = this.fb.group({
@@ -132,6 +133,9 @@ export class CheckoutComponent {
             if (!this.userId) return;
             this.loadUserAndMaybeStores();
         });
+        this.authService.getClientKey().subscribe({
+            next: value => this.clientKey = value.key
+        })
     }
 
     private loadUserAndMaybeStores(): void {
@@ -230,7 +234,7 @@ export class CheckoutComponent {
                 value: sendPaymentResponse.amount,
                 currency: sendPaymentResponse.currency
             },
-            clientKey: 'test_W64WGZ35LFCOTBUASSTEPMZM5U4ZLKUZ',
+            clientKey: this.clientKey,
             onPaymentCompleted: (result, component) => console.info(result, component),
             onPaymentFailed: (result, component) => console.info(result, component),
             onError: (error, component) => console.error(error.name, error.message, error.stack, component)
