@@ -213,8 +213,8 @@ export class MyPlatformService {
     });
   }
 
-  getPayoutConfigurations(userId: number): Observable<PayoutConfiguration[]> {
-    return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/payoutConfiguration/${userId}`);
+  getPayoutConfigurations(userId: number, balanceAccountId: string): Observable<PayoutConfiguration[]> {
+    return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/payoutConfiguration/${userId}/${balanceAccountId}`);
   }
 
 

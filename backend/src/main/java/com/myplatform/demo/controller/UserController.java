@@ -398,13 +398,13 @@ public class UserController {
         }
     }
 
-    @GetMapping("/payoutConfiguration/{userId}")
-    public ResponseEntity<?> getPayoutConfiguration(@PathVariable Long userId) {
+    @GetMapping("/payoutConfiguration/{userId}/{balanceAccountId}")
+    public ResponseEntity<?> getPayoutConfiguration(@PathVariable Long userId, @PathVariable String balanceAccountId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            List<PayoutConfigurationResponse> payoutConfiguration = adyenService.getPayoutConfiguration(user);
+            List<PayoutConfigurationResponse> payoutConfiguration = adyenService.getPayoutConfiguration(user, balanceAccountId);
             return ResponseEntity.ok(payoutConfiguration);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");

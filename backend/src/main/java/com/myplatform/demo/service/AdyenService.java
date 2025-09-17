@@ -654,29 +654,20 @@ public class AdyenService {
         return accountIdentifier;
     }
 
-    public List<PayoutConfigurationResponse> getPayoutConfiguration(User user) throws IOException, ApiException {
+    public List<PayoutConfigurationResponse> getPayoutConfiguration(User user, String balanceAccountId) throws IOException, ApiException {
         List<PayoutConfigurationResponse> payoutConfigs = new ArrayList<>();
 
+        List<SweepConfigurationV2> sweeps = balanceAccountsApi
+                .getAllSweepsForBalanceAccount(balanceAccountId)
+                .getSweeps();
 
-        List<String> balanceAccountIds = accountHoldersApi
-                .getAllBalanceAccountsOfAccountHolder(user.getAccountHolderId())
-                .getBalanceAccounts()
-                .stream()
-                .map(BalanceAccountBase::getId)
-                .toList();
-
-        for (String balanceAccountId : balanceAccountIds) {
-            List<SweepConfigurationV2> sweeps = balanceAccountsApi
-                    .getAllSweepsForBalanceAccount(balanceAccountId)
-                    .getSweeps();
-
-            if (sweeps != null) {
-                for (SweepConfigurationV2 sweep : sweeps) {
-                    PayoutConfigurationResponse response = getPayoutConfigurationResponse(balanceAccountId, sweep, user.getLegalEntityId());
-                    payoutConfigs.add(response);
-                }
+        if (sweeps != null) {
+            for (SweepConfigurationV2 sweep : sweeps) {
+                PayoutConfigurationResponse response = getPayoutConfigurationResponse(balanceAccountId, sweep, user.getLegalEntityId());
+                payoutConfigs.add(response);
             }
         }
+
 
         return payoutConfigs;
     }
