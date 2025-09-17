@@ -3,10 +3,13 @@ package com.myplatform.demo.service;
 import com.adyen.Client;
 import com.adyen.enums.Environment;
 import com.adyen.model.balanceplatform.*;
+import com.adyen.model.balanceplatform.IbanAccountIdentification;
 import com.adyen.model.checkout.*;
 import com.adyen.model.checkout.Amount;
 import com.adyen.model.legalentitymanagement.*;
 import com.adyen.model.legalentitymanagement.Address;
+import com.adyen.model.legalentitymanagement.CALocalAccountIdentification;
+import com.adyen.model.legalentitymanagement.JSON;
 import com.adyen.model.legalentitymanagement.Name;
 import com.adyen.model.management.*;
 import com.adyen.model.management.PaymentMethod;
@@ -17,12 +20,14 @@ import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.BusinessLinesApi;
 import com.adyen.service.legalentitymanagement.HostedOnboardingApi;
 import com.adyen.service.legalentitymanagement.LegalEntitiesApi;
+import com.adyen.service.legalentitymanagement.TransferInstrumentsApi;
 import com.adyen.service.management.AccountStoreLevelApi;
 import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import com.myplatform.demo.repository.UserRepository;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -38,10 +43,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.Objects.isNull;
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class AdyenService {
     private final LegalEntitiesApi lem;
+    private final TransferInstrumentsApi transferInstrumentsApi;
     private final HostedOnboardingApi hop;
     private final AccountHoldersApi accountHoldersApi;
     private final BalanceAccountsApi balanceAccountsApi;
@@ -58,13 +68,14 @@ public class AdyenService {
     private final String clientKey;
 
     private final StoreCustomerRepository storeCustomerRepository;
+    private final UserRepository userRepository;
 
     Map<String, String> languageMap = Map.of(
             "FR", "fr-FR",
             "DE", "de-DE",
             "NL", "nl-NL",
             "GB", "en-EN",
-            "US","en-US"
+            "US", "en-US"
     );
 
 
@@ -72,11 +83,12 @@ public class AdyenService {
                         @Value("${adyen.pspApiKey}") String pspApiKey,
                         @Value("${adyen.merchantAccount}") String merchantAccount,
                         @Value("${adyen.clientKey}") String clientKey,
-                        StoreCustomerRepository storeCustomerRepository) {
+                        StoreCustomerRepository storeCustomerRepository, UserRepository userRepository) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
-        Client pspClient = new Client(pspApiKey,Environment.TEST);
+        Client pspClient = new Client(pspApiKey, Environment.TEST);
 
         lem = new LegalEntitiesApi(balancePlatformClient);
+        transferInstrumentsApi = new TransferInstrumentsApi(balancePlatformClient);
         hop = new HostedOnboardingApi(balancePlatformClient);
         accountHoldersApi = new AccountHoldersApi(balancePlatformClient);
         balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
@@ -96,6 +108,7 @@ public class AdyenService {
         this.storeCustomerRepository = storeCustomerRepository;
 
         this.clientKey = clientKey;
+        this.userRepository = userRepository;
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -169,7 +182,7 @@ public class AdyenService {
     public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing) throws IOException, ApiException {
         AccountHolderInfo accountHolderInfo = new AccountHolderInfo()
                 .legalEntityId(legalEntityId)
-                        .reference(String.valueOf(System.currentTimeMillis()));
+                .reference(String.valueOf(System.currentTimeMillis()));
 
         Map<String, AccountHolderCapability> capabilities = new HashMap<>(Map.of(
                 "receiveFromBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),
@@ -179,13 +192,13 @@ public class AdyenService {
 
         ));
 
-        if (activityReason.equals("marketplace")){
+        if (activityReason.equals("marketplace")) {
             capabilities.put("receivePayments", new AccountHolderCapability().enabled(false).requested(false));
         } else {
             capabilities.put("receivePayments", new AccountHolderCapability().enabled(true).requested(true));
         }
 
-        if (capital){
+        if (capital) {
             capabilities.put("receiveGrants", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("getGrantOffers", new AccountHolderCapability().enabled(true).requested(true));
         } else {
@@ -231,28 +244,28 @@ public class AdyenService {
 
         LegalEntityCapability acquiringCapability;
 
-        if(activityReason.equals("embeddedPayment")){
+        if (activityReason.equals("embeddedPayment")) {
             acquiringCapability = map.get("receivePayments");
         } else {
             acquiringCapability = map.get("receiveFromPlatformPayments");
         }
         LegalEntityCapability sendToTransferInstrument = map.get("sendToTransferInstrument");
 
-        if(bank){
+        if (bank) {
             LegalEntityCapability issueBankAccountCapability = map.get("issueBankAccount");
             Status issueBankAccount = new Status();
             issueBankAccount.setAllowed(issueBankAccountCapability.getAllowed());
             issueBankAccount.setVerificationStatus(issueBankAccountCapability.getVerificationStatus());
             kycStatus.setBankingStatus(issueBankAccount);
         }
-        if(capital){
+        if (capital) {
             LegalEntityCapability receiveGrantsCapability = map.get("receiveGrants");
             Status receiveGrants = new Status();
             receiveGrants.setAllowed(receiveGrantsCapability.getAllowed());
             receiveGrants.setVerificationStatus(receiveGrantsCapability.getVerificationStatus());
             kycStatus.setCapitalStatus(receiveGrants);
         }
-        if(issuing){
+        if (issuing) {
             LegalEntityCapability issueCardCapability = map.get("issueCardCommercial");
             Status issueCard = new Status();
             issueCard.setAllowed(issueCardCapability.getAllowed());
@@ -322,7 +335,7 @@ public class AdyenService {
                 "allowOrigin", "http://localhost",
                 "product", "platform",
                 "policy", Map.of(
-                        "resources", new Map[]{ Map.of(
+                        "resources", new Map[]{Map.of(
                                 "accountHolderId", accountHolderId,
                                 "type", "accountHolder"
                         )},
@@ -349,8 +362,8 @@ public class AdyenService {
     }
 
     public List<BalanceAccountInfoCustomer> getBalanceAccount(String accountHolderId) throws IOException, ApiException {
-       PaginatedBalanceAccountsResponse paginatedBalanceAccountsResponse = accountHoldersApi.getAllBalanceAccountsOfAccountHolder(accountHolderId);
-       List<BalanceAccountBase> balanceAccounts = paginatedBalanceAccountsResponse.getBalanceAccounts();
+        PaginatedBalanceAccountsResponse paginatedBalanceAccountsResponse = accountHoldersApi.getAllBalanceAccountsOfAccountHolder(accountHolderId);
+        List<BalanceAccountBase> balanceAccounts = paginatedBalanceAccountsResponse.getBalanceAccounts();
 
 
         return balanceAccounts.stream()
@@ -376,7 +389,7 @@ public class AdyenService {
                 .postalCode(postalCode)
                 .line1(lineAdresse1);
 
-        if(country.equals("US")) {
+        if (country.equals("US")) {
             storeLocation.setPostalCode("NY"); //workaround, keep the UI simple.
         }
 
@@ -520,12 +533,12 @@ public class AdyenService {
                 .shopperEmail("john.doe@gmail.com")
                 .shopperIP("192.168.1.1")
                 .shopperName(new com.adyen.model.checkout.Name().firstName("John").lastName("Doe"))
-                .dateOfBirth(LocalDate.of(1990, 1,1))
+                .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0) //force autocapture
                 .telephoneNumber("+33610101010")
                 .returnUrl("http://localhost:4000/" + userId + "/payment");
 
-        if (activityReason.equals("embeddedPayment")){
+        if (activityReason.equals("embeddedPayment")) {
             createCheckoutSessionRequest.setStore(storeRef);
             StoreCustomer storeCustomer = this.storeCustomerRepository.findByStoreRef(storeRef);
             createCheckoutSessionRequest.setCountryCode(storeCustomer.getCountry());
@@ -568,4 +581,129 @@ public class AdyenService {
         return paymentSessionResponse;
     }
 
+    public List<PayoutAccount> getPayoutAccount(String legalEntityId) throws IOException, ApiException {
+        LegalEntity legalEntity = lem.getLegalEntity(legalEntityId);
+
+        List<TransferInstrumentReference> transferInstruments =
+                Optional.ofNullable(legalEntity.getTransferInstruments())
+                        .orElse(Collections.emptyList());
+
+        return transferInstruments.stream()
+                .filter(Objects::nonNull)
+                .map(ref -> new PayoutAccount(
+                        ref.getId(),
+                        ref.getAccountIdentifier()
+                ))
+                .toList();
+    }
+
+    public PayoutConfigurationResponse createPayoutConfiguration(String balanceAccountId, String currencyCode, Boolean regular, Boolean instant, String transferInstrumentId, String schedule) throws IOException, ApiException {
+
+        String accountIdentifier = getAccountIdentifier(transferInstrumentId);
+
+        CreateSweepConfigurationV2 createSweepConfigurationV2 = new CreateSweepConfigurationV2();
+        createSweepConfigurationV2.type(CreateSweepConfigurationV2.TypeEnum.PUSH);
+        createSweepConfigurationV2.triggerAmount(new com.adyen.model.balanceplatform.Amount().currency(currencyCode).value(0L));
+        createSweepConfigurationV2.currency(currencyCode);
+        createSweepConfigurationV2.category(CreateSweepConfigurationV2.CategoryEnum.BANK);
+        if (regular) {
+            createSweepConfigurationV2.addPrioritiesItem(CreateSweepConfigurationV2.PrioritiesEnum.REGULAR);
+        }
+        if (instant) {
+            createSweepConfigurationV2.addPrioritiesItem(CreateSweepConfigurationV2.PrioritiesEnum.INSTANT);
+        }
+        SweepCounterparty sweepCounterparty = new SweepCounterparty();
+        sweepCounterparty.setTransferInstrumentId(transferInstrumentId);
+
+
+        SweepSchedule sweepSchedule = new SweepSchedule().type(SweepSchedule.TypeEnum.fromValue(schedule));
+        createSweepConfigurationV2.setSchedule(sweepSchedule);
+        createSweepConfigurationV2.counterparty(sweepCounterparty);
+        createSweepConfigurationV2.description("Payout for " + balanceAccountId);
+        balanceAccountsApi.createSweep(balanceAccountId, createSweepConfigurationV2);
+
+        PayoutConfigurationResponse payoutConfigurationResponse = new PayoutConfigurationResponse();
+        payoutConfigurationResponse.setAccountIdentifier(accountIdentifier);
+        payoutConfigurationResponse.setBalanceAccountId(balanceAccountId);
+        payoutConfigurationResponse.setCurrencyCode(currencyCode);
+        payoutConfigurationResponse.setInstant(instant);
+        payoutConfigurationResponse.setRegular(regular);
+        payoutConfigurationResponse.setSchedule(schedule);
+
+        return payoutConfigurationResponse;
+    }
+
+    private String getAccountIdentifier(String transferInstrumentId) throws ApiException, IOException {
+        String accountIdentifier = "";
+
+        TransferInstrument  transferInstrument = transferInstrumentsApi.getTransferInstrument(transferInstrumentId);
+        Object object = transferInstrument.getBankAccount().getAccountIdentification().getActualInstance();
+
+        BankAccountInfoAccountIdentification bankAccountInfoAccountIdentification = transferInstrument.getBankAccount().getAccountIdentification();
+
+        accountIdentifier = switch (object.getClass().getName()) {
+            case "com.adyen.model.legalentitymanagement.IbanAccountIdentification" ->
+                    bankAccountInfoAccountIdentification.getIbanAccountIdentification().getIban();
+            case "com.adyen.model.legalentitymanagement.USLocalAccountIdentification" ->
+                    bankAccountInfoAccountIdentification.getUSLocalAccountIdentification().getAccountNumber();
+            case "com.adyen.model.legalentitymanagement.UKLocalAccountIdentification" ->
+                    bankAccountInfoAccountIdentification.getUKLocalAccountIdentification().getAccountNumber();
+            default -> accountIdentifier;
+        };
+
+        return accountIdentifier;
+    }
+
+    public List<PayoutConfigurationResponse> getPayoutConfiguration(User user) throws IOException, ApiException {
+        List<PayoutConfigurationResponse> payoutConfigs = new ArrayList<>();
+
+
+        List<String> balanceAccountIds = accountHoldersApi
+                .getAllBalanceAccountsOfAccountHolder(user.getAccountHolderId())
+                .getBalanceAccounts()
+                .stream()
+                .map(BalanceAccountBase::getId)
+                .toList();
+
+        for (String balanceAccountId : balanceAccountIds) {
+            List<SweepConfigurationV2> sweeps = balanceAccountsApi
+                    .getAllSweepsForBalanceAccount(balanceAccountId)
+                    .getSweeps();
+
+            if (sweeps != null) {
+                for (SweepConfigurationV2 sweep : sweeps) {
+                    PayoutConfigurationResponse response = getPayoutConfigurationResponse(balanceAccountId, sweep, user.getLegalEntityId());
+                    payoutConfigs.add(response);
+                }
+            }
+        }
+
+        return payoutConfigs;
+    }
+
+    private PayoutConfigurationResponse getPayoutConfigurationResponse(String balanceAccountId, SweepConfigurationV2 sweep, String legalEntityId) throws IOException, ApiException {
+        PayoutConfigurationResponse response = new PayoutConfigurationResponse();
+
+        response.setBalanceAccountId(balanceAccountId);
+        response.setCurrencyCode(sweep.getCurrency());
+        response.setSchedule(
+                sweep.getSchedule() != null ? sweep.getSchedule().getType().toString() : null
+        );
+
+        List<SweepConfigurationV2.PrioritiesEnum> prioritiesEnums = sweep.getPriorities();
+        response.setInstant(false);
+        response.setRegular(false);
+        for (SweepConfigurationV2.PrioritiesEnum prioritiesEnum : prioritiesEnums) {
+            if (prioritiesEnum.getValue().equals("instant")) {
+                response.setInstant(true);
+            }
+            if (prioritiesEnum.getValue().equals("regular")) {
+                response.setRegular(true);
+            }
+        }
+
+        String accountIdentifier = getAccountIdentifier(sweep.getCounterparty().getTransferInstrumentId());
+        response.setAccountIdentifier(accountIdentifier);
+        return response;
+    }
 }

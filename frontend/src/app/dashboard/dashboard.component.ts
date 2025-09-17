@@ -254,22 +254,21 @@ export class DashboardComponent {
     }
 
     allValid(s: OnboardingResponse): boolean {
+        const isValid = (status?: { verificationStatus: string }) =>
+            !status || status.verificationStatus === 'valid';
+
         return (
-            s.acquiringStatus.allowed &&
-            s.payoutStatus.allowed &&
-            (s.capitalStatus ? s.capitalStatus.allowed : true) &&
-            (s.bankingStatus ? s.bankingStatus.allowed : true) &&
-            (s.issuingStatus ? s.issuingStatus.allowed : true)
+            isValid(s.acquiringStatus) &&
+            isValid(s.payoutStatus) &&
+            isValid(s.capitalStatus) &&
+            isValid(s.bankingStatus) &&
+            isValid(s.issuingStatus)
         );
     }
 
     getMessage(part: OnboardingPart | undefined): string {
         if (!part) {
             return 'ℹ️ No information available.';
-        }
-
-        if (part.allowed) {
-            return '✅ Validated';
         }
 
         switch (part.verificationStatus) {
@@ -279,6 +278,12 @@ export class DashboardComponent {
                 return '⏳ Verification in progress. Please check back later.';
             case 'reject':
                 return '🚫 Rejected. Please contact support@platform.com.';
+            case 'valid':
+                if (part.allowed) {
+                    return '✅ Validated';
+                } else {
+                    return '❌ Not allowed';
+                }
             default:
                 return 'ℹ️ Unknown status.';
         }

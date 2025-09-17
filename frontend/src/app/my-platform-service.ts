@@ -97,6 +97,30 @@ export interface SendPaymentResponse {
   currency: string;
 }
 
+export interface PayoutAccount {
+  transferInstrumentId: string;
+  accountIdentifier: string;
+}
+
+export interface PayoutConfigurationPayload {
+  userId: number;
+  balanceAccountId: string;
+  currencyCode: string;
+  regular: boolean;
+  instant: boolean;
+  transferInstrumentId: string;
+  schedule: string;
+}
+
+export interface PayoutConfiguration {
+  regular: boolean;
+  instant: boolean;
+  accountIdentifier: string;
+  balanceAccountId: string;
+  currencyCode: string;
+  schedule: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -177,6 +201,20 @@ export class MyPlatformService {
 
   getClientKey(): Observable<{ key: string }> {
     return this.http.get<{ key: string }>(`${this.baseUrl}/clientKey`);
+  }
+
+  getPayoutAccounts(userId: number): Observable<PayoutAccount[]> {
+    return this.http.get<PayoutAccount[]>(`${this.baseUrl}/payoutAccount/${userId}`);
+  }
+
+  createPayoutConfiguration(payload: PayoutConfigurationPayload): Observable<PayoutConfiguration> {
+    return this.http.post<PayoutConfiguration>(`${this.baseUrl}/payoutConfiguration`, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  getPayoutConfigurations(userId: number): Observable<PayoutConfiguration[]> {
+    return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/payoutConfiguration/${userId}`);
   }
 
 

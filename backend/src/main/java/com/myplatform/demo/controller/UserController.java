@@ -398,4 +398,62 @@ public class UserController {
         }
     }
 
+    @GetMapping("/payoutConfiguration/{userId}")
+    public ResponseEntity<?> getPayoutConfiguration(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<PayoutConfigurationResponse> payoutConfiguration = adyenService.getPayoutConfiguration(user);
+            return ResponseEntity.ok(payoutConfiguration);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+
+    }
+
+    @PostMapping("/payoutConfiguration")
+    public ResponseEntity<?> createPayoutConfiguration(@RequestBody PayoutConfigurationRequest payoutConfigurationRequest) {
+        try {
+            User user = userRepository.findById(payoutConfigurationRequest.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            PayoutConfigurationResponse payoutConfigurationResponse = adyenService.createPayoutConfiguration(
+                    payoutConfigurationRequest.getBalanceAccountId(),
+                    payoutConfigurationRequest.getCurrencyCode(),
+                    payoutConfigurationRequest.getRegular(),
+                    payoutConfigurationRequest.getInstant(),
+                    payoutConfigurationRequest.getTransferInstrumentId(),
+                    payoutConfigurationRequest.getSchedule());
+
+            return ResponseEntity.ok(payoutConfigurationResponse);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/payoutAccount/{userId}")
+    public ResponseEntity<?> getPayoutAccount(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            List<PayoutAccount> payoutAccounts = adyenService.getPayoutAccount(user.getLegalEntityId());
+
+            return ResponseEntity.ok(payoutAccounts);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+
 }
