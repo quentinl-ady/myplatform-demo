@@ -6,6 +6,7 @@ import com.adyen.model.balanceplatform.*;
 import com.adyen.model.balanceplatform.IbanAccountIdentification;
 import com.adyen.model.checkout.*;
 import com.adyen.model.checkout.Amount;
+import com.adyen.model.checkout.DeliveryAddress;
 import com.adyen.model.legalentitymanagement.*;
 import com.adyen.model.legalentitymanagement.Address;
 import com.adyen.model.legalentitymanagement.CALocalAccountIdentification;
@@ -550,7 +551,14 @@ public class AdyenService {
 
     public PaymentSessionResponse createPaymentSession(String currencyCode, Long amount, String reference, Long userId, String storeRef, String activityReason, String balanceAccountId) throws IOException, ApiException {
 
+        ThreeDSRequestData threeDSRequestData = new ThreeDSRequestData()
+                .nativeThreeDS(ThreeDSRequestData.NativeThreeDSEnum.PREFERRED);
+
+        AuthenticationData authenticationData = new AuthenticationData()
+                .threeDSRequestData(threeDSRequestData);
+
         CreateCheckoutSessionRequest createCheckoutSessionRequest = new CreateCheckoutSessionRequest()
+                .authenticationData(authenticationData)
                 .reference(reference)
                 .amount(new Amount().currency(currencyCode).value(amount))
                 .merchantAccount(this.merchantAccount)

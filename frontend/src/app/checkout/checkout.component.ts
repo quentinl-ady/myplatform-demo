@@ -242,6 +242,9 @@ export class CheckoutComponent {
 
         const checkout = await AdyenCheckout(globalConfiguration);
         const dropinConfiguration = {
+            hasHolderName: true,
+            holderNameRequired: true,
+            billingAddressRequired: true,
             paymentMethodsConfiguration: {
                 card: { hasHolderName: true, holderNameRequired: true }
             }
