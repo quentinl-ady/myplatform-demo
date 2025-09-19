@@ -277,7 +277,6 @@ export class SignupComponent {
             this.updateUserTypeControls(type)
         );
 
-        // ⚠️ initialisation correcte
         this.updateRestrictions();
         this.form.valueChanges.subscribe(() => this.updateRestrictions());
     }
@@ -285,18 +284,16 @@ export class SignupComponent {
     updateUserTypeControls(type: string) {
         if (type === 'individual') {
             this.form.removeControl('legalEntityName');
-            this.form.addControl(
-                'firstName',
-                this.fb.control('', Validators.required)
-            );
+            this.form.addControl('firstName', this.fb.control('', Validators.required));
             this.form.addControl('lastName', this.fb.control('', Validators.required));
-        } else {
-            this.form.addControl(
-                'legalEntityName',
-                this.fb.control('', [Validators.required, Validators.minLength(3)])
-            );
+        } else if (type === 'organization') {
+            this.form.addControl('legalEntityName', this.fb.control('', [Validators.required, Validators.minLength(3)]));
             this.form.removeControl('firstName');
             this.form.removeControl('lastName');
+        } else if (type === 'soleProprietorship') {
+            this.form.addControl('firstName', this.fb.control('', Validators.required));
+            this.form.addControl('lastName', this.fb.control('', Validators.required));
+            this.form.addControl('legalEntityName', this.fb.control('', [Validators.required, Validators.minLength(3)]));
         }
         this.cdr.markForCheck();
     }
@@ -333,7 +330,6 @@ export class SignupComponent {
             }
         }
 
-        // flags UI → cases restent cochables sauf si Individual
         this.disableEmbeddedPayment = userType === 'individual';
         this.disableExtraOptions = userType === 'individual';
 
@@ -368,7 +364,7 @@ export class SignupComponent {
         let payload = { ...this.form.value };
         if (payload.userType === 'individual') {
             delete payload.legalEntityName;
-        } else {
+        } else if (payload.userType === 'organization') {
             delete payload.firstName;
             delete payload.lastName;
         }

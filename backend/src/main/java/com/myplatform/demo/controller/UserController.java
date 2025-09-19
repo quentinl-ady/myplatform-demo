@@ -102,7 +102,7 @@ public class UserController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
             }
 
-            String url = adyenService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId);
+            String url = adyenService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId, user.getActivityReason());
             return ResponseEntity.ok().body("{\"url\": \"" + url + "\"}");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");

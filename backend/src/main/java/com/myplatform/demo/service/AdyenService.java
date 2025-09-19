@@ -83,16 +83,18 @@ public class AdyenService {
                         @Value("${adyen.pspApiKey}") String pspApiKey,
                         @Value("${adyen.merchantAccount}") String merchantAccount,
                         @Value("${adyen.clientKey}") String clientKey,
+                        @Value("${adyen.lemApiKey}") String lemApiKey,
                         StoreCustomerRepository storeCustomerRepository, UserRepository userRepository) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
+        Client lemClient = new Client(lemApiKey, Environment.TEST);
         Client pspClient = new Client(pspApiKey, Environment.TEST);
 
-        lem = new LegalEntitiesApi(balancePlatformClient);
-        transferInstrumentsApi = new TransferInstrumentsApi(balancePlatformClient);
-        hop = new HostedOnboardingApi(balancePlatformClient);
+        lem = new LegalEntitiesApi(lemClient);
+        transferInstrumentsApi = new TransferInstrumentsApi(lemClient);
+        hop = new HostedOnboardingApi(lemClient);
         accountHoldersApi = new AccountHoldersApi(balancePlatformClient);
         balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
-        businessLinesApi = new BusinessLinesApi(balancePlatformClient);
+        businessLinesApi = new BusinessLinesApi(lemClient);
         this.balancePlatformApiKey = balancePlatformApiKey;
 
         accountStoreLevelApi = new AccountStoreLevelApi(pspClient);
@@ -157,7 +159,21 @@ public class AdyenService {
                         .soleProprietorship(soleProprietorship)
                         .type(LegalEntityInfoRequiredType.TypeEnum.SOLEPROPRIETORSHIP);
 
-                LegalEntity response = lem.createLegalEntity(legalEntityInfoRequiredType);
+                LegalEntity responseSoleProprietorship = lem.createLegalEntity(legalEntityInfoRequiredType);
+
+                Individual individual = new Individual()
+                        .name(new Name().firstName(user.getFirstName())
+                                .lastName(user.getLastName()))
+                        .residentialAddress(address);
+
+                LegalEntityInfoRequiredType legalEntityInfoRequiredTypeIndiv = new LegalEntityInfoRequiredType()
+                        .individual(individual)
+                        .addEntityAssociationsItem(new LegalEntityAssociation()
+                                .type(LegalEntityAssociation.TypeEnum.SOLEPROPRIETORSHIP)
+                                .legalEntityId(responseSoleProprietorship.getId()))
+                        .type(LegalEntityInfoRequiredType.TypeEnum.INDIVIDUAL);
+
+                LegalEntity response = lem.createLegalEntity(legalEntityInfoRequiredTypeIndiv);
                 return response.getId();
             }
             default -> {
@@ -166,11 +182,19 @@ public class AdyenService {
         }
     }
 
-    public String createHOP(String legalEntityId, String countryCode, Long userId) throws IOException, ApiException {
+    public String createHOP(String legalEntityId, String countryCode, Long userId, String activityReason) throws IOException, ApiException {
         String languageCode = languageMap.getOrDefault(countryCode.toUpperCase(), "en-US");
+
+        OnboardingLinkSettings onboardingLinkSettings = new OnboardingLinkSettings();
+        onboardingLinkSettings.setChangeLegalEntityType(false);
+        if (activityReason.equals("embeddedPayment")){
+            onboardingLinkSettings.setRequirePciSignEcommerce(true);
+            onboardingLinkSettings.setRequirePciSignPos(true);
+        }
 
         OnboardingLinkInfo onboardingLinkInfo = new OnboardingLinkInfo()
                 .locale(languageCode)
+                .settings(onboardingLinkSettings)
                 .redirectUrl("http://localhost:4200/" + userId + "/dashboard");
 
         OnboardingLink link = hop.getLinkToAdyenhostedOnboardingPage(legalEntityId, onboardingLinkInfo);
