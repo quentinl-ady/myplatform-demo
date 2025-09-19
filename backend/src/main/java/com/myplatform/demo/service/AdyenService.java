@@ -446,7 +446,7 @@ public class AdyenService {
         String currencyCode = balanceAccountsApi.getBalanceAccount(balanceAccountId).getDefaultCurrencyCode();
 
         List<SplitConfiguration> splitConfigurationList = splitConfigurationMerchantLevelApi.listSplitConfigurations(this.merchantAccount).getData();
-        String description = "DEFAULT CONTRACT myPlatform.com " + currencyCode;
+        String description = "DEFAULT CONTRACT 19/09/2025 myPlatform.com " + currencyCode;
 
         SplitConfiguration splitConfiguration1 = splitConfigurationList.stream()
                 .filter(sc -> description.equals(sc.getDescription()))
@@ -463,6 +463,7 @@ public class AdyenService {
                     .paymentMethod("ANY")
                     .shopperInteraction(SplitConfigurationRule.ShopperInteractionEnum.ANY)
                     .splitLogic(new SplitConfigurationLogic()
+                            .refund(SplitConfigurationLogic.RefundEnum.DEDUCTACCORDINGTOSPLITRATIO)
                             .commission(new Commission()
                                     .variablePercentage(1000L))
                             .paymentFee(SplitConfigurationLogic.PaymentFeeEnum.DEDUCTFROMLIABLEACCOUNT)));
@@ -560,14 +561,13 @@ public class AdyenService {
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0) //force autocapture
                 .telephoneNumber("+33610101010")
-                .returnUrl("http://localhost:4000/" + userId + "/payment");
+                .returnUrl("http://localhost:4000/" + userId + "/checkout");
 
         if (activityReason.equals("embeddedPayment")) {
             createCheckoutSessionRequest.setStore(storeRef);
             StoreCustomer storeCustomer = this.storeCustomerRepository.findByStoreRef(storeRef);
             createCheckoutSessionRequest.setCountryCode(storeCustomer.getCountry());
-        }
-        { // marketplace
+        } else if (activityReason.equals("marketplace")) {
             List<Split> splits = new ArrayList<>();
 
             long commissionAmount = Math.round(amount * 0.10); // 10% commission
