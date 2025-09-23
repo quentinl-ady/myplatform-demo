@@ -6,15 +6,13 @@ import com.myplatform.demo.model.*;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.AdyenService;
+import com.myplatform.demo.service.KYCService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 
 @RestController
@@ -29,6 +27,9 @@ public class UserController {
 
     @Autowired
     private AdyenService adyenService;
+
+    @Autowired
+    private KYCService kycService;
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody User user) {
@@ -449,6 +450,47 @@ public class UserController {
             List<PayoutAccount> payoutAccounts = adyenService.getPayoutAccount(user.getLegalEntityId());
 
             return ResponseEntity.ok(payoutAccounts);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/bankAccount/")
+    public ResponseEntity<?> createBankAccount(@RequestBody BusinessBankAccountRequest businessBankAccountRequest) {
+        try {
+            User user = userRepository.findById(businessBankAccountRequest.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            String balanceAccountId = adyenService.createBalanceAccountId(user.getAccountHolderId(), user.getCurrencyCode());
+            // adyenService.createBusinessBankAccount(balanceAccountId, country, ....);
+            return ResponseEntity.ok(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/validateKyc/{userId}")
+    public ResponseEntity<?> validateKyc(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            kycService.validateKyc(user.getLegalEntityId(), user.getUserType(), user.getCountryCode());
+            kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
+
+
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "KYC processed successfully");
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }

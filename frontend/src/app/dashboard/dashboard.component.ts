@@ -123,6 +123,18 @@ export interface BusinessLine {
         </button>
       </form>
     </mat-card>
+    
+    <mat-card class="kyc-test-card">
+  <div class="kyc-test-content">
+    <p class="warning-text">⚠️ Test only !</p>
+    <button mat-raised-button color="warn" 
+            (click)="validateKyc(userId)" 
+            [disabled]="loadingKyc()">
+      🔧 Validate KYC
+      <mat-progress-spinner *ngIf="loadingKyc()" mode="indeterminate" diameter="20"></mat-progress-spinner>
+    </button>
+  </div>
+</mat-card>
 
   </div>
   `,
@@ -182,6 +194,36 @@ export interface BusinessLine {
     }
 
     .full-width { width: 100%; }
+    
+    .kyc-test-card {
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  background-color: #fff;
+  border-left: 4px solid #d32f2f; /* accent warning */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 400px;
+}
+
+.kyc-test-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.kyc-test-card button {
+  align-self: stretch;
+  font-weight: bold;
+}
+
+.warning-text {
+  color: #d32f2f;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
   `]
 })
 export class DashboardComponent {
@@ -190,6 +232,7 @@ export class DashboardComponent {
     readonly loading = signal(false);
     readonly businessLines = signal<BusinessLine[]>([]);
     readonly user = signal<User | null>(null);
+    readonly loadingKyc = signal(false);
     submitting = false;
 
     readonly INDUSTRY_CODES = INDUSTRY_CODES;
@@ -329,4 +372,24 @@ export class DashboardComponent {
             }
         });
     }
+
+    validateKyc(userId: string) {
+        if (!userId) return;
+
+        this.loadingKyc.set(true);
+
+        this.authService.validateKyc(Number(userId)).subscribe({
+            next: () => {
+                this.loadingKyc.set(false);
+                this.matSnackBar.open('✅ KYC validated', 'Close', {duration: 3000});
+                this.checkOnboarding();
+            },
+            error: (err) => {
+                console.error(err);
+                this.loadingKyc.set(false);
+                this.matSnackBar.open('❌ Error validating KYC', 'Close', {duration: 3000});
+            }
+        });
+    }
+
 }

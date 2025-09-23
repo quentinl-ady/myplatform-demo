@@ -4,8 +4,8 @@ spring.jpa.hibernate.ddl-auto=update
 spring.jpa.database-platform=org.hibernate.community.dialect.SQLiteDialect
 adyen.balancePlatformApiKey=
 adyen.lemApiKey=
-adyen.merchantAccount=
 adyen.pspApiKey=
+adyen.merchantAccount=
 adyen.clientKey=
 
 #Rename me application.properties

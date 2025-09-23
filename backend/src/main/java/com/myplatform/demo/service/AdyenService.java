@@ -12,16 +12,14 @@ import com.adyen.model.legalentitymanagement.Address;
 import com.adyen.model.legalentitymanagement.CALocalAccountIdentification;
 import com.adyen.model.legalentitymanagement.JSON;
 import com.adyen.model.legalentitymanagement.Name;
+import com.adyen.model.legalentitymanagement.PhoneNumber;
 import com.adyen.model.management.*;
 import com.adyen.model.management.PaymentMethod;
 import com.adyen.service.balanceplatform.AccountHoldersApi;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
 import com.adyen.service.checkout.PaymentsApi;
 import com.adyen.service.exception.ApiException;
-import com.adyen.service.legalentitymanagement.BusinessLinesApi;
-import com.adyen.service.legalentitymanagement.HostedOnboardingApi;
-import com.adyen.service.legalentitymanagement.LegalEntitiesApi;
-import com.adyen.service.legalentitymanagement.TransferInstrumentsApi;
+import com.adyen.service.legalentitymanagement.*;
 import com.adyen.service.management.AccountStoreLevelApi;
 import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
@@ -29,6 +27,7 @@ import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.util.DocumentUtil;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,6 +41,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.security.KeyRep;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,11 +65,11 @@ public class AdyenService {
     private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
     private final PaymentsApi paymentsApi;
     private final String merchantAccount;
+
     @Getter
     private final String clientKey;
 
     private final StoreCustomerRepository storeCustomerRepository;
-    private final UserRepository userRepository;
 
     Map<String, String> languageMap = Map.of(
             "FR", "fr-FR",
@@ -111,7 +111,6 @@ public class AdyenService {
         this.storeCustomerRepository = storeCustomerRepository;
 
         this.clientKey = clientKey;
-        this.userRepository = userRepository;
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -415,7 +414,7 @@ public class AdyenService {
                 .line1(lineAdresse1);
 
         if (country.equals("US")) {
-            storeLocation.setPostalCode("NY"); //workaround, keep the UI simple.
+            storeLocation.setStateOrProvince("NY"); //workaround, keep the UI simple.
         }
 
         storeCreationRequest.address(storeLocation);

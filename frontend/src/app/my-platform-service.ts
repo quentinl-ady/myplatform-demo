@@ -217,5 +217,9 @@ export class MyPlatformService {
     return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/payoutConfiguration/${userId}/${balanceAccountId}`);
   }
 
+  validateKyc(userId: number): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/validateKyc/${userId}`, {}, { responseType: 'json' });
+  }
+
 
 }
