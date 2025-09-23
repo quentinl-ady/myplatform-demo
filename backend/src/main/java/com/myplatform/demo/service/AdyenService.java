@@ -203,10 +203,14 @@ public class AdyenService {
     }
 
 
-    public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing) throws IOException, ApiException {
+    public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing, String firstName, String lastName, String legalName, String userType) throws IOException, ApiException {
+        String reference = userType.equals("individual")
+                ? firstName + " " + lastName
+                : legalName;
+
         AccountHolderInfo accountHolderInfo = new AccountHolderInfo()
                 .legalEntityId(legalEntityId)
-                .reference(String.valueOf(System.currentTimeMillis()));
+                .reference(reference);
 
         Map<String, AccountHolderCapability> capabilities = new HashMap<>(Map.of(
                 "receiveFromBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),

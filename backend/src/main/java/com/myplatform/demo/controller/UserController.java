@@ -41,7 +41,7 @@ public class UserController {
             }
 
             String legalEntityId = adyenService.createLegalEntity(user);
-            String accountHolderId = adyenService.createAccountHolder(legalEntityId, user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
+            String accountHolderId = adyenService.createAccountHolder(legalEntityId, user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing(), user.getFirstName(), user.getLastName(), user.getLegalEntityName(), user.getUserType());
             String balanceAccountId = adyenService.createBalanceAccountId(accountHolderId, user.getCurrencyCode());
 
             user.setAccountHolderId(accountHolderId);
