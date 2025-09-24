@@ -146,7 +146,7 @@ public class KYCService {
     }
 
     private void handleSoleProprietorshipKyc(String legalEntityId, Address address, CountryKycData countryData, PhoneNumber phoneNumber, TaxInformation taxIndiv) throws IOException, ApiException {
-        String legalEntityIdSole = lem.getLegalEntity(legalEntityId).getEntityAssociations().getFirst().getLegalEntityId();
+        String legalEntityIdSole = lem.getLegalEntity(legalEntityId).getEntityAssociations().get(0).getLegalEntityId();
 
         SoleProprietorship sole = new SoleProprietorship()
                 .name("MySoloCorp")
@@ -167,7 +167,7 @@ public class KYCService {
 
         String acceptedById = "";
         if ("organization".equals(userType)) {
-            acceptedById = lem.getLegalEntity(legalEntityId).getEntityAssociations().getFirst().getLegalEntityId();
+            acceptedById = lem.getLegalEntity(legalEntityId).getEntityAssociations().get(0).getLegalEntityId();
         }
         if ("individual".equals(userType) || "soleProprietorship".equals(userType)) {
             acceptedById = legalEntityId;
