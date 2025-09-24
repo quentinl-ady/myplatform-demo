@@ -48,8 +48,8 @@ This project is an example integration of the **Adyen Embedded Payment && Embedd
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
-cd <repository-root>
+git clone https://github.com/quentinl-ady/myplatform-demo.git
+cd myplatform-demo
 ```
 
 ### 2. Install the frontend
@@ -64,6 +64,13 @@ npm install
 cd ../backend
 mvn clean install
 ```
+#### or with maven wrapper 
+
+```bash
+cd ../backend
+./mvnw clean install
+```
+
 ## Environment Variables
 To run the project, you need to provide Adyen API credentials. You can do this in `backend/src/main/resources/application.properties`
 
@@ -74,6 +81,12 @@ From the `/backend` directory:
 ```bash
 mvn spring-boot:run
 ```
+
+#### or with maven wrapper
+```bash
+./mvnw spring-boot:run
+```
+
 The backend will run on http://localhost:8080
 
 ### 2. Start the frontend

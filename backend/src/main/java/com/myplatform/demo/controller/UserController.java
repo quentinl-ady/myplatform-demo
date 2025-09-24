@@ -466,7 +466,7 @@ public class UserController {
             }
 
             String balanceAccountId = adyenService.createBalanceAccountId(user.getAccountHolderId(), user.getCurrencyCode());
-            // adyenService.createBusinessBankAccount(balanceAccountId, country, ....);
+            //adyenService.createBusinessBankAccount(balanceAccountId, user.getCountryCode(), );
             return ResponseEntity.ok(null);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
