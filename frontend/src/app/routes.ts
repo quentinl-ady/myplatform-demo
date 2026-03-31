@@ -10,12 +10,20 @@ import {DisputeComponent} from "./dispute/dispute.component";
 import {BusinessLoansComponent} from "./business-loans/business-loans.component";
 import {StoreComponent} from "./store/store.component";
 import {CheckoutComponent} from "./checkout/checkout.component";
+import {PaymentResultComponent} from "./result/paymentresult.component";
+import {PayByLinkComponent} from "./paybylink/paybylink.component";
+import {DeviceComponent} from "./device/device.component";
+import {TransferComponent} from "./transfer/transfer.component"
 
 const routeConfig: Routes = [
   {
     path: '',
     component: MainComponent,
     title: 'Homepage'
+  },
+  {
+    path: 'result/:status',
+    component: PaymentResultComponent
   },
   {
     path: 'login',
@@ -65,8 +73,27 @@ const routeConfig: Routes = [
         path: 'checkout',
         component: CheckoutComponent,
         title: 'Checkout'
+      },
+      {
+         path: 'paybylink',
+         component: PayByLinkComponent,
+         title: 'Pay-by-Link'
+      },
+      {
+        path: 'device',
+        component: DeviceComponent,
+        title: 'Device'
+      },
+      {
+        path: 'transfer',
+        component: TransferComponent,
+        title: 'Transfer'
       }
     ]
+  },
+  {
+    path: '**',
+    redirectTo: '/'
   }
 
 ];

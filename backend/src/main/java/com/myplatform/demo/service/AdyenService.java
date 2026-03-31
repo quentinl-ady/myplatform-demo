@@ -2,34 +2,37 @@ package com.myplatform.demo.service;
 
 import com.adyen.Client;
 import com.adyen.enums.Environment;
+import com.adyen.model.RequestOptions;
 import com.adyen.model.balanceplatform.*;
-import com.adyen.model.balanceplatform.IbanAccountIdentification;
+import com.adyen.model.balanceplatform.PaymentInstrument;
 import com.adyen.model.checkout.*;
 import com.adyen.model.checkout.Amount;
-import com.adyen.model.checkout.DeliveryAddress;
 import com.adyen.model.legalentitymanagement.*;
 import com.adyen.model.legalentitymanagement.Address;
-import com.adyen.model.legalentitymanagement.CALocalAccountIdentification;
-import com.adyen.model.legalentitymanagement.JSON;
 import com.adyen.model.legalentitymanagement.Name;
-import com.adyen.model.legalentitymanagement.PhoneNumber;
 import com.adyen.model.management.*;
 import com.adyen.model.management.PaymentMethod;
+import com.adyen.model.transfers.*;
+import com.adyen.model.transfers.IbanAccountIdentification;
 import com.adyen.service.balanceplatform.AccountHoldersApi;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
+import com.adyen.service.balanceplatform.ManageScaDevicesApi;
+import com.adyen.service.balanceplatform.PaymentInstrumentsApi;
 import com.adyen.service.checkout.PaymentsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.*;
 import com.adyen.service.management.AccountStoreLevelApi;
 import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
+import com.adyen.service.transfers.TransfersApi;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
-import com.myplatform.demo.util.DocumentUtil;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -39,17 +42,17 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
-import java.security.KeyRep;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static java.util.Objects.isNull;
-import static java.util.stream.Collectors.toList;
+import static com.myplatform.demo.service.GpayJwtService.MERCHANT_ID;
 
 @Service
+@Getter
 public class AdyenService {
     private final LegalEntitiesApi lem;
     private final TransferInstrumentsApi transferInstrumentsApi;
@@ -65,11 +68,17 @@ public class AdyenService {
     private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
     private final PaymentsApi paymentsApi;
     private final String merchantAccount;
+    private final ManageScaDevicesApi manageScaDevicesApi;
+    private final TransfersApi transfersApi;
+    private final RestTemplate restTemplate;
 
     @Getter
     private final String clientKey;
 
     private final StoreCustomerRepository storeCustomerRepository;
+    private final KYCService kycService;
+    private final PaymentInstrumentsApi paymentInstrumentsApi;
+
 
     Map<String, String> languageMap = Map.of(
             "FR", "fr-FR",
@@ -85,12 +94,16 @@ public class AdyenService {
                         @Value("${adyen.merchantAccount}") String merchantAccount,
                         @Value("${adyen.clientKey}") String clientKey,
                         @Value("${adyen.lemApiKey}") String lemApiKey,
-                        StoreCustomerRepository storeCustomerRepository, UserRepository userRepository) {
+                        @Value("${adyen.lemVersion}") String lemVersion,
+                        StoreCustomerRepository storeCustomerRepository,
+                        UserRepository userRepository, RestTemplate restTemplate, KYCService kycService
+                        ) {
+        this.restTemplate = restTemplate;
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         Client lemClient = new Client(lemApiKey, Environment.TEST);
         Client pspClient = new Client(pspApiKey, Environment.TEST);
 
-        lem = new LegalEntitiesApi(lemClient);
+        lem = new LegalEntitiesApi(lemClient, "https://kyc-test.adyen.com/lem/" + lemVersion);
         transferInstrumentsApi = new TransferInstrumentsApi(lemClient);
         hop = new HostedOnboardingApi(lemClient);
         accountHoldersApi = new AccountHoldersApi(balancePlatformClient);
@@ -111,6 +124,14 @@ public class AdyenService {
         this.storeCustomerRepository = storeCustomerRepository;
 
         this.clientKey = clientKey;
+
+        this.manageScaDevicesApi = new ManageScaDevicesApi(balancePlatformClient);
+
+        this.transfersApi = new TransfersApi(balancePlatformClient);
+
+        this.kycService = kycService;
+
+        this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -204,9 +225,7 @@ public class AdyenService {
 
 
     public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing, String firstName, String lastName, String legalName, String userType) throws IOException, ApiException {
-        String reference = userType.equals("individual")
-                ? firstName + " " + lastName
-                : legalName;
+        String reference = getReference(firstName, lastName, legalName, userType);
 
         AccountHolderInfo accountHolderInfo = new AccountHolderInfo()
                 .legalEntityId(legalEntityId)
@@ -239,6 +258,7 @@ public class AdyenService {
             capabilities.put("sendToThirdParty", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("receiveFromThirdParty", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("receiveFromTransferInstrument", new AccountHolderCapability().enabled(true).requested(true));
+            kycService.createBankBusinessLine(legalEntityId);
         } else {
             capabilities.put("issueBankAccount", new AccountHolderCapability().enabled(false).requested(false));
             capabilities.put("sendToThirdParty", new AccountHolderCapability().enabled(false).requested(false));
@@ -260,6 +280,18 @@ public class AdyenService {
 
         AccountHolder accountHolder = accountHoldersApi.createAccountHolder(accountHolderInfo);
         return accountHolder.getId();
+    }
+
+    private static String getReference(String firstName, String lastName, String legalName, String userType) {
+        return userType.equals("individual")
+                ? firstName + " " + lastName
+                : legalName;
+    }
+
+    public void updateAccountHolder(String accountHolderId, Long id, String firstName, String lastName, String legalName, String userType) throws IOException, ApiException {
+        AccountHolderUpdateRequest accountHolderUpdateRequest = new AccountHolderUpdateRequest()
+                .reference(getReference(firstName, lastName, legalName, userType).concat("_").concat(id.toString()));
+        accountHoldersApi.updateAccountHolder(accountHolderId, accountHolderUpdateRequest);
     }
 
     public KycStatus getLegalEntityKycDetail(String legalEntityId, String activityReason, Boolean bank, Boolean capital, Boolean issuing) throws IOException, ApiException {
@@ -345,6 +377,7 @@ public class AdyenService {
         }
 
         return businessLines.stream()
+                .filter(businessLine -> "paymentProcessing".equals(businessLine.getService().getValue()))
                 .map(businessLine -> {
                     Activity activity = new Activity();
                     activity.setId(businessLine.getId());
@@ -417,6 +450,10 @@ public class AdyenService {
                 .postalCode(postalCode)
                 .line1(lineAdresse1);
 
+        if(country.equals("UK")){
+            country = "GB";
+        }
+
         if (country.equals("US")) {
             storeLocation.setStateOrProvince("NY"); //workaround, keep the UI simple.
         }
@@ -483,9 +520,13 @@ public class AdyenService {
             throws IOException, ApiException {
 
         List<BusinessLine> businessLines =
-                lem.getAllBusinessLinesUnderLegalEntity(legalEntityId).getBusinessLines();
+                lem.getAllBusinessLinesUnderLegalEntity(legalEntityId)
+                        .getBusinessLines()
+                        .stream()
+                        .filter(bl -> "paymentProcessing".equals(bl.getService().getValue()))
+                        .toList();
 
-        List<String> specificPM = new ArrayList<>(List.of("cartebancaire", "amex"));
+        List<String> specificPM = new ArrayList<>(List.of("cartebancaire", "amex", "googlepay"));
 
         for (BusinessLine businessLine : businessLines) {
             for (String paymentMethod : paymentMethodRequest) {
@@ -520,8 +561,25 @@ public class AdyenService {
                 paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
                 paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
                 paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("amex"));
-                paymentMethodSetupInfo.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
                 paymentMethodSetupInfo.setCurrencies(new ArrayList<>(List.of("EUR")));
+
+
+                paymentMethodSetupInfo.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
+
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            }
+        }
+
+        if (paymentMethodRequest.contains("googlepay")) {
+            for (BusinessLine businessLine : businessLines) {
+
+                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
+                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
+                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
+                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("googlepay"));
+
+                paymentMethodSetupInfo.googlePay(new GooglePayInfo().reuseMerchantId(Boolean.TRUE)
+                        .merchantId(MERCHANT_ID));
 
                 paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
             }
@@ -537,7 +595,10 @@ public class AdyenService {
                 .map(paymentMethod -> {
                     PaymentMethodCustomer paymentMethodCustomer = new PaymentMethodCustomer();
                     paymentMethodCustomer.setType(paymentMethod.getType());
-                    paymentMethodCustomer.setVerificationStatus(paymentMethod.getVerificationStatus().getValue());
+                    String verificationStatus = Optional.ofNullable(paymentMethod.getVerificationStatus())
+                            .map(PaymentMethod.VerificationStatusEnum::getValue)
+                            .orElse("valid");
+                    paymentMethodCustomer.setVerificationStatus(verificationStatus);
                     return paymentMethodCustomer;
                 })
                 .toList();
@@ -560,19 +621,40 @@ public class AdyenService {
         AuthenticationData authenticationData = new AuthenticationData()
                 .threeDSRequestData(threeDSRequestData);
 
+        LineItem lineItem = new LineItem();
+        lineItem.setDescription("item toto");
+        lineItem.setAmountIncludingTax(amount);
+        lineItem.setQuantity(1L);
+
+        String countryCode = "";
+        if ("USD".equals(currencyCode)){
+           countryCode = "US";
+        } else if ("EUR".equals(currencyCode)) {
+            countryCode = "FR";
+        } else if ("GBP".equals(currencyCode)) {
+            countryCode = "GB";
+        }
+
         CreateCheckoutSessionRequest createCheckoutSessionRequest = new CreateCheckoutSessionRequest()
+                .storePaymentMethod(Boolean.FALSE)
+                .recurringProcessingModel(CreateCheckoutSessionRequest.RecurringProcessingModelEnum.SUBSCRIPTION)
+                .shopperReference("john.doe@gmail.com_" + storeRef)
                 .authenticationData(authenticationData)
                 .reference(reference)
+                .merchantOrderReference(reference)
+                .countryCode(countryCode)
+                .shopperInteraction(CreateCheckoutSessionRequest.ShopperInteractionEnum.ECOMMERCE)
+                .addLineItemsItem(lineItem)
                 .amount(new Amount().currency(currencyCode).value(amount))
                 .merchantAccount(this.merchantAccount)
                 .channel(CreateCheckoutSessionRequest.ChannelEnum.WEB)
                 .shopperEmail("john.doe@gmail.com")
                 .shopperIP("192.168.1.1")
-                .shopperName(new com.adyen.model.checkout.Name().firstName("John").lastName("Doe"))
+                .shopperName(new ShopperName().firstName("John").lastName("Doe"))
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0) //force autocapture
                 .telephoneNumber("+33610101010")
-                .returnUrl("http://localhost:4000/" + userId + "/checkout");
+                .returnUrl("http://localhost:8080/handleShopperRedirect");
 
         if (activityReason.equals("embeddedPayment")) {
             createCheckoutSessionRequest.setStore(storeRef);
@@ -731,5 +813,133 @@ public class AdyenService {
         String accountIdentifier = getAccountIdentifier(sweep.getCounterparty().getTransferInstrumentId());
         response.setAccountIdentifier(accountIdentifier);
         return response;
+    }
+
+    public List<Device> getListDevices(String paymentInstrumentId) throws IOException, ApiException {
+        SearchRegisteredDevicesResponse searchRegisteredDevicesResponse = manageScaDevicesApi.listRegisteredScaDevices(paymentInstrumentId);
+        return searchRegisteredDevicesResponse.getData();
+    }
+
+    public RegisterSCAResponse registerDevice(String sdkOutput, String paymentInstrumentId) throws IOException, ApiException {
+        DelegatedAuthenticationData delegatedAuthenticationData = new DelegatedAuthenticationData();
+        delegatedAuthenticationData.setSdkOutput(sdkOutput);
+
+        RegisterSCARequest registerSCARequest = new RegisterSCARequest()
+                .name("macbook adyen")
+                .paymentInstrumentId(paymentInstrumentId)
+                .strongCustomerAuthentication(delegatedAuthenticationData);
+
+        return manageScaDevicesApi.initiateRegistrationOfScaDevice(registerSCARequest);
+    }
+
+
+    public RegisterSCAFinalResponse finalizeRegistration(String id, String sdkOutput, String paymentInstrumentId) throws IOException, ApiException {
+        DelegatedAuthenticationData delegatedAuthenticationData = new DelegatedAuthenticationData();
+        delegatedAuthenticationData.setSdkOutput(sdkOutput);
+
+        RegisterSCARequest registerSCARequest = new RegisterSCARequest()
+                .paymentInstrumentId(paymentInstrumentId)
+                .strongCustomerAuthentication(delegatedAuthenticationData);
+
+        return manageScaDevicesApi.completeRegistrationOfScaDevice(id, registerSCARequest);
+    }
+
+    public void deleteDevice(String id, String paymentInstrumentId) throws IOException, ApiException {
+        manageScaDevicesApi.deleteRegistrationOfScaDevice(id, paymentInstrumentId);
+    }
+
+    public InitiateTransferResponse initiateTransfer(TransferRequest request, String paymentInstrumentId) throws IOException, ApiException, HttpClientErrorException {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("X-API-Key", balancePlatformApiKey);
+
+        String authenticate = "SCA realm=\"Transfer\" " + "auth-param1=\"" + request.getSdkOutput() + "\"";
+        headers.add("WWW-Authenticate", authenticate);
+
+        HttpEntity<TransferInfo> entity = new HttpEntity<>(transferInfo, headers);
+
+
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers";
+
+        ResponseEntity<Transfer> response =
+                restTemplate.exchange(
+                        url,
+                        HttpMethod.POST,
+                        entity,
+                        Transfer.class
+                );
+
+        Transfer transferBody = response.getBody();
+        HttpHeaders transferHeaders = response.getHeaders();
+
+        InitiateTransferResponse initiateTransferResponse = new InitiateTransferResponse();
+        initiateTransferResponse.setCounterparty(transferBody.getCounterparty().getBankAccount().getAccountIdentification().getIbanAccountIdentification().getIban());
+        initiateTransferResponse.setAmount(transferBody.getAmount().getValue());
+        initiateTransferResponse.setAuthParam1(transferHeaders.get("auth-param1").stream().findFirst().get());
+
+        return initiateTransferResponse;
+    }
+
+    private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId) {
+        IbanAccountIdentification iban = new IbanAccountIdentification();
+        iban.setIban(request.getCounterpartyBankAccount());
+        iban.setType(IbanAccountIdentification.TypeEnum.IBAN);
+
+        TransferInfo transferInfo = new TransferInfo();
+        transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("EUR")
+                .value(request.getAmount()));
+        transferInfo.setPaymentInstrumentId(paymentInstrumentId);
+        transferInfo.setCategory(TransferInfo.CategoryEnum.BANK);
+        CounterpartyInfoV3 counterpartyInfo = new CounterpartyInfoV3();
+        BankAccountV3 bankAccount = new BankAccountV3();
+        BankAccountV3AccountIdentification accountIdentification = new BankAccountV3AccountIdentification(iban);
+        bankAccount.setAccountHolder(new PartyIdentification().fullName("Quentin Lecornu"));
+        bankAccount.setAccountIdentification(accountIdentification);
+        counterpartyInfo.setBankAccount(bankAccount);
+        transferInfo.setCounterparty(counterpartyInfo);
+        transferInfo.setDescription(request.getReference());
+        transferInfo.setReference(request.getReference());
+        transferInfo.setReferenceForBeneficiary(request.getReference());
+        transferInfo.setPriority(TransferInfo.PriorityEnum.fromValue(request.getTransferType()));
+        return transferInfo;
+    }
+
+    public void finalizeTransfer(TransferRequest request, String paymentInstrumentId) {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("X-API-Key", balancePlatformApiKey);
+
+        String authenticate = "SCA realm=\"Transfer\" " + "auth-param1=\"" + request.getSdkOutput() + "\"";
+        headers.add("WWW-Authenticate", authenticate);
+
+        HttpEntity<TransferInfo> entity = new HttpEntity<>(transferInfo, headers);
+
+
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers";
+
+        ResponseEntity<Transfer> response =
+                restTemplate.exchange(
+                        url,
+                        HttpMethod.POST,
+                        entity,
+                        Transfer.class
+                );
+
+
+    }
+
+    public BankAccountInformationResponse getBankAccountInformation(String bankAccountId) throws IOException, ApiException {
+        BankAccountInformationResponse bankAccountInformationResponse = new BankAccountInformationResponse();
+        PaymentInstrument paymentInstrument = this.paymentInstrumentsApi.getPaymentInstrument(bankAccountId);
+        BalanceAccount balanceAccount = balanceAccountsApi.getBalanceAccount(paymentInstrument.getBalanceAccountId());
+        bankAccountInformationResponse.setCurrency(balanceAccount.getBalances().get(0).getCurrency());
+        bankAccountInformationResponse.setAmount(balanceAccount.getBalances().get(0).getAvailable());
+        bankAccountInformationResponse.setDescription(paymentInstrument.getDescription());
+
+        return bankAccountInformationResponse;
     }
 }

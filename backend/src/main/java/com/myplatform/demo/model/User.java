@@ -28,6 +28,8 @@ public class User {
     private Boolean bank;
     private Boolean capital;
     private Boolean issuing;
+    private String bankAccountId;
+    private String bankAccountNumber;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StoreCustomer> storesCustomer;

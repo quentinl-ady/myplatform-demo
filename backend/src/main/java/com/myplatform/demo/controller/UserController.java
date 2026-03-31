@@ -1,18 +1,37 @@
 package com.myplatform.demo.controller;
 
+import com.adyen.model.balanceplatform.Device;
+import com.adyen.model.balanceplatform.PaymentInstrument;
+import com.adyen.model.balanceplatform.RegisterSCAFinalResponse;
+import com.adyen.model.balanceplatform.RegisterSCAResponse;
+import com.adyen.model.checkout.PaymentCompletionDetails;
+import com.adyen.model.checkout.PaymentDetailsRequest;
+import com.adyen.model.checkout.PaymentDetailsResponse;
+import com.adyen.service.exception.ApiException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myplatform.demo.dto.*;
 import com.myplatform.demo.dto.StoreCustomerDTO;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.AdyenService;
+import com.myplatform.demo.service.GpayJwtService;
+import com.myplatform.demo.service.IssuingService;
 import com.myplatform.demo.service.KYCService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.servlet.view.RedirectView;
 
+import java.io.IOException;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @RestController
@@ -30,6 +49,12 @@ public class UserController {
 
     @Autowired
     private KYCService kycService;
+
+    @Autowired
+    private IssuingService issuingService;
+
+    @Autowired
+    private GpayJwtService gpayJwtService;
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody User user) {
@@ -49,6 +74,7 @@ public class UserController {
             user.setBalanceAccountId(balanceAccountId);
 
             User savedUser = userRepository.save(user);
+            adyenService.updateAccountHolder(accountHolderId, savedUser.getId(), user.getFirstName(), user.getLastName(), user.getLegalEntityName(), user.getUserType());
 
             return ResponseEntity.ok().body("{\"id\": " + savedUser.getId() + "}");
         } catch (Exception e) {
@@ -223,6 +249,29 @@ public class UserController {
         }
     }
 
+
+    @GetMapping("/paybylink/{userId}")
+    public ResponseEntity<?> getPayByLinksInformation(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no accountHolderId");
+            }
+
+            String status = adyenService.createSession(user.getAccountHolderId(), new String[]{
+                    "Pay By Link Component: View",
+                    "Pay By Link Component: View PII",
+                    "Pay By Link Component: Manage Links",
+                    "Pay By Link Component: Manage Settings"
+            });
+            return ResponseEntity.ok(status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
     @PostMapping("/activity/{userId}")
     public ResponseEntity<?> createActivity(@PathVariable Long userId, @RequestBody Activity activity) {
         try {
@@ -388,6 +437,57 @@ public class UserController {
     }
 
 
+    @GetMapping("/handleShopperRedirect")
+    public RedirectView handleShopperRedirect(@RequestParam(required = false) String payload,
+                                              @RequestParam(required = false) String redirectResult) throws IOException, ApiException {
+
+        PaymentCompletionDetails completionDetails = new PaymentCompletionDetails();
+        if (redirectResult != null && !redirectResult.isEmpty()) {
+            completionDetails.redirectResult(redirectResult);
+        } else if (payload != null && !payload.isEmpty()) {
+            completionDetails.payload(payload);
+        }
+
+        PaymentDetailsRequest detailsRequest = new PaymentDetailsRequest();
+        detailsRequest.setDetails(completionDetails);
+
+        PaymentDetailsResponse paymentDetailsResponse = adyenService.getPaymentsApi().paymentsDetails(detailsRequest);
+
+        String redirectURL = "/result/";
+        switch (paymentDetailsResponse.getResultCode()) {
+            case AUTHORISED:
+                redirectURL += "success";
+                break;
+            case PENDING:
+            case RECEIVED:
+                redirectURL += "pending";
+                break;
+            case REFUSED:
+                redirectURL += "failed";
+                break;
+            default:
+                redirectURL += "error";
+                break;
+        }
+
+        return new RedirectView(redirectURL + "?reason=" + paymentDetailsResponse.getResultCode());
+    }
+
+//    @PostMapping("/payments/details")
+//    public PaymentsResponse handleRedirect(@RequestBody Map<String, String> body) throws ApiException, IOException {
+//        String redirectResult = body.get("redirectResult");
+//        String payload = body.get("payload"); // selon le paiement
+//
+//        PaymentsDetailsRequest detailsRequest = new PaymentsDetailsRequest();
+//        Map<String, String> details = new HashMap<>();
+//        if (redirectResult != null) details.put("redirectResult", redirectResult);
+//        if (payload != null) details.put("payload", payload);
+//        detailsRequest.setDetails(details);
+//
+//        return checkout.paymentsDetails(detailsRequest); // SDK officiel
+//    }
+
+
     @GetMapping("/clientKey")
     public ResponseEntity<?> getClientKey() {
         try {
@@ -486,6 +586,23 @@ public class UserController {
             kycService.validateKyc(user.getLegalEntityId(), user.getUserType(), user.getCountryCode());
             kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
 
+            if (user.getBank()){
+                String businessAccountBalanceAccountId = kycService.createBalanceForBusinessAccount(user.getCountryCode(), user.getAccountHolderId());
+                kycService.createSweepAcquiringToBanking(user.getCountryCode(), businessAccountBalanceAccountId, user.getBalanceAccountId());
+                String paymentInstrumentBankAccount = kycService.createBankAccount(user.getCountryCode(), businessAccountBalanceAccountId);
+                PaymentInstrument paymentInstrument = kycService.getPaymentInstrumentDetail(paymentInstrumentBankAccount);
+
+                if("US".equals(user.getCountryCode())){
+                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getRoutingNumber());
+                } else if("FR".equals(user.getCountryCode())) {
+                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getIban());
+                } else if ("UK".equals(user.getCountryCode()) || "GB".equals(user.getCountryCode())){
+                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getSortCode());
+                }
+                user.setBankAccountId(paymentInstrumentBankAccount);
+
+                userRepository.save(user);
+            }
 
             Map<String, String> response = new HashMap<>();
             response.put("status", "success");
@@ -496,6 +613,166 @@ public class UserController {
         }
     }
 
+    @GetMapping("/publicKey")
+    public ResponseEntity<?> getPublicKey(@RequestParam String reason) {
+        try {
+            String publicKey = issuingService.getPublicKey(reason);
+            Map<String, String> response = new HashMap<>();
+            response.put("publicKey", publicKey);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
 
+    @PostMapping("/reveal")
+    public ResponseEntity<?> getCardData(@RequestParam RequestCardData requestCardData) {
+        try {
+            String publicKey = issuingService.getCardData(requestCardData.getEncryptedKey(), requestCardData.getPaymentInstrumentId(), requestCardData.getReason());
+            Map<String, String> response = new HashMap<>();
+            response.put("publicKey", publicKey);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @GetMapping("/gpay-jwt")
+    public ResponseEntity<?> getGooglePayJwt(@RequestParam String hostname) {
+        try {
+            String authJwt = gpayJwtService.generateAuthJwt(hostname);
+            Map<String, String> response = new HashMap<>();
+            response.put("googlePayJwtToken", authJwt);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/listDevices/{userId}")
+    public ResponseEntity<?> listDevices(@PathVariable Long userId) throws Exception {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            List<Device> devices = adyenService.getListDevices(user.getBankAccountId());
+            return ResponseEntity.ok(devices);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/initiateDeviceRegistration")
+    public ResponseEntity<?> initiateDeviceRegistration(
+            @RequestBody InitiateDeviceRegistrationRequest request) {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            RegisterSCAResponse response = adyenService.registerDevice(request.getSdkOutput(), user.getBankAccountId());
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/finalizeRegistration")
+    public ResponseEntity<?> finalizeRegistration(
+            @RequestBody FinalizeRegistrationRequest request) {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            RegisterSCAFinalResponse response =
+                    adyenService.finalizeRegistration(request.getId(), request.getSdkOutput(), user.getBankAccountId());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @PostMapping("/deleteDevice")
+    public ResponseEntity<?> deleteDevice(@RequestBody DeleteDeviceRequest request) {
+        try {
+            adyenService.deleteDevice(request.getId(), request.getPaymentInstrumentId());
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/initiateTransfer")
+    public ResponseEntity<?> initiateTransfer(
+            @RequestBody TransferRequest request) throws JsonProcessingException {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            InitiateTransferResponse initiateTransferResponse = adyenService.initiateTransfer(request, user.getBankAccountId());
+            return ResponseEntity.ok(initiateTransferResponse);
+        }
+
+        catch (HttpClientErrorException e){
+            HttpHeaders errorHeaders = e.getResponseHeaders();
+
+            InitiateTransferResponse res = new InitiateTransferResponse();
+
+            if (errorHeaders != null) {
+                String wwwAuth = errorHeaders.getFirst("WWW-Authenticate");
+
+                if (wwwAuth != null) {
+                    Pattern pattern = Pattern.compile("auth-param1=\"([^\"]+)\"");
+                    Matcher matcher = pattern.matcher(wwwAuth);
+
+                    if (matcher.find()) {
+                        String authParam1 = matcher.group(1);
+                        res.setAuthParam1(authParam1);
+                    }
+                }
+            }
+
+            res.setCounterparty(request.getCounterpartyBankAccount());
+            res.setAmount(request.getAmount());
+            return ResponseEntity.ok(res);
+        }
+        catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+    @PostMapping("/finalizeTransfer")
+    public ResponseEntity<?> finalizeTransfer(@RequestBody TransferRequest request) {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            adyenService.finalizeTransfer(request, user.getBankAccountId());
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @GetMapping("/bankAccount/{userId}")
+    public ResponseEntity<?> getBankAccountInformation(@PathVariable Long userId) throws Exception {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            BankAccountInformationResponse bankAccountInformationResponse = adyenService.getBankAccountInformation(user.getBankAccountId());
+            bankAccountInformationResponse.setBankAccountNumber(user.getBankAccountNumber());
+            return ResponseEntity.ok(bankAccountInformationResponse);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
 
 }

@@ -6,6 +6,7 @@ import {SignupComponent} from "./signup/signup.component";
 import { HttpClientModule } from '@angular/common/http';
 import {DashboardComponent} from "./dashboard/dashboard.component";
 import {MaterialModule} from "./material.module";
+import {PaymentResultComponent} from "./result/paymentresult.component";
 
 @Component({
   selector: 'app-root',
@@ -17,7 +18,8 @@ import {MaterialModule} from "./material.module";
     DashboardComponent,
     LoginComponent,
     SignupComponent,
-    MaterialModule
+    MaterialModule,
+    PaymentResultComponent
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
