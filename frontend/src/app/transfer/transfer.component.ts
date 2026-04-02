@@ -161,6 +161,7 @@ import {
             <div class="form-group">
               <label>Reference</label>
               <input type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Rent payment" />
+              <span class="hint-text">Note: You can use "noNameMatch" or "partialNameMatch" here to test different verification use-cases.</span>
             </div>
           </div>
 
@@ -289,7 +290,6 @@ import {
     </div>
   `,
   styles: [`
-    /* Styles conservés */
     :host {
       --fintech-primary: #000000;
       --fintech-bg: #f5f6f8;
@@ -329,6 +329,7 @@ import {
     .success-text { color: #4caf50; }
     .error-text { color: #f44336; }
     .pending-text { color: var(--fintech-text-secondary); }
+    .hint-text { font-size: 12px; color: var(--fintech-text-secondary); margin-top: 6px; display: block; font-style: italic; }
     .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; display: flex; align-items: center; justify-content: center; gap: 8px; }
     .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
     .fintech-btn:disabled { background-color: var(--fintech-border) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; opacity: 0.7; box-shadow: none !important; }

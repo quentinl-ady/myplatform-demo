@@ -22,8 +22,8 @@ import com.adyen.service.legalentitymanagement.*;
 import com.adyen.service.management.AccountStoreLevelApi;
 import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
+import com.adyen.service.management.TerminalsTerminalLevelApi;
 import com.adyen.service.transfers.TransfersApi;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.myplatform.demo.dto.AdyenVerifyRequestPayload;
 import com.myplatform.demo.dto.AdyenVerifyResponseWrapper;
 import com.myplatform.demo.model.*;
@@ -71,6 +71,7 @@ public class AdyenService {
     private final ManageScaDevicesApi manageScaDevicesApi;
     private final TransfersApi transfersApi;
     private final RestTemplate restTemplate;
+    private final TerminalsTerminalLevelApi terminalsTerminalLevelApi;
 
     @Getter
     private final String clientKey;
@@ -140,6 +141,7 @@ public class AdyenService {
 
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
         this.bankAccountValidationApi = new BankAccountValidationApi(balancePlatformClient);
+        this.terminalsTerminalLevelApi = new TerminalsTerminalLevelApi(pspClient);
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -1100,5 +1102,28 @@ public class AdyenService {
         payload.setReference(request.getReference());
 
         return payload;
+    }
+
+    public List<TerminalResponse> listTerminal(String storeId) throws IOException, ApiException {
+        ListTerminalsResponse listTerminalsResponses = terminalsTerminalLevelApi.listTerminals(null, null, null, null, storeId, null, null, null, null);
+        List<Terminal> terminalList = listTerminalsResponses.getData();
+        if (terminalList == null || terminalList.isEmpty()) {
+            return List.of();
+        }
+
+        return terminalList.stream()
+                .map(terminal -> {
+                    TerminalResponse response = new TerminalResponse();
+                    response.setId(terminal.getId());
+                    response.setModel(terminal.getModel());
+
+                    if (terminal.getAssignment() != null && terminal.getAssignment().getStatus() != null) {
+                        response.setStatus(terminal.getAssignment().getStatus().toString());
+                    }
+
+                    return response;
+                })
+                .toList();
+
     }
 }

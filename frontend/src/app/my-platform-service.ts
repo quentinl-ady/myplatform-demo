@@ -207,6 +207,29 @@ export interface CounterpartyVerificationResponse {
   responseDescription: string;
 }
 
+export interface PosPaymentRequest {
+  reference: string;
+  amount: number;
+  currency: string;
+  terminalId: string;
+}
+
+export interface PosPaymentResponse {
+  status: string; //ERROR //SUCCESS //FAILURE
+  pspReference: string;
+  cardBrand: string;
+  maskedPan: string;
+  errorCondition: string;
+  refusalReason: string;
+  reference: string;
+}
+
+export interface TerminalResponse {
+  id: string;
+  status: string;
+  model: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -401,5 +424,19 @@ export class MyPlatformService {
         { responseType: 'json' }
       );
     }
+
+  makePosPayment(payload: PosPaymentRequest): Observable<PosPaymentResponse> {
+      return this.http.post<PosPaymentResponse>(
+        `${this.baseUrl}/pos/pay`,
+        payload,
+        { responseType: 'json' }
+      );
+    }
+
+  listTerminals(storeId: string): Observable<TerminalResponse[]> {
+      return this.http.get<TerminalResponse[]>(`${this.baseUrl}/listTerminal/storeId/${storeId}`);
+    }
+
+
 
 }

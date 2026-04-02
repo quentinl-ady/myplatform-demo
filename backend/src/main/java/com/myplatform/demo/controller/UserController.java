@@ -838,6 +838,18 @@ public class UserController {
         }
     }
 
+    @GetMapping("/listTerminal/storeId/{storeId}")
+    public ResponseEntity<?> listTerminal(@PathVariable String storeId) throws Exception {
+        try {
+            List<TerminalResponse> terminalResponseList = adyenService.listTerminal(storeId);
+            return ResponseEntity.ok(terminalResponseList);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
+
 
 
 }

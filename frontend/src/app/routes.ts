@@ -14,6 +14,7 @@ import {PaymentResultComponent} from "./result/paymentresult.component";
 import {PayByLinkComponent} from "./paybylink/paybylink.component";
 import {DeviceComponent} from "./device/device.component";
 import {TransferComponent} from "./transfer/transfer.component"
+import {PosComponent} from "./pos/pos.component"
 
 const routeConfig: Routes = [
   {
@@ -87,6 +88,11 @@ const routeConfig: Routes = [
       {
         path: 'transfer',
         component: TransferComponent,
+        title: 'Transfer'
+      },
+      {
+        path: 'pos',
+        component: PosComponent,
         title: 'Transfer'
       }
     ]

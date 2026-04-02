@@ -51,6 +51,10 @@ import { MatButtonModule } from '@angular/material/button';
             <mat-icon matListItemIcon>shop</mat-icon>
             <span matListItemTitle>Checkout</span>
           </a>
+           <a mat-list-item [routerLink]="['/', userId, 'pos']" routerLinkActive="active-link">
+              <mat-icon matListItemIcon>computer</mat-icon>
+              <span matListItemTitle>POS</span>
+           </a>
           <a mat-list-item [routerLink]="['/', userId, 'paybylink']" routerLinkActive="active-link">
              <mat-icon matListItemIcon>link</mat-icon>
              <span matListItemTitle>Pay-by-Link</span>
