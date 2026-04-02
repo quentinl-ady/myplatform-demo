@@ -9,8 +9,6 @@ import com.adyen.model.checkout.PaymentDetailsRequest;
 import com.adyen.model.checkout.PaymentDetailsResponse;
 import com.adyen.service.exception.ApiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myplatform.demo.dto.*;
 import com.myplatform.demo.dto.StoreCustomerDTO;
 import com.myplatform.demo.model.*;
@@ -32,6 +30,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static com.myplatform.demo.service.AdyenService.SEPA_COUNTRIES;
 
 
 @RestController
@@ -736,8 +736,20 @@ public class UserController {
                 }
             }
 
-            res.setCounterparty(request.getCounterpartyBankAccount());
+
+
+            if(SEPA_COUNTRIES.contains(request.getCounterpartyCountry())){
+                res.setIban(request.getIban());
+            } else if ("US".equals(request.getCounterpartyCountry())){
+                res.setAccountNumber(request.getAccountNumber());
+                res.setRoutingNumber(request.getRoutingNumber());
+            } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())){
+                res.setAccountNumber(request.getAccountNumber());
+                res.setSortCode(request.getSortCode());
+            }
+
             res.setAmount(request.getAmount());
+            res.setCounterpartyCountry(request.getCounterpartyCountry());
             return ResponseEntity.ok(res);
         }
         catch (Exception e){
@@ -774,5 +786,58 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }
     }
+
+    @GetMapping("/bankAccountFormat/country/{countryCode}")
+    public ResponseEntity<?> getBankAccountFormat(@PathVariable String countryCode) throws Exception {
+        try {
+            String bankAccountFormat = adyenService.getBankAccountFormat(countryCode);
+            Map<String, String> response = new HashMap<>();
+            response.put("bankAccountFormat", bankAccountFormat);
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/isCrossBorder/")
+    public ResponseEntity<?> isCrossBorder(@RequestBody IsCrossBorderRequest request) throws Exception {
+        try {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Boolean isCrossBorder = adyenService.isCrossBorder(request.getCountryCodeCounterparty(), user.getCountryCode());
+            Map<String, String> response = new HashMap<>();
+            response.put("isCrossBorder", String.valueOf(isCrossBorder));
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/isBankAccountValid")
+    public ResponseEntity<?> isBankAccountValid(@RequestBody IsBankAccountValidRequest request) throws Exception {
+        try {
+            adyenService.isBankAccountValid(request);
+            Map<String, String> response = new HashMap<>();
+            response.put("isBankAccountValid", String.valueOf(Boolean.TRUE));
+            return ResponseEntity.ok(response);
+        } catch (Exception e){
+            Map<String, String> response = new HashMap<>();
+            response.put("isBankAccountValid", String.valueOf(Boolean.FALSE));
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    @PostMapping("/verifyCounterpartyName")
+    public ResponseEntity<?> verifyCounterpartyName(@RequestBody VerifyCounterpartyNameRequest request) throws Exception {
+        try {
+             CounterpartyVerificationResponse counterpartyVerificationResponse = adyenService.verifyCounterpartyName(request);
+            return ResponseEntity.ok(counterpartyVerificationResponse);
+        } catch (Exception e){
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+
 
 }

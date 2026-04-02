@@ -9,5 +9,9 @@ import lombok.Setter;
 public class InitiateTransferResponse {
     String authParam1;
     Long amount;
-    String counterparty;
+    String counterpartyCountry;
+    String accountNumber;
+    String sortCode;
+    String iban;
+    String routingNumber;
 }

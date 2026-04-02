@@ -2,7 +2,6 @@ package com.myplatform.demo.service;
 
 import com.adyen.Client;
 import com.adyen.enums.Environment;
-import com.adyen.model.RequestOptions;
 import com.adyen.model.balanceplatform.*;
 import com.adyen.model.balanceplatform.PaymentInstrument;
 import com.adyen.model.checkout.*;
@@ -14,10 +13,9 @@ import com.adyen.model.management.*;
 import com.adyen.model.management.PaymentMethod;
 import com.adyen.model.transfers.*;
 import com.adyen.model.transfers.IbanAccountIdentification;
-import com.adyen.service.balanceplatform.AccountHoldersApi;
-import com.adyen.service.balanceplatform.BalanceAccountsApi;
-import com.adyen.service.balanceplatform.ManageScaDevicesApi;
-import com.adyen.service.balanceplatform.PaymentInstrumentsApi;
+import com.adyen.model.transfers.UKLocalAccountIdentification;
+import com.adyen.model.transfers.USLocalAccountIdentification;
+import com.adyen.service.balanceplatform.*;
 import com.adyen.service.checkout.PaymentsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.*;
@@ -26,6 +24,8 @@ import com.adyen.service.management.PaymentMethodsMerchantLevelApi;
 import com.adyen.service.management.SplitConfigurationMerchantLevelApi;
 import com.adyen.service.transfers.TransfersApi;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.myplatform.demo.dto.AdyenVerifyRequestPayload;
+import com.myplatform.demo.dto.AdyenVerifyResponseWrapper;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.StoreCustomerRepository;
@@ -78,6 +78,7 @@ public class AdyenService {
     private final StoreCustomerRepository storeCustomerRepository;
     private final KYCService kycService;
     private final PaymentInstrumentsApi paymentInstrumentsApi;
+    private final BankAccountValidationApi bankAccountValidationApi;
 
 
     Map<String, String> languageMap = Map.of(
@@ -86,6 +87,12 @@ public class AdyenService {
             "NL", "nl-NL",
             "GB", "en-EN",
             "US", "en-US"
+    );
+
+    public static final Set<String> SEPA_COUNTRIES = Set.of(
+            "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
+            "HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU", "MT", "MC", "NL", "NO",
+            "PL", "PT", "RO", "SM", "SK", "SI", "ES", "SE"
     );
 
 
@@ -132,6 +139,7 @@ public class AdyenService {
         this.kycService = kycService;
 
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
+        this.bankAccountValidationApi = new BankAccountValidationApi(balancePlatformClient);
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -487,7 +495,7 @@ public class AdyenService {
         String currencyCode = balanceAccountsApi.getBalanceAccount(balanceAccountId).getDefaultCurrencyCode();
 
         List<SplitConfiguration> splitConfigurationList = splitConfigurationMerchantLevelApi.listSplitConfigurations(this.merchantAccount).getData();
-        String description = "DEFAULT CONTRACT 19/09/2025 myPlatform.com " + currencyCode;
+        String description = "DEFAULT CONTRACT 01/04/2026 myPlatform.com " + currencyCode;
 
         SplitConfiguration splitConfiguration1 = splitConfigurationList.stream()
                 .filter(sc -> description.equals(sc.getDescription()))
@@ -498,6 +506,7 @@ public class AdyenService {
             SplitConfiguration splitConfiguration = new SplitConfiguration();
             splitConfiguration.setDescription(description);
             List<SplitConfigurationRule> rules = new ArrayList<>();
+
             rules.add(new SplitConfigurationRule()
                     .currency(currencyCode)
                     .fundingSource(SplitConfigurationRule.FundingSourceEnum.ANY)
@@ -507,6 +516,17 @@ public class AdyenService {
                             .refund(SplitConfigurationLogic.RefundEnum.DEDUCTACCORDINGTOSPLITRATIO)
                             .commission(new Commission()
                                     .variablePercentage(1000L))
+                            .paymentFee(SplitConfigurationLogic.PaymentFeeEnum.DEDUCTFROMLIABLEACCOUNT)));
+
+            rules.add(new SplitConfigurationRule()
+                    .currency("ANY")
+                    .fundingSource(SplitConfigurationRule.FundingSourceEnum.ANY)
+                    .paymentMethod("ANY")
+                    .shopperInteraction(SplitConfigurationRule.ShopperInteractionEnum.ANY)
+                    .splitLogic(new SplitConfigurationLogic()
+                            .refund(SplitConfigurationLogic.RefundEnum.DEDUCTACCORDINGTOSPLITRATIO)
+                            .commission(new Commission()
+                                    .variablePercentage(2000L))
                             .paymentFee(SplitConfigurationLogic.PaymentFeeEnum.DEDUCTFROMLIABLEACCOUNT)));
             splitConfiguration.setRules(rules);
 
@@ -871,30 +891,51 @@ public class AdyenService {
                         Transfer.class
                 );
 
-        Transfer transferBody = response.getBody();
+        /*Transfer transferBody = response.getBody();
         HttpHeaders transferHeaders = response.getHeaders();
 
         InitiateTransferResponse initiateTransferResponse = new InitiateTransferResponse();
         initiateTransferResponse.setCounterparty(transferBody.getCounterparty().getBankAccount().getAccountIdentification().getIbanAccountIdentification().getIban());
         initiateTransferResponse.setAmount(transferBody.getAmount().getValue());
-        initiateTransferResponse.setAuthParam1(transferHeaders.get("auth-param1").stream().findFirst().get());
+        initiateTransferResponse.setAuthParam1(transferHeaders.get("auth-param1").stream().findFirst().get());*/
 
-        return initiateTransferResponse;
+        return null;
     }
 
     private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId) {
-        IbanAccountIdentification iban = new IbanAccountIdentification();
-        iban.setIban(request.getCounterpartyBankAccount());
-        iban.setType(IbanAccountIdentification.TypeEnum.IBAN);
-
         TransferInfo transferInfo = new TransferInfo();
-        transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("EUR")
-                .value(request.getAmount()));
+        BankAccountV3AccountIdentification accountIdentification = new BankAccountV3AccountIdentification();
+
+        if(SEPA_COUNTRIES.contains(request.getCounterpartyCountry())){
+            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("EUR")
+                    .value(request.getAmount()));
+
+            IbanAccountIdentification iban = new IbanAccountIdentification();
+            iban.setIban(request.getIban());
+            iban.setType(IbanAccountIdentification.TypeEnum.IBAN);
+            accountIdentification = new BankAccountV3AccountIdentification(iban);
+        } else if ("US".equals(request.getCounterpartyCountry())){
+            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("USD")
+                    .value(request.getAmount()));
+            USLocalAccountIdentification usLocalAccountIdentification = new USLocalAccountIdentification();
+            usLocalAccountIdentification.accountNumber(request.getAccountNumber());
+            usLocalAccountIdentification.routingNumber(request.getRoutingNumber());
+            accountIdentification = new BankAccountV3AccountIdentification(usLocalAccountIdentification);
+
+        } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())){
+            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("GBP")
+                    .value(request.getAmount()));
+
+            UKLocalAccountIdentification ukLocalAccountIdentification = new UKLocalAccountIdentification();
+            ukLocalAccountIdentification.accountNumber(request.getAccountNumber());
+            ukLocalAccountIdentification.setSortCode(request.getSortCode());
+            accountIdentification = new BankAccountV3AccountIdentification(ukLocalAccountIdentification);
+        }
+
         transferInfo.setPaymentInstrumentId(paymentInstrumentId);
         transferInfo.setCategory(TransferInfo.CategoryEnum.BANK);
         CounterpartyInfoV3 counterpartyInfo = new CounterpartyInfoV3();
         BankAccountV3 bankAccount = new BankAccountV3();
-        BankAccountV3AccountIdentification accountIdentification = new BankAccountV3AccountIdentification(iban);
         bankAccount.setAccountHolder(new PartyIdentification().fullName("Quentin Lecornu"));
         bankAccount.setAccountIdentification(accountIdentification);
         counterpartyInfo.setBankAccount(bankAccount);
@@ -941,5 +982,123 @@ public class AdyenService {
         bankAccountInformationResponse.setDescription(paymentInstrument.getDescription());
 
         return bankAccountInformationResponse;
+    }
+
+    public String getBankAccountFormat(String countryCode) {
+        if (countryCode == null || countryCode.isBlank()) {
+            return "unknown";
+        }
+
+        String normalizedCode = countryCode.trim().toUpperCase();
+
+        return switch (normalizedCode) {
+
+            case "US" -> "accountNumberRoutingNumber";
+            case "GB", "UK" -> "accountNumberSortCode";
+
+            default -> SEPA_COUNTRIES.contains(normalizedCode) ? "iban" : "unknown";
+        };
+    }
+
+    public Boolean isCrossBorder(String countryCodeCounterparty, String countryCodeBankAccount) {
+        if (countryCodeCounterparty == null || countryCodeCounterparty.isBlank() ||
+                countryCodeBankAccount == null || countryCodeBankAccount.isBlank()) {
+            throw new IllegalArgumentException("Missing Argument");
+        }
+
+        String origin = countryCodeCounterparty.trim().toUpperCase();
+        String destination = countryCodeBankAccount.trim().toUpperCase();
+
+        if (origin.equals(destination)) {
+            return false;
+        }
+
+        return !SEPA_COUNTRIES.contains(origin) || !SEPA_COUNTRIES.contains(destination);
+    }
+
+    public void isBankAccountValid(IsBankAccountValidRequest request) throws IOException, ApiException {
+        BankAccountIdentificationValidationRequest bankAccountIdentificationValidationRequest = new BankAccountIdentificationValidationRequest();
+        BankAccountIdentificationValidationRequestAccountIdentification bankAccountIdentificationValidationRequestAccountIdentification = new BankAccountIdentificationValidationRequestAccountIdentification();
+
+        if ("accountNumberRoutingNumber".equals(request.getBankAccountFormat())){
+            com.adyen.model.balanceplatform.USLocalAccountIdentification usLocalAccountIdentification = new com.adyen.model.balanceplatform.USLocalAccountIdentification();
+            usLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
+            usLocalAccountIdentification.setRoutingNumber(request.getRoutingNumber());
+            usLocalAccountIdentification.setType(com.adyen.model.balanceplatform.USLocalAccountIdentification.TypeEnum.USLOCAL);
+            bankAccountIdentificationValidationRequestAccountIdentification = new BankAccountIdentificationValidationRequestAccountIdentification(usLocalAccountIdentification);
+
+        } else if ("accountNumberSortCode".equals(request.getBankAccountFormat())){
+            com.adyen.model.balanceplatform.UKLocalAccountIdentification ukLocalAccountIdentification = new com.adyen.model.balanceplatform.UKLocalAccountIdentification();
+            ukLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
+            ukLocalAccountIdentification.setSortCode(request.getSortCode());
+            ukLocalAccountIdentification.setType(com.adyen.model.balanceplatform.UKLocalAccountIdentification.TypeEnum.UKLOCAL);
+            bankAccountIdentificationValidationRequestAccountIdentification = new BankAccountIdentificationValidationRequestAccountIdentification(ukLocalAccountIdentification);
+
+        } else if("iban".equals(request.getBankAccountFormat())){
+            com.adyen.model.balanceplatform.IbanAccountIdentification iban = new com.adyen.model.balanceplatform.IbanAccountIdentification();
+            iban.setIban(request.getIban());
+            iban.setType( com.adyen.model.balanceplatform.IbanAccountIdentification.TypeEnum.IBAN);
+            bankAccountIdentificationValidationRequestAccountIdentification = new BankAccountIdentificationValidationRequestAccountIdentification(iban);
+        }
+
+        bankAccountIdentificationValidationRequest.setAccountIdentification(bankAccountIdentificationValidationRequestAccountIdentification);
+
+        bankAccountValidationApi.validateBankAccountIdentification(bankAccountIdentificationValidationRequest);
+    }
+
+    public CounterpartyVerificationResponse verifyCounterpartyName(VerifyCounterpartyNameRequest request) {
+
+        AdyenVerifyRequestPayload payload = getAdyenVerifyRequestPayload(request);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("x-api-key", balancePlatformApiKey);
+
+        HttpEntity<AdyenVerifyRequestPayload> entity = new HttpEntity<>(payload, headers);
+
+        ResponseEntity<AdyenVerifyResponseWrapper> response = restTemplate.exchange(
+                "https://balanceplatform-api-test.adyen.com/bcl/v2/verifyCounterpartyName",
+                HttpMethod.POST,
+                entity,
+                AdyenVerifyResponseWrapper.class
+        );
+
+        if (response.getBody() != null) {
+            return response.getBody().getCounterpartyVerification();
+        }
+
+        return null;
+    }
+
+    private AdyenVerifyRequestPayload getAdyenVerifyRequestPayload(VerifyCounterpartyNameRequest request) {
+
+        AdyenVerifyRequestPayload.AccountHolder accountHolder =
+                new AdyenVerifyRequestPayload.AccountHolder(request.getAccountHolderName());
+
+        AdyenVerifyRequestPayload.AccountIdentification accountIdentification =
+                new AdyenVerifyRequestPayload.AccountIdentification();
+
+        if ("iban".equalsIgnoreCase(request.getAccountType())) {
+            accountIdentification.setType("iban");
+            accountIdentification.setIban(request.getIban());
+        } else if ("accountNumberSortCode".equalsIgnoreCase(request.getAccountType())) {
+            accountIdentification.setType("ukLocal");
+            accountIdentification.setAccountNumber(request.getAccountNumber());
+            accountIdentification.setSortCode(request.getSortCode());
+            accountIdentification.setAccountType("business");
+        }
+
+        AdyenVerifyRequestPayload.BankAccount bankAccount = new AdyenVerifyRequestPayload.BankAccount();
+        bankAccount.setAccountHolder(accountHolder);
+        bankAccount.setAccountIdentification(accountIdentification);
+
+        AdyenVerifyRequestPayload.Counterparty counterparty = new AdyenVerifyRequestPayload.Counterparty();
+        counterparty.setBankAccount(bankAccount);
+
+        AdyenVerifyRequestPayload payload = new AdyenVerifyRequestPayload();
+        payload.setCounterparty(counterparty);
+        payload.setReference(request.getReference());
+
+        return payload;
     }
 }

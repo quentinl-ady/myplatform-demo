@@ -6,15 +6,11 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class TransferRequest {
-    String sdkOutput;
-    Long amount;
-    String reference;
-    Long userId;
+public class IsBankAccountValidRequest {
     String transferType;
-    String counterpartyCountry;
     String accountNumber;
     String sortCode;
     String iban;
     String routingNumber;
+    String bankAccountFormat;
 }

@@ -25,7 +25,9 @@ public class BankStatementPdfController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        byte[] pdf = ribPdfGeneratorService.generatePdf(user.getBankAccountNumber());
+        String legalEntityName = user.getLegalEntityName();
+
+        byte[] pdf = ribPdfGeneratorService.generatePdf(user.getBankAccountNumber(), legalEntityName);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
