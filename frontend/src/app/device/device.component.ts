@@ -354,10 +354,6 @@ export class DeviceComponent {
         throw new Error('FINALIZE_FAILED');
       }
 
-      this.snack.open('Device successfully registered ✅', 'OK', {
-        duration: 3000
-      });
-
       this.loadDevices();
 
     } catch (error: any) {
@@ -401,10 +397,6 @@ export class DeviceComponent {
       if (response?.status !== 'success') {
         throw new Error('DELETE_FAILED');
       }
-
-      this.snack.open('Device deleted successfully 🗑️', 'OK', {
-        duration: 3000
-      });
 
       this.loadDevices();
 

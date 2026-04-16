@@ -15,6 +15,8 @@ import {PayByLinkComponent} from "./paybylink/paybylink.component";
 import {DeviceComponent} from "./device/device.component";
 import {TransferComponent} from "./transfer/transfer.component"
 import {PosComponent} from "./pos/pos.component"
+import {CardCreateComponent} from "./card-create/card-create.component"
+import {CardListComponent} from "./card-list/card-list.component"
 
 const routeConfig: Routes = [
   {
@@ -93,7 +95,17 @@ const routeConfig: Routes = [
       {
         path: 'pos',
         component: PosComponent,
-        title: 'Transfer'
+        title: 'POS'
+      },
+      {
+        path: 'cards',
+        component: CardListComponent,
+        title: 'My Cards'
+      },
+      {
+        path: 'card-create',
+        component: CardCreateComponent,
+        title: 'Create Card'
       }
     ]
   },

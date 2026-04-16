@@ -26,9 +26,9 @@ import { MatButtonModule } from '@angular/material/button';
 
         <div class="brand-header">
           <div class="logo-mark">
-            <mat-icon>layers</mat-icon>
+            <img src="https://tvadvertising.co.uk/wp-content/uploads/2024/01/5_image.png"/>
           </div>
-          <span class="brand-name">MyPlatform</span>
+          <span class="brand-name">Treatwell</span>
         </div>
 
         <mat-nav-list class="fintech-nav-list">
@@ -75,7 +75,17 @@ import { MatButtonModule } from '@angular/material/button';
           </a>
           <a mat-list-item [routerLink]="['/', userId, 'businessloans']" routerLinkActive="active-link">
             <mat-icon matListItemIcon>attach_money</mat-icon>
-            <span matListItemTitle>Business Loans</span>
+            <span matListItemTitle>Extra money ?</span>
+          </a>
+
+          <p class="nav-section-title">Cards</p>
+          <a mat-list-item [routerLink]="['/', userId, 'cards']" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>credit_card</mat-icon>
+            <span matListItemTitle>My Cards</span>
+          </a>
+          <a mat-list-item [routerLink]="['/', userId, 'card-create']" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>add_card</mat-icon>
+            <span matListItemTitle>Create Card</span>
           </a>
 
           <p class="nav-section-title">Security & Risk</p>
@@ -165,6 +175,11 @@ import { MatButtonModule } from '@angular/material/button';
       width: 20px;
       height: 20px;
     }
+  .logo-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
     .brand-name {
       font-size: 18px;
       font-weight: 700;

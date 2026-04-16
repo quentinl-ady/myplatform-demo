@@ -625,17 +625,6 @@ public class UserController {
         }
     }
 
-    @PostMapping("/reveal")
-    public ResponseEntity<?> getCardData(@RequestParam RequestCardData requestCardData) {
-        try {
-            String publicKey = issuingService.getCardData(requestCardData.getEncryptedKey(), requestCardData.getPaymentInstrumentId(), requestCardData.getReason());
-            Map<String, String> response = new HashMap<>();
-            response.put("publicKey", publicKey);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
-        }
-    }
 
 
     @GetMapping("/gpay-jwt")
@@ -847,8 +836,6 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
         }
     }
-
-
 
 
 

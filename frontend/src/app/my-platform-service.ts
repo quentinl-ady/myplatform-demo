@@ -230,6 +230,47 @@ export interface TerminalResponse {
   model: string;
 }
 
+// Issuing interfaces
+export interface TransactionRuleRequest {
+  type: string; // maxTransactions, maxAmountPerTransaction, maxTotalAmount
+  value: number;
+  currencyCode?: string;
+}
+
+export interface CreateCardRequest {
+  userId: number;
+  cardholderName: string;
+  brand: string; // visa or mc
+  transactionRules?: TransactionRuleRequest[];
+}
+
+export interface TransactionRuleResponse {
+  id: string;
+  type: string;
+  value: number;
+  currencyCode: string;
+  status: string;
+}
+
+export interface CardResponse {
+  paymentInstrumentId: string;
+  cardholderName: string;
+  brand: string;
+  brandVariant: string;
+  lastFour: string;
+  expiryMonth: string;
+  expiryYear: string;
+  status: string;
+  transactionRules: TransactionRuleResponse[];
+}
+
+export interface AddTransactionRuleRequest {
+  paymentInstrumentId: string;
+  type: string;
+  value: number;
+  currencyCode?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -437,6 +478,48 @@ export class MyPlatformService {
       return this.http.get<TerminalResponse[]>(`${this.baseUrl}/listTerminal/storeId/${storeId}`);
     }
 
+  // Issuing - Cards
+  createCard(request: CreateCardRequest): Observable<CardResponse> {
+    return this.http.post<CardResponse>(`${this.baseUrl}/issuing/cards`, request);
+  }
 
+  getCards(userId: number): Observable<CardResponse[]> {
+    return this.http.get<CardResponse[]>(`${this.baseUrl}/issuing/cards/${userId}`);
+  }
+
+  getCardDetails(paymentInstrumentId: string): Observable<CardResponse> {
+    return this.http.get<CardResponse>(`${this.baseUrl}/issuing/card/${paymentInstrumentId}`);
+  }
+
+  updateCardStatus(paymentInstrumentId: string, status: string): Observable<{ status: string; newStatus: string }> {
+    return this.http.put<{ status: string; newStatus: string }>(`${this.baseUrl}/issuing/cards/status`, {
+      paymentInstrumentId,
+      status
+    });
+  }
+
+  // Issuing - Transaction Rules
+  addTransactionRule(request: AddTransactionRuleRequest): Observable<{ ruleId: string; status: string }> {
+    return this.http.post<{ ruleId: string; status: string }>(`${this.baseUrl}/issuing/rules`, request);
+  }
+
+  getTransactionRules(paymentInstrumentId: string): Observable<TransactionRuleResponse[]> {
+    return this.http.get<TransactionRuleResponse[]>(`${this.baseUrl}/issuing/rules/${paymentInstrumentId}`);
+  }
+
+  updateTransactionRule(ruleId: string, status: string): Observable<{ status: string }> {
+    return this.http.put<{ status: string }>(`${this.baseUrl}/issuing/rules/${ruleId}`, { status });
+  }
+
+  deleteTransactionRule(ruleId: string): Observable<{ status: string }> {
+    return this.http.delete<{ status: string }>(`${this.baseUrl}/issuing/rules/${ruleId}`);
+  }
+
+  // Issuing - Reveal Card Data (all crypto handled server-side)
+  revealCardData(paymentInstrumentId: string): Observable<{ cardData: string }> {
+    return this.http.post<{ cardData: string }>(`${this.baseUrl}/issuing/reveal`, {
+      paymentInstrumentId
+    });
+  }
 
 }
