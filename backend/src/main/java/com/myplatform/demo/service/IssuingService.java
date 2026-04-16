@@ -28,12 +28,22 @@ public class IssuingService {
     private final ManageCardPinApi manageCardPinApi;
     private final PaymentInstrumentsApi paymentInstrumentsApi;
     private final TransactionRulesApi transactionRulesApi;
+    private final String issuingCountry;
+    private final String visaSubvariant;
+    private final String mcSubvariant;
 
-    public IssuingService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey) {
+    public IssuingService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
+                          @Value("${adyen.issuing.country}") String issuingCountry,
+                          @Value("${adyen.issuing.visa.subvariant}") String visaSubvariant,
+                          @Value("${adyen.issuing.mc.subvariant}") String mcSubvariant) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         this.manageCardPinApi = new ManageCardPinApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
         this.transactionRulesApi = new TransactionRulesApi(balancePlatformClient);
+
+        this.issuingCountry = issuingCountry;
+        this.visaSubvariant = visaSubvariant;
+        this.mcSubvariant = mcSubvariant;
     }
 
     public String getPublicKey(String reason) throws IOException, ApiException {
@@ -42,7 +52,7 @@ public class IssuingService {
     }
 
     public String createVirtualCard(String balanceAccountId, String cardholderName, String brand) throws IOException, ApiException {
-        String brandVariant = "visa".equalsIgnoreCase(brand) ? "visa_debit_f" : "mc_credit_mco"; //application.properties
+        String brandVariant = "visa".equalsIgnoreCase(brand) ? this.visaSubvariant : this.mcSubvariant;
 
         CardInfo cardInfo = new CardInfo()
                 .cardholderName(cardholderName)
@@ -52,7 +62,7 @@ public class IssuingService {
 
         PaymentInstrumentInfo paymentInstrumentInfo = new PaymentInstrumentInfo()
                 .balanceAccountId(balanceAccountId)
-                .issuingCountryCode("FR") //application.properties
+                .issuingCountryCode(this.issuingCountry)
                 .type(PaymentInstrumentInfo.TypeEnum.CARD)
                 .card(cardInfo);
 
@@ -118,7 +128,7 @@ public class IssuingService {
                 ruleInfo.setDescription("Max transactions limit: " + value);
                 ruleInfo.setReference("max_tx_" + paymentInstrumentId.substring(0, 8));
                 interval.setType(TransactionRuleInterval.TypeEnum.LIFETIME);
-                
+
                 MatchingTransactionsRestriction matchingRestriction = new MatchingTransactionsRestriction();
                 matchingRestriction.setOperation("greaterThan");
                 matchingRestriction.setValue(value.intValue()); // Block when transactions > N (allows exactly N transactions)
@@ -130,7 +140,7 @@ public class IssuingService {
                 ruleInfo.setDescription("Max amount per transaction: " + String.format("%.2f", value / 100.0) + " " + currencyCode);
                 ruleInfo.setReference("max_per_tx_" + paymentInstrumentId.substring(0, 8));
                 interval.setType(TransactionRuleInterval.TypeEnum.PERTRANSACTION);
-                
+
                 TotalAmountRestriction totalRestriction = new TotalAmountRestriction();
                 totalRestriction.setOperation("greaterThan");
                 totalRestriction.setValue(new Amount().value(value).currency(currencyCode));
@@ -142,7 +152,7 @@ public class IssuingService {
                 ruleInfo.setDescription("Max total amount: " + String.format("%.2f", value / 100.0) + " " + currencyCode);
                 ruleInfo.setReference("max_total_" + paymentInstrumentId.substring(0, 8));
                 interval.setType(TransactionRuleInterval.TypeEnum.LIFETIME);
-                
+
                 TotalAmountRestriction totalRestriction = new TotalAmountRestriction();
                 totalRestriction.setOperation("greaterThan");
                 totalRestriction.setValue(new Amount().value(value).currency(currencyCode));
