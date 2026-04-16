@@ -273,7 +273,7 @@ public class KYCService {
 
             PaymentInstrument pi = paymentInstrumentsApi.createPaymentInstrument(paymentInstrumentInfo);
             return pi.getId();
-        } else if ("US".equals(countryCode) || "UK".equals(countryCode) || "GB".equals(countryCode)) {
+        } else if ("US".equals(countryCode) || "UK".equals(countryCode) || "GB".equals(countryCode) || "NL".equals(countryCode)) {
             paymentInstrumentInfo.type(PaymentInstrumentInfo.TypeEnum.BANKACCOUNT);
             paymentInstrumentInfo.description("Bank Account " + countryCode);
             paymentInstrumentInfo.balanceAccountId(balanceAccountId);
@@ -294,7 +294,7 @@ public class KYCService {
                 .accountHolderId(accountHolderId);
 
         BalanceAccount ba = new BalanceAccount();
-        if ("FR".equals(countryCode)){
+        if ("FR".equals(countryCode) || "NL".equals(countryCode)){
             balanceAccountInfo.setDefaultCurrencyCode("EUR");
             ba = balanceAccountsApi.createBalanceAccount(balanceAccountInfo);
         } else if ("US".equals(countryCode)){
