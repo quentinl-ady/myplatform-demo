@@ -26,9 +26,12 @@ import { MatButtonModule } from '@angular/material/button';
 
         <div class="brand-header">
           <div class="logo-mark">
-            <img src="https://tvadvertising.co.uk/wp-content/uploads/2024/01/5_image.png"/>
+            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+              <rect width="40" height="40" rx="8" fill="#000"/>
+              <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="18" font-weight="700" font-family="system-ui">MP</text>
+            </svg>
           </div>
-          <span class="brand-name">Treatwell</span>
+          <span class="brand-name">MyPlatform</span>
         </div>
 
         <mat-nav-list class="fintech-nav-list">
