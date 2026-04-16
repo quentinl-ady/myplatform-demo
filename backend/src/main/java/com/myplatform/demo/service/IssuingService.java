@@ -35,7 +35,7 @@ public class IssuingService {
     public IssuingService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
                           @Value("${adyen.issuing.country}") String issuingCountry,
                           @Value("${adyen.issuing.visa.subvariant}") String visaSubvariant,
-                          @Value("${adyen.issuing.mc.subvariant}") String mcSubvariant) {
+                          @Value("${adyen.issuing.mastercard.subvariant}") String mcSubvariant) {
         Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         this.manageCardPinApi = new ManageCardPinApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
