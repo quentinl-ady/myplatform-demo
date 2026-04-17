@@ -53,15 +53,24 @@ public class IssuingController {
 
             if (request.getTransactionRules() != null && !request.getTransactionRules().isEmpty()) {
                 for (TransactionRuleRequest ruleRequest : request.getTransactionRules()) {
-                    String currencyCode = ruleRequest.getCurrencyCode() != null 
-                            ? ruleRequest.getCurrencyCode() 
-                            : user.getCurrencyCode();
-                    issuingService.createTransactionRule(
-                            paymentInstrumentId,
-                            ruleRequest.getType(),
-                            ruleRequest.getValue(),
-                            currencyCode
-                    );
+                    if ("blockedMccs".equals(ruleRequest.getType())) {
+                        if (ruleRequest.getBlockedMccs() != null && !ruleRequest.getBlockedMccs().isEmpty()) {
+                            issuingService.createMccBlockRule(
+                                    paymentInstrumentId,
+                                    ruleRequest.getBlockedMccs()
+                            );
+                        }
+                    } else {
+                        String currencyCode = ruleRequest.getCurrencyCode() != null 
+                                ? ruleRequest.getCurrencyCode() 
+                                : user.getCurrencyCode();
+                        issuingService.createTransactionRule(
+                                paymentInstrumentId,
+                                ruleRequest.getType(),
+                                ruleRequest.getValue(),
+                                currencyCode
+                        );
+                    }
                 }
             }
 
@@ -132,23 +141,34 @@ public class IssuingController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Card not found");
             }
 
-            String currencyCode = request.getCurrencyCode() != null 
-                    ? request.getCurrencyCode() 
-                    : card.getUser().getCurrencyCode();
+            String ruleId;
+            if ("blockedMccs".equals(request.getType())) {
+                if (request.getBlockedMccs() == null || request.getBlockedMccs().isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("blockedMccs list is required for this rule type");
+                }
+                ruleId = issuingService.createMccBlockRule(
+                        request.getPaymentInstrumentId(),
+                        request.getBlockedMccs()
+                );
+            } else {
+                String currencyCode = request.getCurrencyCode() != null 
+                        ? request.getCurrencyCode() 
+                        : card.getUser().getCurrencyCode();
 
-            String ruleId = issuingService.createTransactionRule(
-                    request.getPaymentInstrumentId(),
-                    request.getType(),
-                    request.getValue(),
-                    currencyCode
-            );
+                ruleId = issuingService.createTransactionRule(
+                        request.getPaymentInstrumentId(),
+                        request.getType(),
+                        request.getValue(),
+                        currencyCode
+                );
+            }
 
             Map<String, String> response = new HashMap<>();
             response.put("ruleId", ruleId);
             response.put("status", "success");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error adding transaction rule");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error adding transaction rule: " + e.getMessage());
         }
     }
 

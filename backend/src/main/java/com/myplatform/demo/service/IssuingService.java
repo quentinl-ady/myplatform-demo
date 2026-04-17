@@ -168,6 +168,36 @@ public class IssuingService {
         return rule.getId();
     }
 
+    public String createMccBlockRule(String paymentInstrumentId, List<String> mccs) throws IOException, ApiException {
+        TransactionRuleInfo ruleInfo = new TransactionRuleInfo();
+        ruleInfo.setType(TransactionRuleInfo.TypeEnum.BLOCKLIST);
+        ruleInfo.setOutcomeType(TransactionRuleInfo.OutcomeTypeEnum.HARDBLOCK);
+        ruleInfo.setStatus(TransactionRuleInfo.StatusEnum.ACTIVE);
+
+        String mccList = String.join(",", mccs);
+        ruleInfo.setDescription("Blocked MCCs: " + mccList);
+        ruleInfo.setReference("block_mcc_" + paymentInstrumentId.substring(0, 8));
+
+        TransactionRuleEntityKey entityKey = new TransactionRuleEntityKey();
+        entityKey.setEntityType("paymentInstrument");
+        entityKey.setEntityReference(paymentInstrumentId);
+        ruleInfo.setEntityKey(entityKey);
+
+        TransactionRuleInterval interval = new TransactionRuleInterval();
+        interval.setType(TransactionRuleInterval.TypeEnum.PERTRANSACTION);
+        ruleInfo.setInterval(interval);
+
+        TransactionRuleRestrictions restrictions = new TransactionRuleRestrictions();
+        MccsRestriction mccsRestriction = new MccsRestriction();
+        mccsRestriction.setOperation("anyMatch");
+        mccsRestriction.setValue(mccs);
+        restrictions.setMccs(mccsRestriction);
+        ruleInfo.setRuleRestrictions(restrictions);
+
+        TransactionRule rule = transactionRulesApi.createTransactionRule(ruleInfo);
+        return rule.getId();
+    }
+
     public List<TransactionRuleResponseDTO> getTransactionRulesForCard(String paymentInstrumentId) throws IOException, ApiException {
         TransactionRulesResponse rulesResponse = paymentInstrumentsApi.getAllTransactionRulesForPaymentInstrument(paymentInstrumentId);
 
@@ -187,6 +217,8 @@ public class IssuingService {
                         dto.setType("maxAmountPerTransaction");
                     } else if (description.contains("Max total amount")) {
                         dto.setType("maxTotalAmount");
+                    } else if (description.contains("Blocked MCCs")) {
+                        dto.setType("blockedMccs");
                     }
                 }
 
@@ -204,6 +236,13 @@ public class IssuingService {
                         Integer txValue = rule.getRuleRestrictions().getMatchingTransactions().getValue();
                         if (txValue != null) {
                             dto.setValue(txValue.longValue());
+                        }
+                    }
+                    // Handle mccs for blockedMccs rule
+                    if (rule.getRuleRestrictions().getMccs() != null) {
+                        List<String> mccs = rule.getRuleRestrictions().getMccs().getValue();
+                        if (mccs != null) {
+                            dto.setBlockedMccs(mccs);
                         }
                     }
                 }

@@ -232,9 +232,10 @@ export interface TerminalResponse {
 
 // Issuing interfaces
 export interface TransactionRuleRequest {
-  type: string; // maxTransactions, maxAmountPerTransaction, maxTotalAmount
-  value: number;
+  type: string; // maxTransactions, maxAmountPerTransaction, maxTotalAmount, blockedMccs
+  value?: number;
   currencyCode?: string;
+  blockedMccs?: string[];
 }
 
 export interface CreateCardRequest {
@@ -247,9 +248,10 @@ export interface CreateCardRequest {
 export interface TransactionRuleResponse {
   id: string;
   type: string;
-  value: number;
-  currencyCode: string;
+  value?: number;
+  currencyCode?: string;
   status: string;
+  blockedMccs?: string[];
 }
 
 export interface CardResponse {
@@ -267,8 +269,9 @@ export interface CardResponse {
 export interface AddTransactionRuleRequest {
   paymentInstrumentId: string;
   type: string;
-  value: number;
+  value?: number;
   currencyCode?: string;
+  blockedMccs?: string[];
 }
 
 @Injectable({

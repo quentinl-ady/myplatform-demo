@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -12,6 +12,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDialogModule } from '@angular/material/dialog';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 
 import {
   MyPlatformService,
@@ -21,6 +22,7 @@ import {
   AddTransactionRuleRequest
 } from '../my-platform-service';
 import { FormatCardNumberPipe } from './format-card-number.pipe';
+import { MCC_CODES } from '../industry-codes';
 
 @Component({
   selector: 'app-card-list',
@@ -38,6 +40,7 @@ import { FormatCardNumberPipe } from './format-card-number.pipe';
     MatProgressSpinnerModule,
     MatMenuModule,
     MatDialogModule,
+    MatAutocompleteModule,
     FormatCardNumberPipe
   ],
   template: `
@@ -176,14 +179,23 @@ import { FormatCardNumberPipe } from './format-card-number.pipe';
 
         <div class="panel-scrollable-content">
           <div class="rules-list" *ngIf="selectedCard?.transactionRules?.length">
-            <div class="rule-item" *ngFor="let rule of selectedCard.transactionRules">
+            <div class="rule-item" *ngFor="let rule of selectedCard.transactionRules" [class.mcc-rule]="rule.type === 'blockedMccs'">
               <div class="rule-info">
                 <mat-icon class="rule-icon">{{ getRuleIcon(rule.type) }}</mat-icon>
                 <div class="rule-details">
                   <span class="rule-name">{{ getRuleName(rule.type) }}</span>
-                  <span class="rule-value">
-                    {{ rule.type === 'maxTransactions' ? rule.value + ' transactions' : (rule.value / 100 | number:'1.2-2') + ' ' + rule.currencyCode }}
+                  <span class="rule-value" *ngIf="rule.type === 'maxTransactions'">
+                    {{ rule.value }} transactions
                   </span>
+                  <span class="rule-value" *ngIf="rule.type !== 'maxTransactions' && rule.type !== 'blockedMccs'">
+                    {{ (rule.value || 0) / 100 | number:'1.2-2' }} {{ rule.currencyCode }}
+                  </span>
+                  <div class="mcc-list" *ngIf="rule.type === 'blockedMccs' && rule.blockedMccs">
+                    <span class="mcc-tag" *ngFor="let mcc of rule.blockedMccs">
+                      <span class="mcc-code">{{ mcc }}</span>
+                      <span class="mcc-label">{{ getMccLabel(mcc) }}</span>
+                    </span>
+                  </div>
                 </div>
               </div>
               <div class="rule-actions">
@@ -220,12 +232,14 @@ import { FormatCardNumberPipe } from './format-card-number.pipe';
         <div class="panel-fixed-footer">
           <h4>Add New Rule</h4>
           <form [formGroup]="ruleForm" (ngSubmit)="addRule()">
-            <select class="fintech-input full-width" formControlName="type">
+            <select class="fintech-input full-width" formControlName="type" (change)="onRuleTypeChange()">
               <option value="maxTransactions">Transaction limit</option>
               <option value="maxAmountPerTransaction">Max amount per transaction</option>
               <option value="maxTotalAmount">Total spending limit</option>
+              <option value="blockedMccs">Block merchant categories</option>
             </select>
-            <div class="rule-form-row">
+
+            <div class="rule-form-row" *ngIf="ruleForm.value.type !== 'blockedMccs'">
               <input type="number" class="fintech-input" formControlName="value"
                      [step]="ruleForm.value.type === 'maxTransactions' ? '1' : '0.01'"
                      [placeholder]="ruleForm.value.type === 'maxTransactions' ? 'Count' : 'Amount (e.g. 15.00)'" />
@@ -233,6 +247,43 @@ import { FormatCardNumberPipe } from './format-card-number.pipe';
                       [disabled]="ruleForm.invalid || isAddingRule">
                 <mat-spinner *ngIf="isAddingRule" diameter="20"></mat-spinner>
                 <span *ngIf="!isAddingRule">Add</span>
+              </button>
+            </div>
+
+            <div class="mcc-form-section" *ngIf="ruleForm.value.type === 'blockedMccs'">
+              <div class="mcc-search-container">
+                <mat-icon class="search-icon">search</mat-icon>
+                <input type="text" 
+                       class="fintech-input mcc-search" 
+                       placeholder="Search merchant categories..."
+                       [formControl]="mccSearchControl"
+                       [matAutocomplete]="mccAuto" />
+                <mat-autocomplete #mccAuto="matAutocomplete" (optionSelected)="addMccToRule($event)">
+                  <mat-option *ngFor="let mcc of filteredMccs" [value]="mcc">
+                    <span class="mcc-option" [class.risky]="mcc.risky">
+                      <span class="mcc-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+                      <span class="mcc-label">{{ mcc.label }}</span>
+                      <span class="risky-badge" *ngIf="mcc.risky">⚠ Risk</span>
+                    </span>
+                  </mat-option>
+                </mat-autocomplete>
+              </div>
+
+              <div class="selected-mccs-panel" *ngIf="selectedMccsForRule.length > 0">
+                <div class="mcc-chip" *ngFor="let mcc of selectedMccsForRule" [class.risky]="mcc.risky">
+                  <span class="chip-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+                  <span class="chip-label">{{ mcc.label }}</span>
+                  <span class="risky-indicator" *ngIf="mcc.risky">⚠</span>
+                  <button type="button" class="chip-remove" (click)="removeMccFromRule(mcc)">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <button mat-flat-button class="fintech-btn primary full-width mcc-add-btn" type="submit"
+                      [disabled]="selectedMccsForRule.length === 0 || isAddingRule">
+                <mat-spinner *ngIf="isAddingRule" diameter="20"></mat-spinner>
+                <span *ngIf="!isAddingRule">Add MCC Block Rule</span>
               </button>
             </div>
           </form>
@@ -522,6 +573,129 @@ import { FormatCardNumberPipe } from './format-card-number.pipe';
 
     ::ng-deep .danger-item { color: #f44336 !important; }
     ::ng-deep .danger-item mat-icon { color: #f44336 !important; }
+
+    .rule-item.mcc-rule { flex-direction: column; align-items: flex-start; }
+    .rule-item.mcc-rule .rule-info { width: 100%; }
+    .rule-item.mcc-rule .rule-actions { 
+      width: 100%; 
+      justify-content: flex-end; 
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--fintech-border);
+    }
+
+    .mcc-list { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 6px; 
+      margin-top: 8px; 
+    }
+    .mcc-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: var(--fintech-surface);
+      border: 1px solid var(--fintech-border);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .mcc-tag .mcc-code {
+      font-family: monospace;
+      font-weight: 600;
+      background: var(--fintech-primary);
+      color: white;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    .mcc-tag .mcc-label { color: var(--fintech-text-secondary); }
+
+    .mcc-form-section { margin-top: 12px; }
+    .mcc-search-container { position: relative; margin-bottom: 12px; }
+    .mcc-search-container .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--fintech-text-secondary);
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .mcc-search { padding-left: 40px !important; }
+
+    .mcc-option { display: flex; align-items: center; gap: 10px; }
+    .mcc-option .mcc-code { 
+      font-family: monospace; 
+      font-weight: 600; 
+      background: var(--fintech-bg); 
+      padding: 2px 6px; 
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .mcc-option .mcc-label { font-size: 13px; }
+
+    .selected-mccs-panel { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 6px; 
+      margin-bottom: 12px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .mcc-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--fintech-bg);
+      border-radius: 6px;
+      border: 1px solid var(--fintech-border);
+    }
+    .chip-code { 
+      font-family: monospace; 
+      font-weight: 600; 
+      font-size: 11px;
+      background: var(--fintech-primary);
+      color: white;
+      padding: 2px 5px;
+      border-radius: 3px;
+    }
+    .chip-label { font-size: 12px; color: var(--fintech-text); }
+    .chip-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      color: var(--fintech-text-secondary);
+    }
+    .chip-remove:hover { color: #f44336; }
+    .chip-remove mat-icon { font-size: 16px; width: 16px; height: 16px; }
+
+    .mcc-add-btn { margin-top: 8px; }
+
+    .mcc-code.risky { background: #ff5722; }
+    .mcc-chip.risky { 
+      border-color: #ff5722; 
+      background: #fff3e0;
+    }
+    .chip-code.risky { background: #ff5722; }
+    .risky-badge {
+      font-size: 10px;
+      padding: 2px 5px;
+      background: #ff5722;
+      color: white;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: auto;
+    }
+    .risky-indicator {
+      color: #ff5722;
+      font-size: 12px;
+    }
   `]
 })
 export class CardListComponent implements OnInit {
@@ -543,6 +717,11 @@ export class CardListComponent implements OnInit {
 
   revealedCardId?: string;
   revealedData?: { pan: string; cvc: string; expiryMonth: string; expiryYear: string };
+
+  allMccs = MCC_CODES;
+  selectedMccsForRule: { code: string; label: string; risky?: boolean }[] = [];
+  filteredMccs: { code: string; label: string; risky?: boolean }[] = [];
+  mccSearchControl = new FormControl('');
 
   ruleForm = this.fb.group({
     type: ['maxAmountPerTransaction', Validators.required],
@@ -711,6 +890,7 @@ export class CardListComponent implements OnInit {
       case 'maxTransactions': return 'pin';
       case 'maxAmountPerTransaction': return 'payments';
       case 'maxTotalAmount': return 'account_balance_wallet';
+      case 'blockedMccs': return 'block';
       default: return 'rule';
     }
   }
@@ -720,15 +900,53 @@ export class CardListComponent implements OnInit {
       case 'maxTransactions': return 'Transaction limit';
       case 'maxAmountPerTransaction': return 'Max amount per transaction';
       case 'maxTotalAmount': return 'Total spending limit';
+      case 'blockedMccs': return 'Blocked merchant categories';
       default: return type;
     }
   }
 
+  getMccLabel(code: string): string {
+    const mcc = this.allMccs.find(m => m.code === code);
+    return mcc ? mcc.label : code;
+  }
+
   addRule() {
-    if (!this.selectedCard || this.ruleForm.invalid) return;
+    if (!this.selectedCard) return;
+
+    const type = this.ruleForm.value.type!;
+
+    // Handle MCC rule separately
+    if (type === 'blockedMccs') {
+      if (this.selectedMccsForRule.length === 0) return;
+
+      this.isAddingRule = true;
+      const request: AddTransactionRuleRequest = {
+        paymentInstrumentId: this.selectedCard.paymentInstrumentId,
+        type: 'blockedMccs',
+        blockedMccs: this.selectedMccsForRule.map(m => m.code)
+      };
+
+      this.service.addTransactionRule(request).subscribe({
+        next: () => {
+          this.snack.open('MCC block rule added successfully', 'Close', { duration: 3000 });
+          this.selectedMccsForRule = [];
+          this.mccSearchControl.setValue('');
+          this.isAddingRule = false;
+          this.refreshCardRules();
+        },
+        error: () => {
+          this.isAddingRule = false;
+          this.snack.open('Failed to add rule', 'Close', { duration: 3000 });
+          this.cdr.detectChanges();
+        }
+      });
+      return;
+    }
+
+    // Handle other rules
+    if (this.ruleForm.invalid) return;
 
     this.isAddingRule = true;
-    const type = this.ruleForm.value.type!;
     const rawValue = this.ruleForm.value.value!;
     // Convert to minor units for amount-based rules (multiply by 100)
     const value = type === 'maxTransactions' ? rawValue : Math.round(rawValue * 100);
@@ -796,5 +1014,45 @@ export class CardListComponent implements OnInit {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  onRuleTypeChange() {
+    if (this.ruleForm.value.type === 'blockedMccs') {
+      this.filteredMccs = this.allMccs;
+      this.mccSearchControl.valueChanges.subscribe(value => {
+        this.filterMccsForRule(value || '');
+      });
+    }
+    this.selectedMccsForRule = [];
+  }
+
+  filterMccsForRule(searchTerm: string) {
+    if (!searchTerm) {
+      this.filteredMccs = this.allMccs.filter(
+        mcc => !this.selectedMccsForRule.some(s => s.code === mcc.code)
+      );
+      return;
+    }
+    const term = searchTerm.toLowerCase();
+    this.filteredMccs = this.allMccs.filter(
+      mcc => !this.selectedMccsForRule.some(s => s.code === mcc.code) &&
+        (mcc.code.toLowerCase().includes(term) || mcc.label.toLowerCase().includes(term))
+    );
+  }
+
+  addMccToRule(event: any) {
+    const mcc = event.option.value;
+    if (!this.selectedMccsForRule.some(s => s.code === mcc.code)) {
+      this.selectedMccsForRule.push(mcc);
+    }
+    this.mccSearchControl.setValue('');
+    this.filterMccsForRule('');
+    this.cdr.detectChanges();
+  }
+
+  removeMccFromRule(mcc: { code: string; label: string; risky?: boolean }) {
+    this.selectedMccsForRule = this.selectedMccsForRule.filter(s => s.code !== mcc.code);
+    this.filterMccsForRule(this.mccSearchControl.value || '');
+    this.cdr.detectChanges();
   }
 }
