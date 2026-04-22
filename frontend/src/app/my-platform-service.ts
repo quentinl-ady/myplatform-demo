@@ -242,7 +242,15 @@ export interface CreateCardRequest {
   userId: number;
   cardholderName: string;
   brand: string; // visa or mc
+  email?: string;
+  phone?: string;
   transactionRules?: TransactionRuleRequest[];
+}
+
+export interface PhonePrefix {
+  code: string;
+  country: string;
+  flag: string;
 }
 
 export interface TransactionRuleResponse {
@@ -320,6 +328,10 @@ export class MyPlatformService {
 
   getBusinessLoans(userId: string): Observable<SessionToken> {
     return this.http.get<SessionToken>(`${this.baseUrl}/businessLoans/${userId}`);
+  }
+
+  getExternalBankAccountSession(userId: string): Observable<SessionToken> {
+    return this.http.get<SessionToken>(`${this.baseUrl}/external-bank-account/${userId}`);
   }
 
   getBusinessLines(userId: number): Observable<BusinessLine[]> {
@@ -486,8 +498,13 @@ export class MyPlatformService {
     return this.http.post<CardResponse>(`${this.baseUrl}/issuing/cards`, request);
   }
 
-  getCards(userId: number): Observable<CardResponse[]> {
-    return this.http.get<CardResponse[]>(`${this.baseUrl}/issuing/cards/${userId}`);
+  getPhonePrefixes(): Observable<PhonePrefix[]> {
+    return this.http.get<PhonePrefix[]>(`${this.baseUrl}/issuing/phone-prefixes`);
+  }
+
+  getCards(userId: number, status?: string): Observable<CardResponse[]> {
+    const params = status ? `?status=${status}` : '';
+    return this.http.get<CardResponse[]>(`${this.baseUrl}/issuing/cards/${userId}${params}`);
   }
 
   getCardDetails(paymentInstrumentId: string): Observable<CardResponse> {

@@ -56,12 +56,39 @@ import { MCC_CODES } from '../industry-codes';
         </button>
       </div>
 
-      <div class="loading-state" *ngIf="isLoading">
+      <!-- Search Bar -->
+      <div class="search-bar" *ngIf="!isLoadingActive || activeCards.length > 0 || suspendedCards.length > 0">
+        <div class="search-container">
+          <mat-icon class="search-icon">search</mat-icon>
+          <input type="text"
+                 class="fintech-input search-input"
+                 placeholder="Search by cardholder name..."
+                 [formControl]="searchControl"
+                 [matAutocomplete]="searchAuto" />
+          <mat-autocomplete #searchAuto="matAutocomplete" (optionSelected)="onSearchSelect($event)">
+            <mat-option *ngFor="let card of searchSuggestions" [value]="card">
+              <div class="search-suggestion">
+                <span class="suggestion-name">{{ card.cardholderName }}</span>
+                <span class="suggestion-meta">
+                  <span class="suggestion-brand" [class.visa]="card.brand === 'visa'" [class.mc]="card.brand === 'mc'">{{ card.brand === 'visa' ? 'Visa' : 'MC' }}</span>
+                  •••• {{ card.lastFour }}
+                  <span class="suggestion-status" [class]="card.status">{{ card.status }}</span>
+                </span>
+              </div>
+            </mat-option>
+          </mat-autocomplete>
+          <button *ngIf="searchControl.value" class="search-clear" (click)="clearSearch()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="loading-state" *ngIf="isLoadingActive">
         <mat-spinner diameter="40"></mat-spinner>
         <p>Loading your cards...</p>
       </div>
 
-      <div class="empty-state" *ngIf="!isLoading && cards.length === 0">
+      <div class="empty-state" *ngIf="!isLoadingActive && activeCards.length === 0 && suspendedCards.length === 0 && closedCards.length === 0">
         <mat-icon>credit_card_off</mat-icon>
         <h3>No cards yet</h3>
         <p>Create your first virtual card to get started</p>
@@ -70,8 +97,15 @@ import { MCC_CODES } from '../industry-codes';
         </button>
       </div>
 
-      <div class="cards-grid" *ngIf="!isLoading && cards.length > 0">
-        <div class="card-item" *ngFor="let card of cards" [class.selected]="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+      <!-- Active Cards Section -->
+      <div class="cards-section" *ngIf="filteredActiveCards.length > 0">
+        <div class="section-title">
+          <span class="status-dot active"></span>
+          <h2>Active</h2>
+          <span class="card-count">{{ filteredActiveCards.length }}</span>
+        </div>
+        <div class="cards-grid">
+          <div class="card-item" *ngFor="let card of filteredActiveCards" [class.selected]="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
 
           <div class="virtual-card"
                [class.visa]="card.brand === 'visa'"
@@ -162,7 +196,157 @@ import { MCC_CODES } from '../industry-codes';
               <span>Copy</span>
             </button>
           </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Suspended Cards Section -->
+      <div class="cards-section" *ngIf="filteredSuspendedCards.length > 0">
+        <div class="section-title">
+          <span class="status-dot suspended"></span>
+          <h2>Suspended</h2>
+          <span class="card-count">{{ filteredSuspendedCards.length }}</span>
+        </div>
+        <div class="cards-grid">
+          <div class="card-item" *ngFor="let card of filteredSuspendedCards" [class.selected]="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+
+            <div class="virtual-card"
+                 [class.visa]="card.brand === 'visa'"
+                 [class.mc]="card.brand === 'mc'"
+                 [class.suspended]="true"
+                 (click)="selectCard(card)">
+
+              <div class="card-status-badge">Suspended</div>
+
+              <div class="card-top-row">
+                <div class="card-brand-logo">
+                  <svg *ngIf="card.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+                  </svg>
+                  <svg *ngIf="card.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+                    <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+                    <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+                  </svg>
+                </div>
+                <button mat-icon-button [matMenuTriggerFor]="suspCardMenu" class="card-menu-btn" (click)="$event.stopPropagation()">
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #suspCardMenu="matMenu">
+                  <button mat-menu-item (click)="revealCardDetails(card)">
+                    <mat-icon>visibility</mat-icon>
+                    <span>Reveal Details</span>
+                  </button>
+                  <button mat-menu-item (click)="activateCard(card)">
+                    <mat-icon>play_circle</mat-icon>
+                    <span>Reactivate Card</span>
+                  </button>
+                  <button mat-menu-item (click)="closeCard(card)" class="danger-item">
+                    <mat-icon>cancel</mat-icon>
+                    <span>Close Card</span>
+                  </button>
+                </mat-menu>
+              </div>
+
+              <div class="card-number" [class.revealed]="revealedCardId === card.paymentInstrumentId">
+                <span *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+                  •••• •••• •••• {{ card.lastFour }}
+                </span>
+                <span *ngIf="revealedCardId === card.paymentInstrumentId && revealedData" class="revealed-number">
+                  {{ revealedData.pan | formatCardNumber }}
+                </span>
+              </div>
+
+              <div class="card-bottom-row">
+                <div class="card-holder">
+                  <span class="label">CARDHOLDER</span>
+                  <span class="value">{{ card.cardholderName }}</span>
+                </div>
+                <div class="card-expiry">
+                  <span class="label">EXPIRES</span>
+                  <span class="value" *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+                    {{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}
+                  </span>
+                  <span class="value" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+                    {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear?.toString()?.slice(-2) }}
+                  </span>
+                </div>
+                <div class="card-cvv" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+                  <span class="label">CVV</span>
+                  <span class="value">{{ revealedData.cvc }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-actions-quick" *ngIf="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+              <button class="action-btn" (click)="revealCardDetails(card)" [disabled]="isRevealing">
+                <mat-icon>{{ revealedCardId === card.paymentInstrumentId ? 'visibility_off' : 'visibility' }}</mat-icon>
+                <span>{{ revealedCardId === card.paymentInstrumentId ? 'Hide' : 'Reveal' }}</span>
+              </button>
+              <button class="action-btn" (click)="openRulesPanel(card)">
+                <mat-icon>rule</mat-icon>
+                <span>Rules</span>
+              </button>
+              <button class="action-btn" (click)="copyCardNumber(card)" [disabled]="revealedCardId !== card.paymentInstrumentId">
+                <mat-icon>content_copy</mat-icon>
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Closed Cards Section -->
+      <div class="cards-section closed-section">
+        <button class="show-closed-btn" (click)="loadClosedCards()" *ngIf="!closedCardsLoaded && !isLoadingClosed">
+          <mat-icon>inventory_2</mat-icon>
+          Show Closed Cards
+        </button>
+        <div class="loading-state small" *ngIf="isLoadingClosed">
+          <mat-spinner diameter="24"></mat-spinner>
+          <p>Loading closed cards...</p>
+        </div>
+        <div *ngIf="closedCardsLoaded && closedCards.length > 0">
+          <div class="section-title">
+            <span class="status-dot closed"></span>
+            <h2>Closed</h2>
+            <span class="card-count">{{ closedCards.length }}</span>
+          </div>
+          <div class="cards-grid">
+            <div class="card-item" *ngFor="let card of closedCards">
+              <div class="virtual-card"
+                   [class.visa]="card.brand === 'visa'"
+                   [class.mc]="card.brand === 'mc'"
+                   [class.closed]="true">
+                <div class="card-status-badge">Closed</div>
+                <div class="card-top-row">
+                  <div class="card-brand-logo">
+                    <svg *ngIf="card.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+                    </svg>
+                    <svg *ngIf="card.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+                      <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+                      <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="card-number">•••• •••• •••• {{ card.lastFour }}</div>
+                <div class="card-bottom-row">
+                  <div class="card-holder">
+                    <span class="label">CARDHOLDER</span>
+                    <span class="value">{{ card.cardholderName }}</span>
+                  </div>
+                  <div class="card-expiry">
+                    <span class="label">EXPIRES</span>
+                    <span class="value">{{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="no-closed" *ngIf="closedCardsLoaded && closedCards.length === 0">No closed cards.</p>
       </div>
 
       <!-- Rules Panel -->
@@ -677,6 +861,132 @@ import { MCC_CODES } from '../industry-codes';
 
     .mcc-add-btn { margin-top: 8px; }
 
+    .search-bar { margin-bottom: 24px; }
+    .search-container {
+      position: relative;
+      max-width: 400px;
+    }
+    .search-container .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--fintech-text-secondary);
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      z-index: 1;
+    }
+    .search-input {
+      padding-left: 44px !important;
+      padding-right: 40px !important;
+      width: 100%;
+      border-radius: 24px !important;
+    }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--fintech-text-secondary);
+      display: flex;
+      align-items: center;
+      padding: 4px;
+    }
+    .search-clear:hover { color: var(--fintech-text); }
+    .search-clear mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    .search-suggestion {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+    .suggestion-name { font-weight: 500; }
+    .suggestion-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--fintech-text-secondary);
+    }
+    .suggestion-brand {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .suggestion-brand.visa { background: #1a1f71; color: white; }
+    .suggestion-brand.mc { background: #eb001b; color: white; }
+    .suggestion-status {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .suggestion-status.active { background: #e8f5e9; color: #4caf50; }
+    .suggestion-status.suspended { background: #fff3e0; color: #ff9800; }
+
+    .cards-section { margin-bottom: 32px; }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .section-title h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--fintech-text);
+    }
+    .card-count {
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--fintech-bg);
+      color: var(--fintech-text-secondary);
+      padding: 2px 10px;
+      border-radius: 12px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .status-dot.active { background: #4caf50; }
+    .status-dot.suspended { background: #ff9800; }
+    .status-dot.closed { background: #9e9e9e; }
+
+    .closed-section { margin-top: 16px; }
+    .show-closed-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border: 1px dashed var(--fintech-border);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--fintech-text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      justify-content: center;
+    }
+    .show-closed-btn:hover { border-color: var(--fintech-primary); color: var(--fintech-primary); }
+    .loading-state.small { padding: 24px; }
+    .loading-state.small p { font-size: 13px; }
+    .no-closed {
+      text-align: center;
+      color: var(--fintech-text-secondary);
+      font-size: 14px;
+      padding: 16px;
+    }
+
     .mcc-code.risky { background: #ff5722; }
     .mcc-chip.risky { 
       border-color: #ff5722; 
@@ -708,9 +1018,17 @@ export class CardListComponent implements OnInit {
 
   userId = '';
   user?: User;
-  cards: CardResponse[] = [];
+  activeCards: CardResponse[] = [];
+  suspendedCards: CardResponse[] = [];
+  closedCards: CardResponse[] = [];
+  closedCardsLoaded = false;
+  filteredActiveCards: CardResponse[] = [];
+  filteredSuspendedCards: CardResponse[] = [];
+  searchSuggestions: CardResponse[] = [];
+  searchControl = new FormControl('');
   selectedCard?: CardResponse;
-  isLoading = true;
+  isLoadingActive = true;
+  isLoadingClosed = false;
   isRevealing = false;
   isAddingRule = false;
   showRulesPanel = false;
@@ -733,8 +1051,12 @@ export class CardListComponent implements OnInit {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadUser();
-        this.loadCards();
+        this.loadActiveAndSuspended();
       }
+    });
+
+    this.searchControl.valueChanges.subscribe(value => {
+      this.filterCards(typeof value === 'string' ? value : '');
     });
   }
 
@@ -747,20 +1069,100 @@ export class CardListComponent implements OnInit {
     });
   }
 
-  loadCards() {
-    this.isLoading = true;
-    this.service.getCards(Number(this.userId)).subscribe({
+  loadActiveAndSuspended() {
+    this.isLoadingActive = true;
+    let loaded = 0;
+    const onLoaded = () => {
+      loaded++;
+      if (loaded >= 2) {
+        this.isLoadingActive = false;
+        this.filterCards('');
+        this.cdr.detectChanges();
+      }
+    };
+
+    this.service.getCards(Number(this.userId), 'active').subscribe({
       next: (cards) => {
-        this.cards = cards;
-        this.isLoading = false;
+        this.activeCards = cards;
+        this.filteredActiveCards = cards;
+        this.cdr.detectChanges();
+        onLoaded();
+      },
+      error: () => {
+        this.snack.open('Failed to load active cards', 'Close', { duration: 3000 });
+        onLoaded();
+      }
+    });
+
+    this.service.getCards(Number(this.userId), 'suspended').subscribe({
+      next: (cards) => {
+        this.suspendedCards = cards;
+        this.filteredSuspendedCards = cards;
+        this.cdr.detectChanges();
+        onLoaded();
+      },
+      error: () => {
+        this.snack.open('Failed to load suspended cards', 'Close', { duration: 3000 });
+        onLoaded();
+      }
+    });
+  }
+
+  loadClosedCards() {
+    this.isLoadingClosed = true;
+    this.cdr.detectChanges();
+    this.service.getCards(Number(this.userId), 'closed').subscribe({
+      next: (cards) => {
+        this.closedCards = cards;
+        this.closedCardsLoaded = true;
+        this.isLoadingClosed = false;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.isLoading = false;
-        this.snack.open('Failed to load cards', 'Close', { duration: 3000 });
+        this.isLoadingClosed = false;
+        this.closedCardsLoaded = true;
+        this.snack.open('Failed to load closed cards', 'Close', { duration: 3000 });
         this.cdr.detectChanges();
       }
     });
+  }
+
+  filterCards(searchTerm: string) {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) {
+      this.filteredActiveCards = this.activeCards;
+      this.filteredSuspendedCards = this.suspendedCards;
+      this.searchSuggestions = [];
+      return;
+    }
+    const allCards = [...this.activeCards, ...this.suspendedCards];
+    this.searchSuggestions = allCards.filter(c =>
+      c.cardholderName?.toLowerCase().includes(term)
+    );
+    this.filteredActiveCards = this.activeCards.filter(c =>
+      c.cardholderName?.toLowerCase().includes(term)
+    );
+    this.filteredSuspendedCards = this.suspendedCards.filter(c =>
+      c.cardholderName?.toLowerCase().includes(term)
+    );
+  }
+
+  onSearchSelect(event: any) {
+    const card: CardResponse = event.option.value;
+    this.searchControl.setValue(card.cardholderName, { emitEvent: false });
+    this.filteredActiveCards = this.activeCards.filter(c => c.paymentInstrumentId === card.paymentInstrumentId);
+    this.filteredSuspendedCards = this.suspendedCards.filter(c => c.paymentInstrumentId === card.paymentInstrumentId);
+    this.searchSuggestions = [];
+    this.selectCard(card);
+    this.cdr.detectChanges();
+  }
+
+  clearSearch() {
+    this.searchControl.setValue('');
+    this.filteredActiveCards = this.activeCards;
+    this.filteredSuspendedCards = this.suspendedCards;
+    this.searchSuggestions = [];
+    this.cdr.detectChanges();
   }
 
   navigateToCreate() {
@@ -836,7 +1238,10 @@ export class CardListComponent implements OnInit {
   suspendCard(card: CardResponse) {
     this.service.updateCardStatus(card.paymentInstrumentId, 'suspended').subscribe({
       next: () => {
+        this.activeCards = this.activeCards.filter(c => c.paymentInstrumentId !== card.paymentInstrumentId);
         card.status = 'suspended';
+        this.suspendedCards.push(card);
+        this.filterCards(this.searchControl.value || '');
         this.snack.open('Card suspended', 'Close', { duration: 3000 });
         this.cdr.detectChanges();
       },
@@ -849,7 +1254,10 @@ export class CardListComponent implements OnInit {
   activateCard(card: CardResponse) {
     this.service.updateCardStatus(card.paymentInstrumentId, 'active').subscribe({
       next: () => {
+        this.suspendedCards = this.suspendedCards.filter(c => c.paymentInstrumentId !== card.paymentInstrumentId);
         card.status = 'active';
+        this.activeCards.push(card);
+        this.filterCards(this.searchControl.value || '');
         this.snack.open('Card reactivated', 'Close', { duration: 3000 });
         this.cdr.detectChanges();
       },
@@ -863,7 +1271,13 @@ export class CardListComponent implements OnInit {
     if (confirm('Are you sure you want to close this card? This action cannot be undone.')) {
       this.service.updateCardStatus(card.paymentInstrumentId, 'closed').subscribe({
         next: () => {
+          this.activeCards = this.activeCards.filter(c => c.paymentInstrumentId !== card.paymentInstrumentId);
+          this.suspendedCards = this.suspendedCards.filter(c => c.paymentInstrumentId !== card.paymentInstrumentId);
           card.status = 'closed';
+          if (this.closedCardsLoaded) {
+            this.closedCards.push(card);
+          }
+          this.filterCards(this.searchControl.value || '');
           this.snack.open('Card closed', 'Close', { duration: 3000 });
           this.cdr.detectChanges();
         },
@@ -1007,10 +1421,11 @@ export class CardListComponent implements OnInit {
     this.service.getCardDetails(this.selectedCard.paymentInstrumentId).subscribe({
       next: (card) => {
         this.selectedCard = card;
-        const index = this.cards.findIndex(c => c.paymentInstrumentId === card.paymentInstrumentId);
-        if (index >= 0) {
-          this.cards[index] = card;
-        }
+        const activeIndex = this.activeCards.findIndex(c => c.paymentInstrumentId === card.paymentInstrumentId);
+        if (activeIndex >= 0) this.activeCards[activeIndex] = card;
+        const suspIndex = this.suspendedCards.findIndex(c => c.paymentInstrumentId === card.paymentInstrumentId);
+        if (suspIndex >= 0) this.suspendedCards[suspIndex] = card;
+        this.filterCards(this.searchControl.value || '');
         this.cdr.detectChanges();
       }
     });

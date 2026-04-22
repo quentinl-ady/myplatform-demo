@@ -21,7 +21,8 @@ export const INDUSTRY_CODES = [
     { code: '493', label: 'Warehousing and storage' },
     { code: '484', label: 'Truck transportation' },
     { code: '72111', label: 'Hotels (except casino hotels) and motels' },
-    { code: '6244', label: 'Child day care services' }
+    { code: '6244', label: 'Child day care services' },
+    { code: '711A', label: 'Ticketing agencies' }
 ];
 
 export const MCC_CODES = [

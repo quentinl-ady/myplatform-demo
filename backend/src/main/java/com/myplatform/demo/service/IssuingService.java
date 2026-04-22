@@ -51,7 +51,7 @@ public class IssuingService {
         return publicKeyResponse.getPublicKey();
     }
 
-    public String createVirtualCard(String balanceAccountId, String cardholderName, String brand) throws IOException, ApiException {
+    public String createVirtualCard(String balanceAccountId, String cardholderName, String brand, String email, String phone) throws IOException, ApiException {
         String brandVariant = "visa".equalsIgnoreCase(brand) ? this.visaSubvariant : this.mcSubvariant;
 
         CardInfo cardInfo = new CardInfo()
@@ -59,6 +59,19 @@ public class IssuingService {
                 .brand(brand.toLowerCase())
                 .brandVariant(brandVariant)
                 .formFactor(CardInfo.FormFactorEnum.VIRTUAL);
+
+        if (email != null || phone != null) {
+            Authentication authentication = new Authentication();
+            if (email != null && !email.isBlank()) {
+                authentication.email(email);
+            }
+            if (phone != null && !phone.isBlank()) {
+                authentication.phone(new Phone()
+                        .number(phone)
+                        .type(Phone.TypeEnum.MOBILE));
+            }
+            cardInfo.authentication(authentication);
+        }
 
         PaymentInstrumentInfo paymentInstrumentInfo = new PaymentInstrumentInfo()
                 .balanceAccountId(balanceAccountId)
@@ -101,7 +114,10 @@ public class IssuingService {
         switch (status.toLowerCase()) {
             case "active" -> updateRequest.setStatus(PaymentInstrumentUpdateRequest.StatusEnum.ACTIVE);
             case "suspended" -> updateRequest.setStatus(PaymentInstrumentUpdateRequest.StatusEnum.SUSPENDED);
-            case "closed" -> updateRequest.setStatus(PaymentInstrumentUpdateRequest.StatusEnum.CLOSED);
+            case "closed" -> {
+                updateRequest.setStatus(PaymentInstrumentUpdateRequest.StatusEnum.CLOSED);
+                updateRequest.setStatusReason(PaymentInstrumentUpdateRequest.StatusReasonEnum.ENDOFLIFE);
+            }
             default -> throw new IllegalArgumentException("Invalid status: " + status);
         }
 

@@ -43,7 +43,9 @@ public class IssuingController {
             String paymentInstrumentId = issuingService.createVirtualCard(
                     user.getBalanceAccountId(),
                     request.getCardholderName(),
-                    request.getBrand()
+                    request.getBrand(),
+                    request.getEmail(),
+                    request.getPhone()
             );
 
             Card card = new Card();
@@ -83,7 +85,7 @@ public class IssuingController {
     }
 
     @GetMapping("/cards/{userId}")
-    public ResponseEntity<?> getCards(@PathVariable Long userId) {
+    public ResponseEntity<?> getCards(@PathVariable Long userId, @RequestParam(required = false) String status) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
@@ -94,12 +96,16 @@ public class IssuingController {
             for (Card card : cards) {
                 try {
                     CardResponse cardResponse = issuingService.getCardDetails(card.getPaymentInstrumentId());
-                    responses.add(cardResponse);
+                    if (status == null || status.equalsIgnoreCase(cardResponse.getStatus())) {
+                        responses.add(cardResponse);
+                    }
                 } catch (Exception e) {
-                    CardResponse errorCard = new CardResponse();
-                    errorCard.setPaymentInstrumentId(card.getPaymentInstrumentId());
-                    errorCard.setStatus("error");
-                    responses.add(errorCard);
+                    if (status == null || "error".equalsIgnoreCase(status)) {
+                        CardResponse errorCard = new CardResponse();
+                        errorCard.setPaymentInstrumentId(card.getPaymentInstrumentId());
+                        errorCard.setStatus("error");
+                        responses.add(errorCard);
+                    }
                 }
             }
 
@@ -234,5 +240,42 @@ public class IssuingController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error revealing card data: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/phone-prefixes")
+    public ResponseEntity<List<PhonePrefix>> getPhonePrefixes() {
+        List<PhonePrefix> prefixes = List.of(
+                new PhonePrefix("+1", "United States", "🇺🇸"),
+                new PhonePrefix("+1", "Canada", "🇨🇦"),
+                new PhonePrefix("+44", "United Kingdom", "🇬🇧"),
+                new PhonePrefix("+33", "France", "🇫🇷"),
+                new PhonePrefix("+49", "Germany", "🇩🇪"),
+                new PhonePrefix("+31", "Netherlands", "🇳🇱"),
+                new PhonePrefix("+34", "Spain", "🇪🇸"),
+                new PhonePrefix("+39", "Italy", "🇮🇹"),
+                new PhonePrefix("+32", "Belgium", "🇧🇪"),
+                new PhonePrefix("+41", "Switzerland", "🇨🇭"),
+                new PhonePrefix("+43", "Austria", "🇦🇹"),
+                new PhonePrefix("+46", "Sweden", "🇸🇪"),
+                new PhonePrefix("+47", "Norway", "🇳🇴"),
+                new PhonePrefix("+45", "Denmark", "🇩🇰"),
+                new PhonePrefix("+358", "Finland", "🇫🇮"),
+                new PhonePrefix("+353", "Ireland", "🇮🇪"),
+                new PhonePrefix("+351", "Portugal", "🇵🇹"),
+                new PhonePrefix("+48", "Poland", "🇵🇱"),
+                new PhonePrefix("+420", "Czech Republic", "🇨🇿"),
+                new PhonePrefix("+36", "Hungary", "🇭🇺"),
+                new PhonePrefix("+40", "Romania", "🇷🇴"),
+                new PhonePrefix("+30", "Greece", "🇬🇷"),
+                new PhonePrefix("+61", "Australia", "🇦🇺"),
+                new PhonePrefix("+81", "Japan", "🇯🇵"),
+                new PhonePrefix("+65", "Singapore", "🇸🇬"),
+                new PhonePrefix("+852", "Hong Kong", "🇭🇰"),
+                new PhonePrefix("+971", "United Arab Emirates", "🇦🇪"),
+                new PhonePrefix("+966", "Saudi Arabia", "🇸🇦"),
+                new PhonePrefix("+55", "Brazil", "🇧🇷"),
+                new PhonePrefix("+52", "Mexico", "🇲🇽")
+        );
+        return ResponseEntity.ok(prefixes);
     }
 }

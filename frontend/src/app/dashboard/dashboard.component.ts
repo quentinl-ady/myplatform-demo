@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit } from '@angular/core';
+import { Component, signal, inject, OnInit, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -16,6 +16,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MyPlatformService, OnboardingPart, OnboardingResponse, User } from "../my-platform-service";
 import { MaterialModule } from "../material.module";
 import { INDUSTRY_CODES } from "../industry-codes";
+import '@adyen/kyc-components/transfer-instrument-management';
+import '@adyen/kyc-components/transfer-instrument-configuration';
 
 export interface BusinessLine {
   id: string;
@@ -26,6 +28,7 @@ export interface BusinessLine {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [
     CommonModule,
     MaterialModule,
@@ -158,6 +161,18 @@ export interface BusinessLine {
             <mat-spinner *ngIf="submitting" diameter="20" color="accent"></mat-spinner>
           </button>
         </form>
+      </mat-card>
+
+      <mat-card class="bank-account-card" *ngIf="user()?.legalEntityId">
+        <div class="bank-account-header">
+          <div class="bank-account-title">
+            <mat-icon>account_balance</mat-icon>
+            <h3>External Bank Accounts</h3>
+          </div>
+          <p class="bank-account-subtitle">Manage bank accounts linked to your legal entity for payouts.</p>
+        </div>
+
+        <div id="ti-management-container"></div>
       </mat-card>
 
       <mat-card class="dev-tool-card">
@@ -408,6 +423,44 @@ export interface BusinessLine {
       gap: 16px;
     }
 
+    /* Bank Account Card */
+    .bank-account-header { margin-bottom: 20px; }
+    .bank-account-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .bank-account-title mat-icon {
+      color: var(--fintech-primary);
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+    .bank-account-title h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--fintech-text);
+    }
+    .bank-account-subtitle {
+      font-size: 13px;
+      color: var(--fintech-text-secondary);
+      margin: 0;
+    }
+    .bank-account-loading {
+      text-align: center;
+      padding: 24px;
+    }
+    .bank-account-loading p {
+      margin: 12px 0 0;
+      color: var(--fintech-text-secondary);
+      font-size: 13px;
+    }
+    #transfer-instrument-container {
+      min-height: 0;
+    }
+
     /* Dev Tool Card */
     .dev-tool-card {
       background: #fffafa;
@@ -480,6 +533,9 @@ export class DashboardComponent implements OnInit {
           this.user.set(u);
           if (u.activityReason === 'embeddedPayment') {
             this.loadBusinessLines();
+          }
+          if (u.legalEntityId) {
+            this.initTransferInstrumentComponent(u.legalEntityId);
           }
         },
         error: () => {
@@ -585,6 +641,69 @@ export class DashboardComponent implements OnInit {
         this.submitting = false;
       }
     });
+  }
+
+  private tiLegalEntityId = '';
+
+  private getFetchToken() {
+    return async () => {
+      const session = await this.authService.getExternalBankAccountSession(this.userId).toPromise();
+      if (!session) throw new Error('Failed to get session token');
+      return { token: session.token };
+    };
+  }
+
+  private initTransferInstrumentComponent(legalEntityId: string) {
+    this.tiLegalEntityId = legalEntityId;
+    setTimeout(() => this.showManagementComponent());
+  }
+
+  private showManagementComponent() {
+    const container = document.getElementById('ti-management-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const el = document.createElement('adyen-transfer-instrument-management') as any;
+    el.locale = 'en-US';
+    el.environment = 'test';
+    el.rootlegalentityid = this.tiLegalEntityId;
+    el.fetchToken = this.getFetchToken();
+    el.addEventListener('add', () => {
+      this.showConfigurationComponent();
+    });
+    el.addEventListener('edit', (e: any) => {
+      const transferInstrumentId = e.detail;
+      this.showConfigurationComponent(transferInstrumentId);
+    });
+    el.addEventListener('remove', (e: any) => {
+      console.log('Transfer instrument removed', e.detail);
+    });
+
+    container.appendChild(el);
+  }
+
+  private showConfigurationComponent(transferInstrumentId?: string) {
+    const container = document.getElementById('ti-management-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const el = document.createElement('adyen-transfer-instrument-configuration') as any;
+    el.locale = 'en-US';
+    el.environment = 'test';
+    el.rootlegalentityid = this.tiLegalEntityId;
+    el.fetchToken = this.getFetchToken();
+    el.settings = {
+      allowIntraRegionCrossBorderPayout: true,
+      allowBankAccountFormatSelection: true
+    };
+    if (transferInstrumentId) {
+      el.transferInstrumentId = transferInstrumentId;
+    }
+    el.addEventListener('complete', () => {
+      this.showManagementComponent();
+    });
+
+    container.appendChild(el);
   }
 
   validateKyc(userId: string) {

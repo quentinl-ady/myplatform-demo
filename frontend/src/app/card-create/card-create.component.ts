@@ -18,7 +18,8 @@ import {
   MyPlatformService,
   User,
   CreateCardRequest,
-  TransactionRuleRequest
+  TransactionRuleRequest,
+  PhonePrefix
 } from '../my-platform-service';
 import { MCC_CODES } from '../industry-codes';
 
@@ -105,6 +106,39 @@ import { MCC_CODES } from '../industry-codes';
                   <span>Mastercard Debit</span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <div class="section-header">
+              <h3>Authentication</h3>
+              <span class="optional-badge">Optional</span>
+            </div>
+            <p class="section-description">Add email and phone for 3D Secure card authentication.</p>
+
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" class="fintech-input" formControlName="email" 
+                     placeholder="cardholder@example.com" />
+              <span class="field-error" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
+                Please enter a valid email address
+              </span>
+            </div>
+
+            <div class="form-group">
+              <label>Phone Number</label>
+              <div class="phone-input-row">
+                <select class="fintech-input phone-prefix-select" formControlName="phonePrefix">
+                  <option *ngFor="let p of phonePrefixes" [value]="p.code">
+                    {{ p.flag }} {{ p.code }} {{ p.country }}
+                  </option>
+                </select>
+                <input type="tel" class="fintech-input phone-number-input" formControlName="phoneNumber" 
+                       placeholder="6 11 22 33 44" />
+              </div>
+              <span class="field-error" *ngIf="form.get('phoneNumber')?.invalid && form.get('phoneNumber')?.touched">
+                Please enter a valid phone number (digits, spaces, dashes)
+              </span>
             </div>
           </div>
 
@@ -543,6 +577,24 @@ import { MCC_CODES } from '../industry-codes';
     }
     .mcc-hint mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
+    .phone-input-row {
+      display: flex;
+      gap: 12px;
+    }
+    .phone-prefix-select {
+      flex: 0 0 200px;
+      min-width: 200px;
+    }
+    .phone-number-input {
+      flex: 1;
+    }
+    .field-error {
+      display: block;
+      color: #f44336;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
     .mcc-code.risky { background: #ff5722; }
     .mcc-chip.risky { 
       border-color: #ff5722; 
@@ -578,6 +630,7 @@ export class CardCreateComponent implements OnInit {
   isSuccess = false;
   createdCard?: any;
 
+  phonePrefixes: PhonePrefix[] = [];
   allMccs = MCC_CODES;
   selectedMccs: { code: string; label: string; risky?: boolean }[] = [];
   filteredMccs: { code: string; label: string; risky?: boolean }[] = [];
@@ -586,6 +639,9 @@ export class CardCreateComponent implements OnInit {
   form = this.fb.group({
     cardholderName: ['', [Validators.required, Validators.minLength(2)]],
     brand: ['visa', Validators.required],
+    email: ['', [Validators.email]],
+    phonePrefix: ['+31'],
+    phoneNumber: ['', [Validators.pattern(/^[\d\s\-()]+$/)]],
     rules: this.fb.array([])
   });
 
@@ -605,6 +661,11 @@ export class CardCreateComponent implements OnInit {
       this.filterMccs(value || '');
     });
     this.filteredMccs = this.allMccs;
+
+    this.service.getPhonePrefixes().subscribe({
+      next: (prefixes) => this.phonePrefixes = prefixes,
+      error: () => this.phonePrefixes = [{ code: '+31', country: 'Netherlands', flag: '🇳🇱' }]
+    });
   }
 
   filterMccs(searchTerm: string) {
@@ -641,6 +702,9 @@ export class CardCreateComponent implements OnInit {
     this.service.getUserById(Number(this.userId)).subscribe({
       next: (user) => {
         this.user = user;
+        if (user.email) {
+          this.form.patchValue({ email: user.email });
+        }
         this.cdr.detectChanges();
       },
       error: () => {
@@ -687,10 +751,16 @@ export class CardCreateComponent implements OnInit {
       });
     }
 
+    const email = this.form.value.email?.trim() || undefined;
+    const phoneNumber = this.form.value.phoneNumber?.trim();
+    const phone = phoneNumber ? `${this.form.value.phonePrefix} ${phoneNumber}` : undefined;
+
     const request: CreateCardRequest = {
       userId: Number(this.userId),
       cardholderName: this.form.value.cardholderName!,
       brand: this.form.value.brand!,
+      email,
+      phone,
       transactionRules: rules.length > 0 ? rules : undefined
     };
 
@@ -712,7 +782,7 @@ export class CardCreateComponent implements OnInit {
   createAnother() {
     this.isSuccess = false;
     this.createdCard = null;
-    this.form.reset({ brand: 'visa', cardholderName: '' });
+    this.form.reset({ brand: 'visa', cardholderName: '', email: this.user?.email || '', phonePrefix: '+31', phoneNumber: '' });
     this.rulesArray.clear();
     this.selectedMccs = [];
     this.filterMccs('');

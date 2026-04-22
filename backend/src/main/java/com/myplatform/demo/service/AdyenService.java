@@ -61,6 +61,7 @@ public class AdyenService {
     private final BalanceAccountsApi balanceAccountsApi;
     private final BusinessLinesApi businessLinesApi;
     private final String balancePlatformApiKey;
+    private final String lemApiKey;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final AccountStoreLevelApi accountStoreLevelApi;
@@ -118,6 +119,7 @@ public class AdyenService {
         balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
         businessLinesApi = new BusinessLinesApi(lemClient);
         this.balancePlatformApiKey = balancePlatformApiKey;
+        this.lemApiKey = lemApiKey;
 
         accountStoreLevelApi = new AccountStoreLevelApi(pspClient);
         paymentMethodsMerchantLevelApi = new PaymentMethodsMerchantLevelApi(pspClient);
@@ -429,6 +431,37 @@ public class AdyenService {
             return response.body();
         } else {
             throw new RuntimeException("Error create session: " + response.body());
+        }
+    }
+
+    public String createSessionWithLemKey(String legalEntityId, String[] roles) throws Exception {
+        Map<String, Object> requestBody = Map.of(
+                "allowOrigin", "http://localhost",
+                "product", "onboarding",
+                "policy", Map.of(
+                        "resources", new Map[]{Map.of(
+                                "legalEntityId", legalEntityId,
+                                "type", "legalEntity"
+                        )},
+                        "roles", roles
+                )
+        );
+
+        String json = objectMapper.writeValueAsString(requestBody);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://test.adyen.com/authe/api/v1/sessions"))
+                .header("Content-Type", "application/json")
+                .header("x-api-key", lemApiKey)
+                .POST(BodyPublishers.ofString(json))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+
+        if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            return response.body();
+        } else {
+            throw new RuntimeException("Error create session with LEM key: " + response.body());
         }
     }
 
@@ -975,12 +1008,18 @@ public class AdyenService {
 
     }
 
-    public BankAccountInformationResponse getBankAccountInformation(String bankAccountId) throws IOException, ApiException {
+    public BankAccountInformationResponse getBankAccountInformation(String bankAccountId, String userCurrency) throws IOException, ApiException {
         BankAccountInformationResponse bankAccountInformationResponse = new BankAccountInformationResponse();
         PaymentInstrument paymentInstrument = this.paymentInstrumentsApi.getPaymentInstrument(bankAccountId);
         BalanceAccount balanceAccount = balanceAccountsApi.getBalanceAccount(paymentInstrument.getBalanceAccountId());
-        bankAccountInformationResponse.setCurrency(balanceAccount.getBalances().get(0).getCurrency());
-        bankAccountInformationResponse.setAmount(balanceAccount.getBalances().get(0).getAvailable());
+
+        Balance matchingBalance = balanceAccount.getBalances().stream()
+                .filter(b -> userCurrency != null && userCurrency.equalsIgnoreCase(b.getCurrency()))
+                .findFirst()
+                .orElse(balanceAccount.getBalances().get(0));
+
+        bankAccountInformationResponse.setCurrency(matchingBalance.getCurrency());
+        bankAccountInformationResponse.setAmount(matchingBalance.getAvailable());
         bankAccountInformationResponse.setDescription(paymentInstrument.getDescription());
 
         return bankAccountInformationResponse;

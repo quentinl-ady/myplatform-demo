@@ -230,6 +230,26 @@ public class UserController {
         }
     }
 
+    @GetMapping("/external-bank-account/{userId}")
+    public ResponseEntity<?> getExternalBankAccountSession(@PathVariable Long userId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getLegalEntityId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no legalEntityId");
+            }
+
+            String session = adyenService.createSessionWithLemKey(user.getLegalEntityId(), new String[]{
+                    "transferInstrumentConfiguration",
+                    "transferInstrumentManagement"
+            });
+            return ResponseEntity.ok(session);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/businessLoans/{userId}")
     public ResponseEntity<?> getBusinessLoansInformation(@PathVariable Long userId) {
         try {
@@ -768,7 +788,7 @@ public class UserController {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            BankAccountInformationResponse bankAccountInformationResponse = adyenService.getBankAccountInformation(user.getBankAccountId());
+            BankAccountInformationResponse bankAccountInformationResponse = adyenService.getBankAccountInformation(user.getBankAccountId(), user.getCurrencyCode());
             bankAccountInformationResponse.setBankAccountNumber(user.getBankAccountNumber());
             return ResponseEntity.ok(bankAccountInformationResponse);
         } catch (Exception e){

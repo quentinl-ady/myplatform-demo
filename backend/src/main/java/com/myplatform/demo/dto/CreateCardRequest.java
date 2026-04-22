@@ -9,5 +9,7 @@ public class CreateCardRequest {
     private Long userId;
     private String cardholderName;
     private String brand; // visa or mc
+    private String email;
+    private String phone;
     private List<TransactionRuleRequest> transactionRules;
 }

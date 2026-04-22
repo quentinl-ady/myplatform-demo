@@ -57,6 +57,8 @@ public class KYCService {
         );
 
         uploadDocument(legalEntity.getId(), Document.TypeEnum.PASSPORT, "passport");
+        uploadDocument(legalEntity.getId(), Document.TypeEnum.LIVESELFIE, "live-selfie");
+
         return legalEntity.getId();
     }
 
