@@ -15,7 +15,7 @@ import { MaterialModule } from '../material.module';
 
         <div class="brand-header">
           <div class="logo-mark">
-            <img src="assets/memo-bank-logo.svg" alt="My Platform" />
+            <img src="assets/logo.svg" alt="My Platform" />
           </div>
         </div>
 

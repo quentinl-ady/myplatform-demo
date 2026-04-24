@@ -57,7 +57,7 @@ public class KYCService {
         );
 
         uploadDocument(legalEntity.getId(), Document.TypeEnum.PASSPORT, "passport");
-        uploadDocument(legalEntity.getId(), Document.TypeEnum.LIVESELFIE, "live-selfie");
+        //uploadDocument(legalEntity.getId(), Document.TypeEnum.LIVESELFIE, "live-selfie"); //Fixme
 
         return legalEntity.getId();
     }
@@ -159,6 +159,8 @@ public class KYCService {
 
         if (List.of("NL", "DE", "FR").contains(countryData.countryCode)) {
             organization.addTaxInformationItem(taxOrg);
+            organization.addFinancialReportsItem(new FinancialReport()
+                    .annualTurnover("100000"));
         }
 
         LegalEntityInfo legalEntityInfo = new LegalEntityInfo().organization(organization)

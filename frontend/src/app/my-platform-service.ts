@@ -54,6 +54,14 @@ export interface User {
   bankAccountNumber: string;
 }
 
+export interface BankAccountStatus {
+  bankingEnabled: boolean;
+  bankAccountCreated: boolean;
+  bankingAllowed: boolean;
+  bankAccountId: string | null;
+  bankAccountNumber: string | null;
+}
+
 export interface BalanceAccount {
   currencyCode: string;
   description: string;
@@ -446,6 +454,14 @@ export class MyPlatformService {
 
   validateKyc(userId: number): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/validateKyc/${userId}`, {}, { responseType: 'json' });
+  }
+
+  createBankAccount(userId: number): Observable<{ bankAccountId: string; bankAccountNumber: string }> {
+    return this.http.post<{ bankAccountId: string; bankAccountNumber: string }>(`${this.baseUrl}/api/users/${userId}/create-bank-account`, {});
+  }
+
+  getBankAccountStatus(userId: number): Observable<BankAccountStatus> {
+    return this.http.get<BankAccountStatus>(`${this.baseUrl}/api/users/${userId}/bank-account-status`);
   }
 
   handleShopperRedirect(data: any): Observable<any> {

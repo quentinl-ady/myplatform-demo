@@ -1,5 +1,5 @@
 import { Component, signal, inject, OnInit, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -13,7 +13,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatIconModule } from '@angular/material/icon';
 
-import { MyPlatformService, OnboardingPart, OnboardingResponse, User } from "../my-platform-service";
+import { MyPlatformService, OnboardingPart, OnboardingResponse, User, BankAccountStatus } from "../my-platform-service";
 import { MaterialModule } from "../material.module";
 import { INDUSTRY_CODES } from "../industry-codes";
 import '@adyen/kyc-components/transfer-instrument-management';
@@ -112,6 +112,57 @@ export interface BusinessLine {
             </div>
           </div>
         </ng-template>
+      </mat-card>
+
+      <!-- Business Bank Account -->
+      <mat-card class="banking-card" *ngIf="bankStatus() as bs">
+        <div class="banking-header">
+          <div class="banking-title-row">
+            <mat-icon>account_balance</mat-icon>
+            <h3>Business Bank Account</h3>
+          </div>
+          <p class="banking-subtitle">Your dedicated business bank account.</p>
+        </div>
+
+        <!-- STATE 1: Account already created -->
+        <div class="bank-active" *ngIf="bs.bankAccountCreated">
+          <div class="bank-info-card">
+            <div class="bank-info-row">
+              <span class="bank-label">Account Number</span>
+              <span class="bank-value mono">{{ bs.bankAccountNumber }}</span>
+            </div>
+            <div class="bank-info-row" *ngIf="bs.bankAccountId">
+              <span class="bank-label">Payment Instrument ID</span>
+              <span class="bank-value mono small">{{ bs.bankAccountId }}</span>
+            </div>
+            <div class="bank-status-badge">
+              <mat-icon>check_circle</mat-icon>
+              <span>Account active</span>
+            </div>
+          </div>
+          <button class="bank-cta-btn" (click)="goToTransfers()">
+            <mat-icon>send</mat-icon>
+            <span>See my account</span>
+            <mat-icon class="cta-arrow">arrow_forward</mat-icon>
+          </button>
+        </div>
+
+        <!-- STATE 2: Not created yet -->
+        <div class="bank-provision" *ngIf="!bs.bankAccountCreated">
+          <div class="bank-provision-visual">
+            <div class="bank-provision-icon" [class.locked]="!bs.bankingAllowed">
+              <mat-icon>{{ bs.bankingAllowed ? 'account_balance_wallet' : 'lock' }}</mat-icon>
+            </div>
+            <h4>{{ bs.bankingAllowed ? 'Ready to create' : 'Not available yet' }}</h4>
+            <p>{{ bs.bankingAllowed ? 'No bank account has been created yet.' : 'Banking capability is not yet allowed. Complete your onboarding and check your status.' }}</p>
+          </div>
+          <button class="bank-create-btn" [class.disabled]="!bs.bankingAllowed || creatingBankAccount()"
+                  (click)="bs.bankingAllowed && !creatingBankAccount() && createBankAccount()">
+            <mat-spinner *ngIf="creatingBankAccount()" diameter="18" color="accent"></mat-spinner>
+            <mat-icon *ngIf="!creatingBankAccount()">{{ bs.bankingAllowed ? 'add' : 'lock_outline' }}</mat-icon>
+            <span *ngIf="!creatingBankAccount()">Create Bank Account</span>
+          </button>
+        </div>
       </mat-card>
 
       <mat-card class="business-card" *ngIf="user()?.activityReason === 'embeddedPayment'">
@@ -423,7 +474,189 @@ export interface BusinessLine {
       gap: 16px;
     }
 
-    /* Bank Account Card */
+    /* Business Banking Card */
+    .banking-card {
+      border: 1px solid var(--fintech-border);
+    }
+    .banking-header { margin-bottom: 20px; }
+    .banking-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .banking-title-row mat-icon {
+      color: var(--fintech-primary);
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+    .banking-title-row h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--fintech-text);
+    }
+    .banking-subtitle {
+      font-size: 13px;
+      color: var(--fintech-text-secondary);
+      margin: 0;
+    }
+    .bank-info-card {
+      background: var(--fintech-bg);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .bank-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bank-label {
+      font-size: 13px;
+      color: var(--fintech-text-secondary);
+      font-weight: 500;
+    }
+    .bank-value {
+      font-size: 14px;
+      color: var(--fintech-text);
+      font-weight: 600;
+    }
+    .bank-value.mono {
+      font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.5px;
+    }
+    .bank-value.small {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--fintech-text-secondary);
+    }
+    .bank-active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .bank-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #4caf50;
+      padding-top: 10px;
+      border-top: 1px solid var(--fintech-border);
+    }
+    .bank-status-badge mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .bank-cta-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 14px 20px;
+      border: 1px solid var(--fintech-border);
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--fintech-surface);
+      color: var(--fintech-text);
+      transition: all 0.2s;
+    }
+    .bank-cta-btn:hover {
+      background: var(--fintech-bg);
+      border-color: #bdbdbd;
+    }
+    .bank-cta-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      color: var(--fintech-text-secondary);
+    }
+    .bank-cta-btn .cta-arrow {
+      margin-left: auto;
+    }
+    .bank-provision {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .bank-provision-visual {
+      text-align: center;
+    }
+    .bank-provision-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: #f0f4ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px;
+    }
+    .bank-provision-icon mat-icon {
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+      color: var(--fintech-primary);
+    }
+    .bank-provision-icon.locked {
+      background: #f5f5f5;
+    }
+    .bank-provision-icon.locked mat-icon {
+      color: #bdbdbd;
+    }
+    .bank-provision-visual h4 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 6px;
+      color: var(--fintech-text);
+    }
+    .bank-provision-visual p {
+      font-size: 13px;
+      color: var(--fintech-text-secondary);
+      margin: 0;
+      max-width: 320px;
+    }
+    .bank-create-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--fintech-primary);
+      color: white;
+    }
+    .bank-create-btn:hover:not(.disabled) {
+      opacity: 0.9;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .bank-create-btn.disabled {
+      background: #e0e0e0;
+      color: #9e9e9e;
+      cursor: not-allowed;
+    }
+    .bank-create-btn mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    /* External Bank Account Card */
     .bank-account-header { margin-bottom: 20px; }
     .bank-account-title {
       display: flex;
@@ -505,6 +738,8 @@ export class DashboardComponent implements OnInit {
   readonly businessLines = signal<BusinessLine[]>([]);
   readonly user = signal<User | null>(null);
   readonly loadingKyc = signal(false);
+  readonly creatingBankAccount = signal(false);
+  readonly bankStatus = signal<BankAccountStatus | null>(null);
   submitting = false;
 
   readonly INDUSTRY_CODES = INDUSTRY_CODES;
@@ -513,6 +748,7 @@ export class DashboardComponent implements OnInit {
 
   private authService = inject(MyPlatformService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private matSnackBar = inject(MatSnackBar);
   private fb = inject(FormBuilder);
 
@@ -531,6 +767,9 @@ export class DashboardComponent implements OnInit {
       this.authService.getUserById(Number(this.userId)).subscribe({
         next: (u) => {
           this.user.set(u);
+          if (u.bank) {
+            this.loadBankAccountStatus();
+          }
           if (u.activityReason === 'embeddedPayment') {
             this.loadBusinessLines();
           }
@@ -704,6 +943,35 @@ export class DashboardComponent implements OnInit {
     });
 
     container.appendChild(el);
+  }
+
+  loadBankAccountStatus() {
+    this.authService.getBankAccountStatus(Number(this.userId)).subscribe({
+      next: (status) => this.bankStatus.set(status),
+      error: () => {}
+    });
+  }
+
+  createBankAccount() {
+    if (!this.userId) return;
+    this.creatingBankAccount.set(true);
+
+    this.authService.createBankAccount(Number(this.userId)).subscribe({
+      next: (res) => {
+        this.creatingBankAccount.set(false);
+        this.loadBankAccountStatus();
+        this.matSnackBar.open('✅ Bank account created: ' + res.bankAccountNumber, 'Close', { duration: 5000 });
+      },
+      error: (err) => {
+        console.error(err);
+        this.creatingBankAccount.set(false);
+        this.matSnackBar.open('❌ Error creating bank account', 'Close', { duration: 3000 });
+      }
+    });
+  }
+
+  goToTransfers() {
+    this.router.navigate(['/', this.userId, 'transfer']);
   }
 
   validateKyc(userId: string) {

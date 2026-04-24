@@ -269,7 +269,7 @@ public class AdyenService {
             capabilities.put("issueBankAccount", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("sendToThirdParty", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("receiveFromThirdParty", new AccountHolderCapability().enabled(true).requested(true));
-            capabilities.put("receiveFromTransferInstrument", new AccountHolderCapability().enabled(true).requested(true));
+            //capabilities.put("receiveFromTransferInstrument", new AccountHolderCapability().enabled(true).requested(true));
             kycService.createBankBusinessLine(legalEntityId);
         } else {
             capabilities.put("issueBankAccount", new AccountHolderCapability().enabled(false).requested(false));
@@ -481,6 +481,16 @@ public class AdyenService {
                 .toList();
     }
 
+
+    public String findBusinessBankBalanceAccountId(String accountHolderId) throws IOException, ApiException {
+        PaginatedBalanceAccountsResponse response = accountHoldersApi.getAllBalanceAccountsOfAccountHolder(accountHolderId);
+        if (response.getBalanceAccounts() == null) return null;
+        return response.getBalanceAccounts().stream()
+                .filter(ba -> "Business Bank Account".equals(ba.getDescription()))
+                .map(BalanceAccountBase::getId)
+                .findFirst()
+                .orElse(null);
+    }
 
     public StoreCustomer createStore(String legalEntityId, List<String> businessLineId, String city, String country, String postalCode, String lineAdresse1, String storeReference, String legalEntityName, String phoneNumber, String balanceAccountId, List<String> paymentMethodRequest) throws IOException, ApiException {
         StoreCreationRequest storeCreationRequest = new StoreCreationRequest();

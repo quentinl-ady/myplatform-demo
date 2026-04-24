@@ -607,21 +607,7 @@ public class UserController {
             kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
 
             if (user.getBank()){
-                String businessAccountBalanceAccountId = kycService.createBalanceForBusinessAccount(user.getCountryCode(), user.getAccountHolderId());
-                kycService.createSweepAcquiringToBanking(user.getCountryCode(), businessAccountBalanceAccountId, user.getBalanceAccountId());
-                String paymentInstrumentBankAccount = kycService.createBankAccount(user.getCountryCode(), businessAccountBalanceAccountId);
-                PaymentInstrument paymentInstrument = kycService.getPaymentInstrumentDetail(paymentInstrumentBankAccount);
-
-                if("US".equals(user.getCountryCode())){
-                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getRoutingNumber());
-                } else if("FR".equals(user.getCountryCode()) || "NL".equals(user.getCountryCode())) {
-                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getIban());
-                } else if ("UK".equals(user.getCountryCode()) || "GB".equals(user.getCountryCode())){
-                    user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getSortCode());
-                }
-                user.setBankAccountId(paymentInstrumentBankAccount);
-
-                userRepository.save(user);
+                provisionBankAccount(user);
             }
 
             Map<String, String> response = new HashMap<>();
@@ -858,5 +844,89 @@ public class UserController {
     }
 
 
+    @GetMapping("/api/users/{id}/bank-account-status")
+    public ResponseEntity<?> getBankAccountStatus(@PathVariable Long id) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("bankingEnabled", Boolean.TRUE.equals(user.getBank()));
+            result.put("bankAccountCreated", user.getBankAccountId() != null && !user.getBankAccountId().isBlank());
+            result.put("bankAccountId", user.getBankAccountId());
+            result.put("bankAccountNumber", user.getBankAccountNumber());
+
+            // Check banking capability from Adyen
+            boolean bankingAllowed = false;
+            if (user.getLegalEntityId() != null && Boolean.TRUE.equals(user.getBank())) {
+                try {
+                    KycStatus kycStatus = adyenService.getLegalEntityKycDetail(
+                            user.getLegalEntityId(), user.getActivityReason(),
+                            user.getBank(), user.getCapital(), user.getIssuing());
+                    if (kycStatus.getBankingStatus() != null) {
+                        bankingAllowed = Boolean.TRUE.equals(kycStatus.getBankingStatus().getAllowed());
+                    }
+                } catch (Exception ignored) {}
+            }
+            result.put("bankingAllowed", bankingAllowed);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error");
+        }
+    }
+
+    @PostMapping("/api/users/{id}/create-bank-account")
+    public ResponseEntity<?> createBankAccount(@PathVariable Long id) {
+        try {
+            User user = userRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (!Boolean.TRUE.equals(user.getBank())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Banking is not enabled for this user");
+            }
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no account holder");
+            }
+            if (user.getBankAccountId() != null && !user.getBankAccountId().isBlank()) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body("Bank account already exists");
+            }
+
+            provisionBankAccount(user);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("bankAccountId", user.getBankAccountId());
+            response.put("bankAccountNumber", user.getBankAccountNumber());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating bank account: " + e.getMessage());
+        }
+    }
+
+    private void provisionBankAccount(User user) throws Exception {
+        // Check if a Business Bank Account balance account already exists
+        String businessAccountBalanceAccountId = adyenService.findBusinessBankBalanceAccountId(user.getAccountHolderId());
+
+        if (businessAccountBalanceAccountId == null) {
+            businessAccountBalanceAccountId = kycService.createBalanceForBusinessAccount(user.getCountryCode(), user.getAccountHolderId());
+            kycService.createSweepAcquiringToBanking(user.getCountryCode(), businessAccountBalanceAccountId, user.getBalanceAccountId());
+        }
+
+        String paymentInstrumentBankAccount = kycService.createBankAccount(user.getCountryCode(), businessAccountBalanceAccountId);
+        PaymentInstrument paymentInstrument = kycService.getPaymentInstrumentDetail(paymentInstrumentBankAccount);
+
+        if ("US".equals(user.getCountryCode())) {
+            user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getRoutingNumber());
+        } else if ("FR".equals(user.getCountryCode()) || "NL".equals(user.getCountryCode())) {
+            user.setBankAccountNumber(paymentInstrument.getBankAccount().getIban());
+        } else if ("UK".equals(user.getCountryCode()) || "GB".equals(user.getCountryCode())) {
+            user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getSortCode());
+        }
+        user.setBankAccountId(paymentInstrumentBankAccount);
+
+        userRepository.save(user);
+    }
 
 }
