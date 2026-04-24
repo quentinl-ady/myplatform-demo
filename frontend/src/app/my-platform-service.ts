@@ -282,6 +282,64 @@ export interface AddTransactionRuleRequest {
   blockedMccs?: string[];
 }
 
+// Card Transfers
+export interface CardTransferValidationFact {
+  type: string;
+  result: string;
+}
+
+export interface CardTransferEvent {
+  id: string;
+  status: string;
+  bookingDate: string;
+  type: string;
+  amountValue: number;
+  amountCurrency: string;
+  originalAmountValue: number;
+  originalAmountCurrency: string;
+}
+
+export interface CardTransferTriggeredRule {
+  reason: string;
+  ruleDescription: string;
+  ruleId: string;
+  outcomeType: string;
+}
+
+export interface CardTransferRulesResult {
+  advice: string;
+  allHardBlockRulesPassed: boolean;
+  score: number;
+  triggeredRules: CardTransferTriggeredRule[];
+}
+
+export interface CardTransfer {
+  id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  description: string;
+  type: string;
+  reason: string;
+  reference: string;
+  createdAt: string;
+  updatedAt: string;
+  sequenceNumber: number;
+  paymentInstrumentId: string;
+  paymentInstrumentDescription: string;
+  processingType: string;
+  panEntryMode: string;
+  authorisationType: string;
+  threeDSecureAcsTransactionId: string;
+  merchantName: string;
+  merchantCity: string;
+  merchantCountry: string;
+  mcc: string;
+  validationFacts: CardTransferValidationFact[];
+  events: CardTransferEvent[];
+  transactionRulesResult: CardTransferRulesResult;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -540,6 +598,15 @@ export class MyPlatformService {
     return this.http.post<{ cardData: string }>(`${this.baseUrl}/issuing/reveal`, {
       paymentInstrumentId
     });
+  }
+
+  // Issuing - Card Transfers
+  getCardTransfers(userId: number, paymentInstrumentId?: string): Observable<CardTransfer[]> {
+    let params = `?userId=${userId}`;
+    if (paymentInstrumentId) {
+      params += `&paymentInstrumentId=${paymentInstrumentId}`;
+    }
+    return this.http.get<CardTransfer[]>(`${this.baseUrl}/issuing/transfers${params}`);
   }
 
 }

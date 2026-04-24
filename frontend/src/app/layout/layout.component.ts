@@ -26,12 +26,8 @@ import { MatButtonModule } from '@angular/material/button';
 
         <div class="brand-header">
           <div class="logo-mark">
-            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-              <rect width="40" height="40" rx="8" fill="#000"/>
-              <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="#fff" font-size="18" font-weight="700" font-family="system-ui">MP</text>
-            </svg>
+            <img src="assets/memo-bank-logo.svg" alt="My Platform" />
           </div>
-          <span class="brand-name">MyPlatform</span>
         </div>
 
         <mat-nav-list class="fintech-nav-list">
@@ -89,6 +85,10 @@ import { MatButtonModule } from '@angular/material/button';
           <a mat-list-item [routerLink]="['/', userId, 'card-create']" routerLinkActive="active-link">
             <mat-icon matListItemIcon>add_card</mat-icon>
             <span matListItemTitle>Create Card</span>
+          </a>
+          <a mat-list-item [routerLink]="['/', userId, 'card-transactions']" routerLinkActive="active-link">
+            <mat-icon matListItemIcon>receipt_long</mat-icon>
+            <span matListItemTitle>Transactions</span>
           </a>
 
           <p class="nav-section-title">Security & Risk</p>
@@ -164,25 +164,16 @@ import { MatButtonModule } from '@angular/material/button';
       border-bottom: 1px solid var(--fintech-border);
     }
     .logo-mark {
-      width: 32px;
-      height: 32px;
-      background-color: var(--fintech-primary);
-      color: white;
-      border-radius: 8px;
+      height: 36px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .logo-mark mat-icon {
-      font-size: 20px;
-      width: 20px;
-      height: 20px;
+    .logo-mark img {
+      height: 100%;
+      width: auto;
+      object-fit: contain;
     }
-  .logo-mark img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
     .brand-name {
       font-size: 18px;
       font-weight: 700;

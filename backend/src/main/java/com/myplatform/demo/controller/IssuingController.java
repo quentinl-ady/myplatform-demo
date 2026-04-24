@@ -5,6 +5,7 @@ import com.myplatform.demo.model.Card;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.CardRepository;
 import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.service.CardTransferService;
 import com.myplatform.demo.service.IssuingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,9 @@ public class IssuingController {
 
     @Autowired
     private IssuingService issuingService;
+
+    @Autowired
+    private CardTransferService cardTransferService;
 
     @Autowired
     private UserRepository userRepository;
@@ -239,6 +243,31 @@ public class IssuingController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error revealing card data: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/transfers")
+    public ResponseEntity<?> getCardTransfers(
+            @RequestParam Long userId,
+            @RequestParam(required = false) String paymentInstrumentId) {
+        try {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            if (user.getAccountHolderId() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("User has no account holder");
+            }
+
+            List<CardTransferDTO> transfers = cardTransferService.getCardTransfers(
+                    user.getAccountHolderId(),
+                    paymentInstrumentId
+            );
+
+            return ResponseEntity.ok(transfers);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error fetching card transfers: " + e.getMessage());
         }
     }
 

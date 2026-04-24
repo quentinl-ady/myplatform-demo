@@ -1,5 +1,6 @@
 export const INDUSTRY_CODES = [
     { code: '23', label: 'Construction & installation' },
+    { code: '55', label: 'Management of companies and enterprises' },
     { code: '311', label: 'Food manufacturing' },
     { code: '4451', label: 'Grocery stores, Supermarkets' },
     { code: '722511', label: 'Full-service restaurants' },

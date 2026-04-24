@@ -17,6 +17,7 @@ import {TransferComponent} from "./transfer/transfer.component"
 import {PosComponent} from "./pos/pos.component"
 import {CardCreateComponent} from "./card-create/card-create.component"
 import {CardListComponent} from "./card-list/card-list.component"
+import {CardTransactionsComponent} from "./card-transactions/card-transactions.component"
 
 const routeConfig: Routes = [
   {
@@ -106,6 +107,11 @@ const routeConfig: Routes = [
         path: 'card-create',
         component: CardCreateComponent,
         title: 'Create Card'
+      },
+      {
+        path: 'card-transactions',
+        component: CardTransactionsComponent,
+        title: 'Card Transactions'
       }
     ]
   },
