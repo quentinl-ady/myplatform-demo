@@ -643,9 +643,15 @@ export class TransferComponent implements OnInit, OnDestroy {
       this.authService.initiateTransfer(request).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
-            this.transferResponse = res;
-            this.showModal = true;
-            this.isProcessing = false;
+            if (!res.authParam1) {
+              this.isSuccess = true;
+              this.isProcessing = false;
+              this.fetchAccountInformation();
+            } else {
+              this.transferResponse = res;
+              this.showModal = true;
+              this.isProcessing = false;
+            }
             this.cdr.detectChanges();
           });
         },

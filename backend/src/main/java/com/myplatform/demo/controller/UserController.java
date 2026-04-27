@@ -31,8 +31,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.myplatform.demo.service.AdyenService.SEPA_COUNTRIES;
-
 
 @RestController
 @CrossOrigin(origins = "http://localhost:4200")
@@ -733,15 +731,7 @@ public class UserController {
 
 
 
-            if(SEPA_COUNTRIES.contains(request.getCounterpartyCountry())){
-                res.setIban(request.getIban());
-            } else if ("US".equals(request.getCounterpartyCountry())){
-                res.setAccountNumber(request.getAccountNumber());
-                res.setRoutingNumber(request.getRoutingNumber());
-            } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())){
-                res.setAccountNumber(request.getAccountNumber());
-                res.setSortCode(request.getSortCode());
-            }
+            adyenService.populateCounterpartyDetails(res, request);
 
             res.setAmount(request.getAmount());
             res.setCounterpartyCountry(request.getCounterpartyCountry());

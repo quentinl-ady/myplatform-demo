@@ -936,15 +936,32 @@ public class AdyenService {
                         Transfer.class
                 );
 
-        /*Transfer transferBody = response.getBody();
+        Transfer transferBody = response.getBody();
         HttpHeaders transferHeaders = response.getHeaders();
 
         InitiateTransferResponse initiateTransferResponse = new InitiateTransferResponse();
-        initiateTransferResponse.setCounterparty(transferBody.getCounterparty().getBankAccount().getAccountIdentification().getIbanAccountIdentification().getIban());
         initiateTransferResponse.setAmount(transferBody.getAmount().getValue());
-        initiateTransferResponse.setAuthParam1(transferHeaders.get("auth-param1").stream().findFirst().get());*/
+        initiateTransferResponse.setCounterpartyCountry(request.getCounterpartyCountry());
+        populateCounterpartyDetails(initiateTransferResponse, request);
 
-        return null;
+        List<String> authParam1Values = transferHeaders.get("auth-param1");
+        if (authParam1Values != null && !authParam1Values.isEmpty()) {
+            initiateTransferResponse.setAuthParam1(authParam1Values.get(0));
+        }
+
+        return initiateTransferResponse;
+    }
+
+    public void populateCounterpartyDetails(InitiateTransferResponse response, TransferRequest request) {
+        if (SEPA_COUNTRIES.contains(request.getCounterpartyCountry())) {
+            response.setIban(request.getIban());
+        } else if ("US".equals(request.getCounterpartyCountry())) {
+            response.setAccountNumber(request.getAccountNumber());
+            response.setRoutingNumber(request.getRoutingNumber());
+        } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())) {
+            response.setAccountNumber(request.getAccountNumber());
+            response.setSortCode(request.getSortCode());
+        }
     }
 
     private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId) {
