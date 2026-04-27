@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { Component, signal, inject, OnInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -731,7 +731,8 @@ export interface BusinessLine {
     }
   `]
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
+  private bankStatusInterval: ReturnType<typeof setInterval> | null = null;
   userId = '';
   readonly status = signal<OnboardingResponse | null>(null);
   readonly loading = signal(false);
@@ -769,6 +770,7 @@ export class DashboardComponent implements OnInit {
           this.user.set(u);
           if (u.bank) {
             this.loadBankAccountStatus();
+            this.startBankStatusPolling();
           }
           if (u.activityReason === 'embeddedPayment') {
             this.loadBusinessLines();
@@ -947,9 +949,30 @@ export class DashboardComponent implements OnInit {
 
   loadBankAccountStatus() {
     this.authService.getBankAccountStatus(Number(this.userId)).subscribe({
-      next: (status) => this.bankStatus.set(status),
+      next: (status) => {
+        this.bankStatus.set(status);
+        if (status.bankAccountCreated) {
+          this.stopBankStatusPolling();
+        }
+      },
       error: () => {}
     });
+  }
+
+  private startBankStatusPolling() {
+    this.stopBankStatusPolling();
+    this.bankStatusInterval = setInterval(() => this.loadBankAccountStatus(), 5000);
+  }
+
+  private stopBankStatusPolling() {
+    if (this.bankStatusInterval) {
+      clearInterval(this.bankStatusInterval);
+      this.bankStatusInterval = null;
+    }
+  }
+
+  ngOnDestroy() {
+    this.stopBankStatusPolling();
   }
 
   createBankAccount() {

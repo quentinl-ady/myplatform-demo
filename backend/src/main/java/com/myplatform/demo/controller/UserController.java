@@ -604,10 +604,6 @@ public class UserController {
             kycService.validateKyc(user.getLegalEntityId(), user.getUserType(), user.getCountryCode());
             kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
 
-            if (user.getBank()){
-                provisionBankAccount(user);
-            }
-
             Map<String, String> response = new HashMap<>();
             response.put("status", "success");
             response.put("message", "KYC processed successfully");

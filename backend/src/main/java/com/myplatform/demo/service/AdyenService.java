@@ -281,11 +281,10 @@ public class AdyenService {
         if (issuing) {
             capabilities.put("issueCard", new AccountHolderCapability().enabled(true).requested(true));
             capabilities.put("useCard", new AccountHolderCapability().enabled(true).requested(true));
-            capabilities.put("useCardInRestrictedCountries", new AccountHolderCapability().enabled(true).requested(true).requestedLevel(AccountHolderCapability.RequestedLevelEnum.MEDIUM));
+            kycService.createIssuingBusinessLine(legalEntityId);
         } else {
             capabilities.put("issueCard", new AccountHolderCapability().enabled(false).requested(false));
             capabilities.put("useCard", new AccountHolderCapability().enabled(false).requested(false));
-            capabilities.put("useCardInRestrictedCountries", new AccountHolderCapability().enabled(false).requested(false));
         }
 
         accountHolderInfo.setCapabilities(capabilities);

@@ -18,8 +18,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.myplatform.demo.util.DocumentUtil.loadResource;
 
 @Service
 public class KYCService {
@@ -56,8 +60,9 @@ public class KYCService {
                         .individual(individual)
         );
 
-        uploadDocument(legalEntity.getId(), Document.TypeEnum.PASSPORT, "passport");
-        //uploadDocument(legalEntity.getId(), Document.TypeEnum.LIVESELFIE, "live-selfie"); //Fixme
+        uploadDocumentWithResource(legalEntity.getId(), Document.TypeEnum.PASSPORT, "passport.png", "Documents and live photo captured", "sample_driving_licence_back");
+
+        uploadDocumentWithResource(legalEntity.getId(), Document.TypeEnum.LIVESELFIE, "sample_driving_licence_back.png", "live-selfie", "sample_driving_licence_back");
 
         return legalEntity.getId();
     }
@@ -84,6 +89,17 @@ public class KYCService {
                 .type(type)
                 .description(description)
                 .attachment(new Attachment().content(DocumentUtil.generateBase64EmptyPdf().getBytes()))
+                .owner(new OwnerEntity().id(legalEntityId).type("legalEntity"));
+
+        documentsApi.uploadDocumentForVerificationChecks(doc);
+    }
+
+    private void uploadDocumentWithResource(String legalEntityId, Document.TypeEnum type, String fileName, String description, String resourceName) throws IOException, ApiException {
+        Document doc = new Document()
+                .type(type)
+                .fileName(fileName)
+                .description(description)
+                .attachment(new Attachment().content(loadResource(resourceName).getBytes()))
                 .owner(new OwnerEntity().id(legalEntityId).type("legalEntity"));
 
         documentsApi.uploadDocumentForVerificationChecks(doc);
@@ -160,7 +176,8 @@ public class KYCService {
         if (List.of("NL", "DE", "FR").contains(countryData.countryCode)) {
             organization.addTaxInformationItem(taxOrg);
             organization.addFinancialReportsItem(new FinancialReport()
-                    .annualTurnover("100000"));
+                    .annualTurnover("100000")
+                    .currencyOfFinancialData("EUR"));
         }
 
         LegalEntityInfo legalEntityInfo = new LegalEntityInfo().organization(organization)
@@ -253,14 +270,26 @@ public class KYCService {
         businessLinesApi.createBusinessLine(businessLineInfo);
     }
 
+    public void createIssuingBusinessLine(String legalEntityId) throws IOException, ApiException {
+        List<WebData> webDataList = new ArrayList<>(
+                List.of(new WebData().webAddress("http://localhost/"))
+        );
+
+        BusinessLineInfo businessLineInfo = new BusinessLineInfo()
+                .legalEntityId(legalEntityId)
+                .industryCode("4531")
+                .service(BusinessLineInfo.ServiceEnum.ISSUING)
+                .sourceOfFunds(new SourceOfFunds()
+                        .adyenProcessedFunds(Boolean.TRUE)
+                        .type(SourceOfFunds.TypeEnum.BUSINESS)
+                        .amount(new Amount().currency("EUR").value(1000000L)))
+                .webData(webDataList);
+
+        businessLinesApi.createBusinessLine(businessLineInfo);
+    }
+
     public String createBankAccount(String countryCode, String balanceAccountId) throws IOException, ApiException {
         PaymentInstrumentInfo paymentInstrumentInfo = new PaymentInstrumentInfo();
-
-        try {
-            Thread.sleep(12000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
 
         if ("FR".equals(countryCode)){
             paymentInstrumentInfo.type(PaymentInstrumentInfo.TypeEnum.BANKACCOUNT);

@@ -1,5 +1,8 @@
 package com.myplatform.demo.util;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -11,6 +14,21 @@ public class DocumentUtil {
         String randomToken = UUID.randomUUID().toString();
         String encodedToken = Base64.getEncoder().encodeToString(randomToken.getBytes());
         return BASE64_EMPTY_PDF + encodedToken;
+    }
+
+    public static String loadResource(String resourceName) throws IOException {
+        try (InputStream is = DocumentUtil.class.getClassLoader().getResourceAsStream(resourceName)) {
+            if (is == null) {
+                throw new IOException("Resource not found: " + resourceName);
+            }
+            String base64Content = new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
+            byte[] imageBytes = java.util.Base64.getDecoder().decode(base64Content);
+            byte[] uuidBytes = java.util.UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8);
+            byte[] uniqueImage = new byte[imageBytes.length + uuidBytes.length];
+            System.arraycopy(imageBytes, 0, uniqueImage, 0, imageBytes.length);
+            System.arraycopy(uuidBytes, 0, uniqueImage, imageBytes.length, uuidBytes.length);
+            return java.util.Base64.getEncoder().encodeToString(uniqueImage);
+        }
     }
 
 }
