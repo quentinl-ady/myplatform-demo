@@ -123,10 +123,10 @@
           <div class="card-expiry">
             <span class="label">EXPIRES</span>
             <span class="value" *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
-              {{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}
+              {{ card.expiryMonth }}/{{ card.expiryYear.slice(-2) }}
             </span>
             <span class="value" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
-              {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear?.toString()?.slice(-2) }}
+              {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear.toString().slice(-2) }}
             </span>
           </div>
           <div class="card-cvv" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
@@ -219,10 +219,10 @@
             <div class="card-expiry">
               <span class="label">EXPIRES</span>
               <span class="value" *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
-                {{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}
+                {{ card.expiryMonth }}/{{ card.expiryYear.slice(-2) }}
               </span>
               <span class="value" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
-                {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear?.toString()?.slice(-2) }}
+                {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear.toString().slice(-2) }}
               </span>
             </div>
             <div class="card-cvv" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
@@ -293,7 +293,7 @@
               </div>
               <div class="card-expiry">
                 <span class="label">EXPIRES</span>
-                <span class="value">{{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}</span>
+                <span class="value">{{ card.expiryMonth }}/{{ card.expiryYear.slice(-2) }}</span>
               </div>
             </div>
           </div>
