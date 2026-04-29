@@ -1,12 +1,12 @@
 package com.myplatform.demo.service;
 
 import com.adyen.Client;
-import com.adyen.enums.Environment;
 import com.adyen.model.balanceplatform.*;
 import com.adyen.service.balanceplatform.*;
 import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.dto.CardResponse;
 import com.myplatform.demo.dto.TransactionRuleResponseDTO;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -32,11 +32,10 @@ public class IssuingService {
     private final String visaSubvariant;
     private final String mcSubvariant;
 
-    public IssuingService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
+    public IssuingService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
                           @Value("${adyen.issuing.country}") String issuingCountry,
                           @Value("${adyen.issuing.visa.subvariant}") String visaSubvariant,
                           @Value("${adyen.issuing.mastercard.subvariant}") String mcSubvariant) {
-        Client balancePlatformClient = new Client(balancePlatformApiKey, Environment.TEST);
         this.manageCardPinApi = new ManageCardPinApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
         this.transactionRulesApi = new TransactionRulesApi(balancePlatformClient);

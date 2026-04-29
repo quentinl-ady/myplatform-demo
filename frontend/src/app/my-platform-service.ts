@@ -357,171 +357,171 @@ export class MyPlatformService {
 
 
   login(payload: AuthPayload): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/login`, payload, { responseType: 'json'});
+    return this.http.post<any>(`${this.baseUrl}/api/auth/login`, payload, { responseType: 'json'});
   }
 
   signup(payload: AuthPayload): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/signup`, payload, { responseType: 'json'});
+    return this.http.post<any>(`${this.baseUrl}/api/auth/signup`, payload, { responseType: 'json'});
   }
 
   getOnboardingLink(userId: number): Observable<{ url: string }> {
-    return this.http.get<{ url: string }>(`${this.baseUrl}/onboarding-link/${userId}`);
+    return this.http.get<{ url: string }>(`${this.baseUrl}/api/onboarding/${userId}/link`);
   }
 
   getOnboardingStatus(userId: number): Observable<OnboardingResponse> {
-    return this.http.get<OnboardingResponse>(`${this.baseUrl}/kyc-status/${userId}`);
+    return this.http.get<OnboardingResponse>(`${this.baseUrl}/api/onboarding/${userId}/kyc-status`);
   }
 
   getPaymentInformation(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/paymentInformation/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/payments`);
   }
 
   getReportInformation(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/reportInformation/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/reports`);
   }
 
   getPayByLinkInformation(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/paybylink/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/pay-by-link`);
   }
 
   getPayoutInformation(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/payoutInformation/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/payouts`);
   }
 
   getDisputeInformation(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/disputeInformation/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/disputes`);
   }
 
   getBusinessLoans(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/businessLoans/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/business-loans`);
   }
 
   getExternalBankAccountSession(userId: string): Observable<SessionToken> {
-    return this.http.get<SessionToken>(`${this.baseUrl}/external-bank-account/${userId}`);
+    return this.http.get<SessionToken>(`${this.baseUrl}/api/sessions/${userId}/external-bank-account`);
   }
 
   getBusinessLines(userId: number): Observable<BusinessLine[]> {
-    return this.http.get<BusinessLine[]>(`${this.baseUrl}/activity/${userId}`);
+    return this.http.get<BusinessLine[]>(`${this.baseUrl}/api/activities/${userId}`);
   }
 
   addBusinessLine(userId: number, payload: { industryCode: string; salesChannels: string[] }): Observable<BusinessLine> {
-    return this.http.post<BusinessLine>(`${this.baseUrl}/activity/${userId}`, payload, {
+    return this.http.post<BusinessLine>(`${this.baseUrl}/api/activities/${userId}`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   getUserById(userId: number): Observable<User> {
-    return this.http.get<User>(`${this.baseUrl}/user/${userId}`);
+    return this.http.get<User>(`${this.baseUrl}/api/users/${userId}`);
   }
 
   getBalanceAccounts(userId: number): Observable<BalanceAccount[]> {
-    return this.http.get<BalanceAccount[]>(`${this.baseUrl}/accounts/${userId}`);
+    return this.http.get<BalanceAccount[]>(`${this.baseUrl}/api/accounts/${userId}/balance`);
   }
 
   createStore(userId: number, payload: StorePayload): Observable<Store> {
-    return this.http.post<Store>(`${this.baseUrl}/store/${userId}`, payload, {
+    return this.http.post<Store>(`${this.baseUrl}/api/stores/${userId}`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   getStores(userId: number): Observable<Store[]> {
-    return this.http.get<Store[]>(`${this.baseUrl}/stores/${userId}`);
+    return this.http.get<Store[]>(`${this.baseUrl}/api/stores/${userId}`);
   }
 
   sendPayment(payload: SendPaymentPayload): Observable<SendPaymentResponse> {
-    return this.http.post<SendPaymentResponse>(`${this.baseUrl}/sendPayment/`, payload, {
+    return this.http.post<SendPaymentResponse>(`${this.baseUrl}/api/payments/session`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   getClientKey(): Observable<{ key: string }> {
-    return this.http.get<{ key: string }>(`${this.baseUrl}/clientKey`);
+    return this.http.get<{ key: string }>(`${this.baseUrl}/api/payments/client-key`);
   }
 
   getPayoutAccounts(userId: number): Observable<PayoutAccount[]> {
-    return this.http.get<PayoutAccount[]>(`${this.baseUrl}/payoutAccount/${userId}`);
+    return this.http.get<PayoutAccount[]>(`${this.baseUrl}/api/payouts/${userId}/accounts`);
   }
 
   createPayoutConfiguration(payload: PayoutConfigurationPayload): Observable<PayoutConfiguration> {
-    return this.http.post<PayoutConfiguration>(`${this.baseUrl}/payoutConfiguration`, payload, {
+    return this.http.post<PayoutConfiguration>(`${this.baseUrl}/api/payouts/configurations`, payload, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
 
   getPayoutConfigurations(userId: number, balanceAccountId: string): Observable<PayoutConfiguration[]> {
-    return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/payoutConfiguration/${userId}/${balanceAccountId}`);
+    return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/api/payouts/${userId}/configurations/${balanceAccountId}`);
   }
 
   validateKyc(userId: number): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/validateKyc/${userId}`, {}, { responseType: 'json' });
+    return this.http.post<any>(`${this.baseUrl}/api/onboarding/${userId}/validate-kyc`, {}, { responseType: 'json' });
   }
 
   createBankAccount(userId: number): Observable<{ bankAccountId: string; bankAccountNumber: string }> {
-    return this.http.post<{ bankAccountId: string; bankAccountNumber: string }>(`${this.baseUrl}/api/users/${userId}/create-bank-account`, {});
+    return this.http.post<{ bankAccountId: string; bankAccountNumber: string }>(`${this.baseUrl}/api/accounts/${userId}/bank`, {});
   }
 
   getBankAccountStatus(userId: number): Observable<BankAccountStatus> {
-    return this.http.get<BankAccountStatus>(`${this.baseUrl}/api/users/${userId}/bank-account-status`);
+    return this.http.get<BankAccountStatus>(`${this.baseUrl}/api/accounts/${userId}/bank/status`);
   }
 
   handleShopperRedirect(data: any): Observable<any> {
-    return this.http.get(`${this.baseUrl}/handleShopperRedirect`, data);
+    return this.http.get(`${this.baseUrl}/api/payments/redirect`, data);
   }
 
   getGooglePayJwt(hostname: string): Observable<{ googlePayJwtToken: string }> {
       return this.http.get<{ googlePayJwtToken: string }>(
-        `${this.baseUrl}/gpay-jwt`,
+        `${this.baseUrl}/api/payments/gpay-jwt`,
         { params: { hostname } }
       );
     }
 
   listDevices(userId: number): Observable<Device[]> {
-    return this.http.get<Device[]>(`${this.baseUrl}/listDevices/${userId}`);
+    return this.http.get<Device[]>(`${this.baseUrl}/api/transfers/${userId}/devices`);
   }
 
   initiateDeviceRegistration(sdkOutput: string, userId: number): Observable<RegisterSCAResponse> {
     return this.http.post<RegisterSCAResponse>(
-      `${this.baseUrl}/initiateDeviceRegistration`,
+      `${this.baseUrl}/api/transfers/devices/register`,
       { sdkOutput, userId }
     );
   }
 
   finalizeRegistration(id: string, sdkOutput: string, userId: number): Observable<RegisterSCAFinalResponse> {
     return this.http.post<RegisterSCAFinalResponse>(
-      `${this.baseUrl}/finalizeRegistration`,
+      `${this.baseUrl}/api/transfers/devices/register/finalize`,
       { id, sdkOutput, userId }
     );
   }
 
   deleteDevice(request: DeleteDeviceRequest): Observable<{ status: string }> {
       return this.http.post<{ status: string }>(
-        `${this.baseUrl}/deleteDevice`,
+        `${this.baseUrl}/api/transfers/devices/delete`,
         request
       );
     }
 
   initiateTransfer(request: InitiateTransferRequest): Observable<InitiateTransferResponse> {
       return this.http.post<InitiateTransferResponse>(
-        `${this.baseUrl}/initiateTransfer`,
+        `${this.baseUrl}/api/transfers/initiate`,
         request
       );
     }
 
   finalizeTransfer(request: InitiateTransferRequest): Observable<{ status: string }> {
         return this.http.post<{ status: string }>(
-          `${this.baseUrl}/finalizeTransfer`,
+          `${this.baseUrl}/api/transfers/finalize`,
           request
         );
       }
 
     getBankAccountInformation(userId: number): Observable<BankAccountInformationResponse> {
       return this.http.get<BankAccountInformationResponse>(
-        `${this.baseUrl}/bankAccount/${userId}`
+        `${this.baseUrl}/api/accounts/${userId}/bank`
       );
     }
 
     getRibPdf(userId: number): Observable<Blob> {
-      return this.http.get(`${this.baseUrl}/api/bankstatement/rib/pdf`, {
+      return this.http.get(`${this.baseUrl}/api/bank-statement/rib/pdf`, {
         params: { userId },
         responseType: 'blob'
       });
@@ -529,27 +529,27 @@ export class MyPlatformService {
 
   getBankAccountFormat(countryCode: string): Observable<{ bankAccountFormat: string }> {
       return this.http.get<{ bankAccountFormat: string }>(
-        `${this.baseUrl}/bankAccountFormat/country/${countryCode}`
+        `${this.baseUrl}/api/bank-validation/format/${countryCode}`
       );
     }
 
   isCrossBorder(request: IsCrossBorderRequest): Observable<{ isCrossBorder: string }> {
       return this.http.post<{ isCrossBorder: string }>(
-        `${this.baseUrl}/isCrossBorder/`,
+        `${this.baseUrl}/api/bank-validation/cross-border`,
         request
       );
     }
 
   isBankAccountValid(request: IsBankAccountValidRequest): Observable<{ isBankAccountValid: string }> {
       return this.http.post<{ isBankAccountValid: string }>(
-        `${this.baseUrl}/isBankAccountValid`,
+        `${this.baseUrl}/api/bank-validation/validate`,
         request
       );
     }
 
   verifyCounterpartyName(payload: VerifyCounterpartyNameRequest): Observable<CounterpartyVerificationResponse> {
       return this.http.post<CounterpartyVerificationResponse>(
-        `${this.baseUrl}/verifyCounterpartyName`,
+        `${this.baseUrl}/api/bank-validation/verify-counterparty`,
         payload,
         { responseType: 'json' }
       );
@@ -557,36 +557,36 @@ export class MyPlatformService {
 
   makePosPayment(payload: PosPaymentRequest): Observable<PosPaymentResponse> {
       return this.http.post<PosPaymentResponse>(
-        `${this.baseUrl}/pos/pay`,
+        `${this.baseUrl}/api/pos/pay`,
         payload,
         { responseType: 'json' }
       );
     }
 
   listTerminals(storeId: string): Observable<TerminalResponse[]> {
-      return this.http.get<TerminalResponse[]>(`${this.baseUrl}/listTerminal/storeId/${storeId}`);
+      return this.http.get<TerminalResponse[]>(`${this.baseUrl}/api/stores/${storeId}/terminals`);
     }
 
   // Issuing - Cards
   createCard(request: CreateCardRequest): Observable<CardResponse> {
-    return this.http.post<CardResponse>(`${this.baseUrl}/issuing/cards`, request);
+    return this.http.post<CardResponse>(`${this.baseUrl}/api/issuing/cards`, request);
   }
 
   getPhonePrefixes(): Observable<PhonePrefix[]> {
-    return this.http.get<PhonePrefix[]>(`${this.baseUrl}/issuing/phone-prefixes`);
+    return this.http.get<PhonePrefix[]>(`${this.baseUrl}/api/issuing/phone-prefixes`);
   }
 
   getCards(userId: number, status?: string): Observable<CardResponse[]> {
     const params = status ? `?status=${status}` : '';
-    return this.http.get<CardResponse[]>(`${this.baseUrl}/issuing/cards/${userId}${params}`);
+    return this.http.get<CardResponse[]>(`${this.baseUrl}/api/issuing/cards/${userId}${params}`);
   }
 
   getCardDetails(paymentInstrumentId: string): Observable<CardResponse> {
-    return this.http.get<CardResponse>(`${this.baseUrl}/issuing/card/${paymentInstrumentId}`);
+    return this.http.get<CardResponse>(`${this.baseUrl}/api/issuing/card/${paymentInstrumentId}`);
   }
 
   updateCardStatus(paymentInstrumentId: string, status: string): Observable<{ status: string; newStatus: string }> {
-    return this.http.put<{ status: string; newStatus: string }>(`${this.baseUrl}/issuing/cards/status`, {
+    return this.http.put<{ status: string; newStatus: string }>(`${this.baseUrl}/api/issuing/cards/status`, {
       paymentInstrumentId,
       status
     });
@@ -594,24 +594,24 @@ export class MyPlatformService {
 
   // Issuing - Transaction Rules
   addTransactionRule(request: AddTransactionRuleRequest): Observable<{ ruleId: string; status: string }> {
-    return this.http.post<{ ruleId: string; status: string }>(`${this.baseUrl}/issuing/rules`, request);
+    return this.http.post<{ ruleId: string; status: string }>(`${this.baseUrl}/api/issuing/rules`, request);
   }
 
   getTransactionRules(paymentInstrumentId: string): Observable<TransactionRuleResponse[]> {
-    return this.http.get<TransactionRuleResponse[]>(`${this.baseUrl}/issuing/rules/${paymentInstrumentId}`);
+    return this.http.get<TransactionRuleResponse[]>(`${this.baseUrl}/api/issuing/rules/${paymentInstrumentId}`);
   }
 
   updateTransactionRule(ruleId: string, status: string): Observable<{ status: string }> {
-    return this.http.put<{ status: string }>(`${this.baseUrl}/issuing/rules/${ruleId}`, { status });
+    return this.http.put<{ status: string }>(`${this.baseUrl}/api/issuing/rules/${ruleId}`, { status });
   }
 
   deleteTransactionRule(ruleId: string): Observable<{ status: string }> {
-    return this.http.delete<{ status: string }>(`${this.baseUrl}/issuing/rules/${ruleId}`);
+    return this.http.delete<{ status: string }>(`${this.baseUrl}/api/issuing/rules/${ruleId}`);
   }
 
   // Issuing - Reveal Card Data (all crypto handled server-side)
   revealCardData(paymentInstrumentId: string): Observable<{ cardData: string }> {
-    return this.http.post<{ cardData: string }>(`${this.baseUrl}/issuing/reveal`, {
+    return this.http.post<{ cardData: string }>(`${this.baseUrl}/api/issuing/reveal`, {
       paymentInstrumentId
     });
   }
@@ -622,7 +622,7 @@ export class MyPlatformService {
     if (paymentInstrumentId) {
       params += `&paymentInstrumentId=${paymentInstrumentId}`;
     }
-    return this.http.get<CardTransfer[]>(`${this.baseUrl}/issuing/transfers${params}`);
+    return this.http.get<CardTransfer[]>(`${this.baseUrl}/api/issuing/transfers${params}`);
   }
 
 }

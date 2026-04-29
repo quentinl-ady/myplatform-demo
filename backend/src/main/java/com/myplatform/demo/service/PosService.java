@@ -1,11 +1,11 @@
 package com.myplatform.demo.service;
 
 import com.adyen.Client;
-import com.adyen.enums.Environment;
 import com.adyen.model.nexo.*;
 import com.adyen.service.TerminalCloudAPI;
 import com.myplatform.demo.model.PosPaymentResponse;
 import lombok.Getter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.adyen.model.terminal.TerminalAPIRequest;
@@ -26,10 +26,9 @@ public class PosService {
     private final TerminalCloudAPI terminalCloudAPI;
     private final String saleId;
 
-    public PosService(@Value("${adyen.pspApiKey}") String pspApiKey,
+    public PosService(@Qualifier("pspClient") Client pspClient,
                       @Value("${adyen.saleId:POS_SYSTEM_MYPLATFORM}") String saleId) {
         this.saleId = saleId;
-        Client pspClient = new Client(pspApiKey, Environment.TEST);
         this.terminalCloudAPI = new TerminalCloudAPI(pspClient);
     }
 
