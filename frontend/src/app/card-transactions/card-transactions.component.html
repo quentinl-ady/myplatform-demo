@@ -1,0 +1,252 @@
+<div class="fintech-wrapper">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1>Card Transactions</h1>
+      <p class="subtitle">Authorizations, captures, refunds and more</p>
+    </div>
+    <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </div>
+
+  <!-- Card Selector -->
+  <div class="card-selector" *ngIf="cards.length > 0">
+    <div class="selector-toggle" (click)="toggleCardDropdown()">
+      <div class="selected-card-info" *ngIf="getSelectedCard() as card">
+        <span class="sel-brand" [class.visa]="card.brand === 'visa'" [class.mc]="card.brand === 'mc'">{{ card.brand === 'visa' ? 'Visa' : 'MC' }}</span>
+        <span class="sel-name">{{ card.cardholderName }}</span>
+        <span class="sel-last4">&bull;&bull;&bull;&bull; {{ card.lastFour }}</span>
+        <span class="sel-status" [ngClass]="card.status">{{ card.status }}</span>
+      </div>
+      <mat-icon class="sel-arrow" [class.open]="cardDropdownOpen">expand_more</mat-icon>
+    </div>
+    <div class="card-dropdown" *ngIf="cardDropdownOpen">
+      <div class="card-option" *ngFor="let card of cards"
+           [class.active]="card.paymentInstrumentId === selectedPaymentInstrumentId"
+           (click)="selectCardFilter(card.paymentInstrumentId)">
+        <span class="opt-brand" [class.visa]="card.brand === 'visa'" [class.mc]="card.brand === 'mc'">{{ card.brand === 'visa' ? 'Visa' : 'MC' }}</span>
+        <span class="opt-name">{{ card.cardholderName }}</span>
+        <span class="opt-last4">&bull;&bull;&bull;&bull; {{ card.lastFour }}</span>
+        <span class="opt-status" [ngClass]="card.status">{{ card.status }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="isLoading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading transactions...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!isLoading && transfers.length === 0">
+    <mat-icon>receipt_long</mat-icon>
+    <h3>No transactions found</h3>
+    <p>No card transactions available for the selected filter</p>
+  </div>
+
+  <!-- Transactions List -->
+  <div class="tx-list" *ngIf="!isLoading && transfers.length > 0">
+    <div class="tx-list-header">
+      <span class="col-date">Date</span>
+      <span class="col-merchant">Merchant</span>
+      <span class="col-type">Channel</span>
+      <span class="col-status">Status</span>
+      <span class="col-amount">Amount</span>
+    </div>
+    <div class="tx-row" *ngFor="let t of transfers" (click)="openDetail(t)">
+      <span class="col-date">{{ formatDate(t.createdAt) }}</span>
+      <div class="col-merchant">
+        <span class="merchant-name">{{ t.merchantName || 'Unknown Merchant' }}</span>
+        <span class="merchant-mcc" *ngIf="t.mcc">{{ t.mcc }} - {{ getMccLabel(t.mcc) }}</span>
+      </div>
+      <span class="col-type">
+        <span class="channel-badge" [class.ecom]="t.processingType === 'ecommerce'" [class.pos]="t.processingType === 'pos'">
+          {{ t.processingType === 'ecommerce' ? 'eCOM' : t.processingType === 'pos' ? 'POS' : (t.processingType || '-') }}
+        </span>
+      </span>
+      <span class="col-status">
+        <span class="status-badge" [ngClass]="'st-' + t.status">{{ t.status }}</span>
+        <span class="tx-reason" *ngIf="t.reason">{{ formatReason(t.reason) }}</span>
+      </span>
+      <span class="col-amount">
+        {{ formatAmount(t.amount) }} {{ t.currency }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Detail Modal Overlay -->
+  <div class="detail-overlay" *ngIf="selectedTransfer" (click)="closeDetail()">
+    <div class="detail-modal" (click)="$event.stopPropagation()">
+
+      <div class="modal-header">
+        <h2>Transaction Details</h2>
+        <button mat-icon-button (click)="closeDetail()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="modal-body">
+
+        <!-- Overview -->
+        <div class="detail-section">
+          <h3>Overview</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="label">Transfer ID</span>
+              <span class="value mono">{{ selectedTransfer.id }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Status</span>
+              <span class="status-badge" [ngClass]="'st-' + selectedTransfer.status">{{ selectedTransfer.status }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Amount</span>
+              <span class="value">{{ formatAmount(selectedTransfer.amount) }} {{ selectedTransfer.currency }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Type</span>
+              <span class="value">{{ selectedTransfer.type }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.description">
+              <span class="label">Description</span>
+              <span class="value">{{ selectedTransfer.description }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.reason">
+              <span class="label">Reason</span>
+              <span class="value reason-text">{{ formatReason(selectedTransfer.reason) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Processing</span>
+              <span class="value">{{ selectedTransfer.processingType || '-' }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.panEntryMode">
+              <span class="label">PAN Entry Mode</span>
+              <span class="value">{{ selectedTransfer.panEntryMode }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.authorisationType">
+              <span class="label">Authorisation Type</span>
+              <span class="value">{{ selectedTransfer.authorisationType }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Description</span>
+              <span class="value">{{ selectedTransfer.paymentInstrumentDescription || selectedTransfer.paymentInstrumentId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Reference</span>
+              <span class="value mono">{{ selectedTransfer.reference }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Created</span>
+              <span class="value">{{ formatDateTime(selectedTransfer.createdAt) }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.updatedAt">
+              <span class="label">Updated</span>
+              <span class="value">{{ formatDateTime(selectedTransfer.updatedAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Merchant -->
+        <div class="detail-section" *ngIf="selectedTransfer.merchantName">
+          <h3>Merchant</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="label">Name</span>
+              <span class="value">{{ selectedTransfer.merchantName }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.mcc">
+              <span class="label">MCC</span>
+              <span class="value"><strong>{{ selectedTransfer.mcc }}</strong> - {{ getMccLabel(selectedTransfer.mcc) }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedTransfer.merchantCity || selectedTransfer.merchantCountry">
+              <span class="label">Location</span>
+              <span class="value">{{ formatLocation(selectedTransfer.merchantCity, selectedTransfer.merchantCountry) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D Secure -->
+        <div class="detail-section" *ngIf="selectedTransfer.threeDSecureAcsTransactionId">
+          <h3>3D Secure</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="label">ACS Transaction ID</span>
+              <span class="value mono">{{ selectedTransfer.threeDSecureAcsTransactionId }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lifecycle Events -->
+        <div class="detail-section" *ngIf="selectedTransfer.events?.length">
+          <h3>Lifecycle</h3>
+          <div class="lifecycle-timeline">
+            <div class="lifecycle-event" *ngFor="let event of selectedTransfer.events; let last = last">
+              <div class="event-dot-col">
+                <div class="event-dot" [ngClass]="'dot-' + event.status"></div>
+                <div class="event-line" *ngIf="!last"></div>
+              </div>
+              <div class="event-info">
+                <div class="event-header">
+                  <span class="event-status" [ngClass]="'st-' + event.status">{{ event.status }}</span>
+                  <span class="event-type">({{ event.type }})</span>
+                </div>
+                <div class="event-meta">
+                  <span>{{ formatDateTime(event.bookingDate) }}</span>
+                  <span class="event-amount">{{ formatAmount(event.amountValue) }} {{ event.amountCurrency }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validation Facts -->
+        <div class="detail-section" *ngIf="getInvalidFacts(selectedTransfer.validationFacts).length">
+          <h3>Validation Checks</h3>
+          <div class="validation-grid">
+            <div class="validation-item" *ngFor="let fact of getInvalidFacts(selectedTransfer.validationFacts)"
+                 [ngClass]="'vr-' + fact.result">
+              <mat-icon class="validation-icon">
+                {{ fact.result === 'valid' ? 'check_circle' : fact.result === 'invalid' ? 'cancel' : 'help_outline' }}
+              </mat-icon>
+              <span class="validation-type">{{ formatValidationType(fact.type) }}</span>
+              <span class="validation-result">{{ fact.result }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Rules Result -->
+        <div class="detail-section" *ngIf="selectedTransfer.transactionRulesResult">
+          <h3>Transaction Rules</h3>
+          <div class="rules-result">
+            <div class="rules-summary">
+              <span class="rules-advice" [class.deny]="selectedTransfer.transactionRulesResult.advice === 'DenyTransaction'">
+                {{ selectedTransfer.transactionRulesResult.advice }}
+              </span>
+              <span class="rules-passed" *ngIf="!selectedTransfer.transactionRulesResult.allHardBlockRulesPassed">
+                Hard block rules failed
+              </span>
+            </div>
+            <div class="triggered-rules" *ngIf="selectedTransfer.transactionRulesResult.triggeredRules?.length">
+              <div class="triggered-rule" *ngFor="let rule of selectedTransfer.transactionRulesResult.triggeredRules">
+                <div class="rule-header">
+                  <mat-icon class="rule-block-icon">block</mat-icon>
+                  <span class="rule-desc">{{ rule.ruleDescription }}</span>
+                </div>
+                <div class="rule-meta">
+                  <span *ngIf="rule.reason">{{ rule.reason }}</span>
+                  <span class="rule-outcome">{{ rule.outcomeType }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>

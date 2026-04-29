@@ -1,5 +1,5 @@
 import { Pipe, PipeTransform } from '@angular/core';
-import { PayoutConfiguration } from '../my-platform-service';
+import { PayoutConfiguration } from '../models';
 
 @Pipe({
     name: 'payoutType',

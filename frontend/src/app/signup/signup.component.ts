@@ -14,9 +14,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MaterialModule } from '../material.module';
-import { MyPlatformService } from '../my-platform-service';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatTooltipModule } from '@angular/material/tooltip';
+import { AuthService } from '../services';
 
 @Component({
     selector: 'app-signup',
@@ -25,216 +23,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
         CommonModule,
         ReactiveFormsModule,
         MaterialModule,
-        MatButtonToggleModule,
-        MatTooltipModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
-      <!-- USER TYPE -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Type</mat-label>
-        <mat-select formControlName="userType">
-          <mat-option
-            *ngFor="let type of userTypes"
-            [value]="type.value"
-            [disabled]="type.disabled"
-            [matTooltip]="
-              type.value === 'individual' && type.disabled
-                ? 'Individual not allowed with Embedded Payment or extra options'
-                : ''
-            "
-          >
-            {{ type.label }}
-          </mat-option>
-        </mat-select>
-      </mat-form-field>
-      <div *ngIf="individualDisabledMessage" class="info">
-        {{ individualDisabledMessage }}
-      </div>
-
-      <!-- ACTIVITY REASON -->
-      <div>
-        <label class="section-label">Reason of activity</label>
-        <mat-button-toggle-group
-          formControlName="activityReason"
-          appearance="legacy"
-          class="full-width"
-        >
-          <mat-button-toggle value="marketplace">Marketplace</mat-button-toggle>
-          <mat-button-toggle
-            value="embeddedPayment"
-            [disabled]="disableEmbeddedPayment"
-            [matTooltip]="
-              disableEmbeddedPayment
-                ? 'Embedded Payment is not allowed for Individual users'
-                : ''
-            "
-          >
-            Embedded Payment
-          </mat-button-toggle>
-        </mat-button-toggle-group>
-        <div *ngIf="disableEmbeddedPayment" class="info">
-          Embedded Payment disabled because you selected Individual.
-        </div>
-      </div>
-
-      <!-- EXTRA OPTIONS -->
-      <div class="checkbox-group">
-        <mat-checkbox
-          formControlName="capital"
-          [disabled]="disableExtraOptions"
-          [matTooltip]="
-            disableExtraOptions
-              ? 'Capital option is not allowed for Individual users'
-              : ''
-          "
-        >
-          Capital
-        </mat-checkbox>
-        <mat-checkbox
-          formControlName="bank"
-          [disabled]="disableExtraOptions"
-          [matTooltip]="
-            disableExtraOptions
-              ? 'Bank option is not allowed for Individual users'
-              : ''
-          "
-        >
-          Bank
-        </mat-checkbox>
-        <mat-checkbox
-          formControlName="issuing"
-          [disabled]="disableExtraOptions"
-          [matTooltip]="
-            disableExtraOptions
-              ? 'Issuing option is not allowed for Individual users'
-              : ''
-          "
-        >
-          Issuing
-        </mat-checkbox>
-      </div>
-      <div *ngIf="disableExtraOptions" class="info">
-        Extra options (Capital, Bank, Issuing) are disabled for Individual users.
-      </div>
-
-      <!-- COMPANY OR INDIVIDUAL -->
-      <mat-form-field
-        *ngIf="form.get('legalEntityName')"
-        appearance="outline"
-        class="full-width"
-      >
-        <mat-label>Company name</mat-label>
-        <input matInput formControlName="legalEntityName" />
-        <mat-error *ngIf="companyNameInvalid()"
-          >Company name required (min 3 characters).</mat-error
-        >
-      </mat-form-field>
-
-      <mat-form-field
-        *ngIf="form.get('firstName')"
-        appearance="outline"
-        class="full-width"
-      >
-        <mat-label>First name</mat-label>
-        <input matInput formControlName="firstName" />
-        <mat-error *ngIf="firstNameInvalid()">First name required.</mat-error>
-      </mat-form-field>
-
-      <mat-form-field
-        *ngIf="form.get('lastName')"
-        appearance="outline"
-        class="full-width"
-      >
-        <mat-label>Last name</mat-label>
-        <input matInput formControlName="lastName" />
-        <mat-error *ngIf="lastNameInvalid()">Last name required.</mat-error>
-      </mat-form-field>
-
-      <!-- COUNTRY -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Country</mat-label>
-        <mat-select formControlName="countryCode">
-          <mat-option value="NL">Netherlands</mat-option>
-          <mat-option value="FR">France</mat-option>
-          <mat-option value="GB">United Kingdom</mat-option>
-          <mat-option value="DE">Germany</mat-option>
-          <mat-option value="US">United States</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <!-- CURRENCY -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Currency</mat-label>
-        <mat-select formControlName="currencyCode">
-          <mat-option value="EUR">EUR</mat-option>
-          <mat-option value="GBP">GBP</mat-option>
-          <mat-option value="USD">USD</mat-option>
-        </mat-select>
-      </mat-form-field>
-
-      <!-- EMAIL -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Email</mat-label>
-        <input matInput type="email" formControlName="email" />
-        <mat-error *ngIf="emailInvalid()">Input valid email.</mat-error>
-      </mat-form-field>
-
-      <!-- PASSWORD -->
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Password</mat-label>
-        <input matInput type="password" formControlName="password" />
-        <mat-error *ngIf="passwordInvalid()"
-          >Password required (min 4 characters).</mat-error
-        >
-      </mat-form-field>
-
-      <button
-        mat-raised-button
-        color="accent"
-        class="full-width"
-        [disabled]="form.invalid"
-      >
-        Sign Up
-      </button>
-      <div *ngIf="error" class="error">{{ error }}</div>
-    </form>
-  `,
-    styles: [
-        `
-      .auth-form {
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-      }
-      .full-width {
-        width: 100%;
-      }
-      .checkbox-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        margin: 0.5rem 0;
-      }
-      .info {
-        font-size: 0.9rem;
-        color: #555;
-        margin-bottom: 0.5rem;
-      }
-      .error {
-        color: red;
-        margin-top: 0.5rem;
-        text-align: center;
-      }
-      .section-label {
-        font-size: 0.95rem;
-        font-weight: 500;
-        margin-bottom: 0.3rem;
-        display: block;
-      }
-    `,
-    ],
+    templateUrl: './signup.component.html',
+    styleUrl: './signup.component.css',
 })
 export class SignupComponent {
     form: FormGroup;
@@ -256,7 +48,7 @@ export class SignupComponent {
 
     constructor(
         private fb: FormBuilder,
-        private authService: MyPlatformService,
+        private authService: AuthService,
         private router: Router,
         private cdr: ChangeDetectorRef
     ) {

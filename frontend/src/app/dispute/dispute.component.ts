@@ -1,15 +1,14 @@
-import {Component, ElementRef, ViewChild} from '@angular/core';
+import {Component} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {MaterialModule} from '../material.module';
 import {CommonModule} from "@angular/common";
 import {
     AdyenPlatformExperience,
-    DisputesOverview,
-    PayoutsOverview,
-    ReportsOverview
+    DisputesOverview
 } from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
-import {MyPlatformService} from "../my-platform-service";
+import {SessionService} from "../services";
 
 @Component({
     selector: 'app-dispute',
@@ -19,14 +18,14 @@ import {MyPlatformService} from "../my-platform-service";
       <div id="disputes-overview-container"></div>
     </div>
   `,
-    imports: [MatSnackBarModule, CommonModule]
+    imports: [CommonModule, MaterialModule]
 })
 export class DisputeComponent {
 
     userId = '';
 
     constructor(private route: ActivatedRoute,
-                private authService: MyPlatformService,
+                private sessionService: SessionService,
                 private matSnackBar: MatSnackBar) {
     }
 
@@ -42,7 +41,7 @@ export class DisputeComponent {
     private async initAdyenComponents() {
         const core = await AdyenPlatformExperience({
             onSessionCreate: async () => {
-                const sessionToken = await this.authService.getDisputeInformation(this.userId).toPromise();
+                const sessionToken = await this.sessionService.getDisputeInformation(this.userId).toPromise();
                 if (!sessionToken) {
                     throw new Error('Impossible to get dispute information');
                 }

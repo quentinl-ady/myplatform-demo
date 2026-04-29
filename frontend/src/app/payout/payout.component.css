@@ -1,0 +1,21 @@
+.payout-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+.full-width { width: 100%; }
+.checkbox-group { display: flex; gap: 1rem; margin: 0.5rem 0; }
+.config-card {
+  border: 1px solid #ddd;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 6px;
+  background-color: #fafafa;
+}
+.tab-content { padding: 1rem 0; }
+.loading-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -1,0 +1,113 @@
+<mat-sidenav-container class="fintech-layout-container">
+
+  <mat-sidenav #drawer mode="side" class="fintech-sidenav" opened>
+
+    <div class="brand-header">
+      <div class="logo-mark">
+        <img src="assets/logo.svg" alt="My Platform" />
+      </div>
+    </div>
+
+    <mat-nav-list class="fintech-nav-list">
+      <p class="nav-section-title">Overview</p>
+      <a mat-list-item [routerLink]="['/', userId, 'dashboard']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>verified_user</mat-icon>
+        <span matListItemTitle>Onboarding</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'report']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>bar_chart</mat-icon>
+        <span matListItemTitle>Reports</span>
+      </a>
+
+      <p class="nav-section-title">Payments & Commerce</p>
+      <a mat-list-item [routerLink]="['/', userId, 'payment']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>payment</mat-icon>
+        <span matListItemTitle>Payments</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'checkout']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>shop</mat-icon>
+        <span matListItemTitle>Checkout</span>
+      </a>
+       <a mat-list-item [routerLink]="['/', userId, 'pos']" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>computer</mat-icon>
+          <span matListItemTitle>POS</span>
+       </a>
+      <a mat-list-item [routerLink]="['/', userId, 'paybylink']" routerLinkActive="active-link">
+         <mat-icon matListItemIcon>link</mat-icon>
+         <span matListItemTitle>Pay-by-Link</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'store']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>store</mat-icon>
+        <span matListItemTitle>Stores</span>
+      </a>
+
+      <p class="nav-section-title">Banking & Finance</p>
+      <a mat-list-item [routerLink]="['/', userId, 'transfer']" routerLinkActive="active-link">
+          <mat-icon matListItemIcon>sync_alt</mat-icon>
+          <span matListItemTitle>Transfers</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'payout']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>account_balance</mat-icon>
+        <span matListItemTitle>Payouts</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'businessloans']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>attach_money</mat-icon>
+        <span matListItemTitle>Extra money ?</span>
+      </a>
+
+      <p class="nav-section-title">Cards</p>
+      <a mat-list-item [routerLink]="['/', userId, 'cards']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>credit_card</mat-icon>
+        <span matListItemTitle>My Cards</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'card-create']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>add_card</mat-icon>
+        <span matListItemTitle>Create Card</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'card-transactions']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>receipt_long</mat-icon>
+        <span matListItemTitle>Transactions</span>
+      </a>
+
+      <p class="nav-section-title">Security & Risk</p>
+      <a mat-list-item [routerLink]="['/', userId, 'device']" routerLinkActive="active-link">
+         <mat-icon matListItemIcon>devices</mat-icon>
+         <span matListItemTitle>Trusted Devices</span>
+      </a>
+      <a mat-list-item [routerLink]="['/', userId, 'dispute']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>gavel</mat-icon>
+        <span matListItemTitle>Disputes</span>
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="fintech-content-wrapper">
+
+    <mat-toolbar class="fintech-topbar">
+      <button mat-icon-button (click)="drawer.toggle()" class="mobile-toggle">
+        <mat-icon>menu</mat-icon>
+      </button>
+
+      <div class="spacer"></div>
+
+      <div class="user-profile">
+        <div class="user-info">
+          <span class="user-role">Account ID</span>
+          <span class="user-id">#{{ userId || 'N/A' }}</span>
+          <span class="user-email" *ngIf="userEmail">{{ userEmail }}</span>
+        </div>
+        <div class="user-avatar">
+          <mat-icon>person</mat-icon>
+        </div>
+      </div>
+      <button mat-icon-button class="sign-out-btn" (click)="signOut()" matTooltip="Sign out">
+        <mat-icon>logout</mat-icon>
+      </button>
+    </mat-toolbar>
+
+    <main class="main-content">
+      <router-outlet></router-outlet>
+    </main>
+
+  </mat-sidenav-content>
+</mat-sidenav-container>

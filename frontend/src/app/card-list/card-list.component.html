@@ -1,0 +1,438 @@
+<div class="fintech-wrapper">
+  <div class="page-header">
+    <div class="header-content">
+      <h1>My Cards</h1>
+      <p class="subtitle">Manage your virtual cards and spending rules</p>
+    </div>
+    <button mat-flat-button class="fintech-btn primary" (click)="navigateToCreate()">
+      <mat-icon>add</mat-icon>
+      New Card
+    </button>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar" *ngIf="!isLoadingActive || activeCards.length > 0 || suspendedCards.length > 0">
+    <div class="search-container">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input type="text"
+             class="fintech-input search-input"
+             placeholder="Search by cardholder name..."
+             [formControl]="searchControl"
+             [matAutocomplete]="searchAuto" />
+      <mat-autocomplete #searchAuto="matAutocomplete" (optionSelected)="onSearchSelect($event)">
+        <mat-option *ngFor="let card of searchSuggestions" [value]="card">
+          <div class="search-suggestion">
+            <span class="suggestion-name">{{ card.cardholderName }}</span>
+            <span class="suggestion-meta">
+              <span class="suggestion-brand" [class.visa]="card.brand === 'visa'" [class.mc]="card.brand === 'mc'">{{ card.brand === 'visa' ? 'Visa' : 'MC' }}</span>
+              •••• {{ card.lastFour }}
+              <span class="suggestion-status" [class]="card.status">{{ card.status }}</span>
+            </span>
+          </div>
+        </mat-option>
+      </mat-autocomplete>
+      <button *ngIf="searchControl.value" class="search-clear" (click)="clearSearch()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="isLoadingActive">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading your cards...</p>
+  </div>
+
+  <div class="empty-state" *ngIf="!isLoadingActive && activeCards.length === 0 && suspendedCards.length === 0 && closedCards.length === 0">
+    <mat-icon>credit_card_off</mat-icon>
+    <h3>No cards yet</h3>
+    <p>Create your first virtual card to get started</p>
+    <button mat-flat-button class="fintech-btn primary" (click)="navigateToCreate()">
+      Create Card
+    </button>
+  </div>
+
+  <!-- Active Cards Section -->
+  <div class="cards-section" *ngIf="filteredActiveCards.length > 0">
+    <div class="section-title">
+      <span class="status-dot active"></span>
+      <h2>Active</h2>
+      <span class="card-count">{{ filteredActiveCards.length }}</span>
+    </div>
+    <div class="cards-grid">
+      <div class="card-item" *ngFor="let card of filteredActiveCards" [class.selected]="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+
+      <div class="virtual-card"
+           [class.visa]="card.brand === 'visa'"
+           [class.mc]="card.brand === 'mc'"
+           [class.suspended]="card.status === 'suspended'"
+           [class.closed]="card.status === 'closed'"
+           (click)="selectCard(card)">
+
+        <div class="card-status-badge" *ngIf="card.status !== 'active'">
+          {{ card.status | titlecase }}
+        </div>
+
+        <div class="card-top-row">
+          <div class="card-brand-logo">
+            <svg *ngIf="card.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+              <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+            </svg>
+            <svg *ngIf="card.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+              <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+              <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+            </svg>
+          </div>
+          <button mat-icon-button [matMenuTriggerFor]="cardMenu" class="card-menu-btn" (click)="$event.stopPropagation()">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+          <mat-menu #cardMenu="matMenu">
+            <button mat-menu-item (click)="revealCardDetails(card)" [disabled]="card.status === 'closed'">
+              <mat-icon>visibility</mat-icon>
+              <span>Reveal Details</span>
+            </button>
+            <button mat-menu-item (click)="suspendCard(card)" *ngIf="card.status === 'active'">
+              <mat-icon>pause_circle</mat-icon>
+              <span>Suspend Card</span>
+            </button>
+            <button mat-menu-item (click)="activateCard(card)" *ngIf="card.status === 'suspended'">
+              <mat-icon>play_circle</mat-icon>
+              <span>Reactivate Card</span>
+            </button>
+            <button mat-menu-item (click)="closeCard(card)" *ngIf="card.status !== 'closed'" class="danger-item">
+              <mat-icon>cancel</mat-icon>
+              <span>Close Card</span>
+            </button>
+          </mat-menu>
+        </div>
+
+        <div class="card-number" [class.revealed]="revealedCardId === card.paymentInstrumentId">
+          <span *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+            •••• •••• •••• {{ card.lastFour }}
+          </span>
+          <span *ngIf="revealedCardId === card.paymentInstrumentId && revealedData" class="revealed-number">
+            {{ revealedData.pan | formatCardNumber }}
+          </span>
+        </div>
+
+        <div class="card-bottom-row">
+          <div class="card-holder">
+            <span class="label">CARDHOLDER</span>
+            <span class="value">{{ card.cardholderName }}</span>
+          </div>
+          <div class="card-expiry">
+            <span class="label">EXPIRES</span>
+            <span class="value" *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+              {{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}
+            </span>
+            <span class="value" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+              {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear?.toString()?.slice(-2) }}
+            </span>
+          </div>
+          <div class="card-cvv" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+            <span class="label">CVV</span>
+            <span class="value">{{ revealedData.cvc }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-actions-quick" *ngIf="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+        <button class="action-btn" (click)="revealCardDetails(card)" [disabled]="card.status === 'closed' || isRevealing">
+          <mat-icon>{{ revealedCardId === card.paymentInstrumentId ? 'visibility_off' : 'visibility' }}</mat-icon>
+          <span>{{ revealedCardId === card.paymentInstrumentId ? 'Hide' : 'Reveal' }}</span>
+        </button>
+        <button class="action-btn" (click)="openRulesPanel(card)">
+          <mat-icon>rule</mat-icon>
+          <span>Rules</span>
+        </button>
+        <button class="action-btn" (click)="copyCardNumber(card)" [disabled]="revealedCardId !== card.paymentInstrumentId">
+          <mat-icon>content_copy</mat-icon>
+          <span>Copy</span>
+        </button>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suspended Cards Section -->
+  <div class="cards-section" *ngIf="filteredSuspendedCards.length > 0">
+    <div class="section-title">
+      <span class="status-dot suspended"></span>
+      <h2>Suspended</h2>
+      <span class="card-count">{{ filteredSuspendedCards.length }}</span>
+    </div>
+    <div class="cards-grid">
+      <div class="card-item" *ngFor="let card of filteredSuspendedCards" [class.selected]="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+
+        <div class="virtual-card"
+             [class.visa]="card.brand === 'visa'"
+             [class.mc]="card.brand === 'mc'"
+             [class.suspended]="true"
+             (click)="selectCard(card)">
+
+          <div class="card-status-badge">Suspended</div>
+
+          <div class="card-top-row">
+            <div class="card-brand-logo">
+              <svg *ngIf="card.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+                <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+              </svg>
+              <svg *ngIf="card.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+                <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+                <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+              </svg>
+            </div>
+            <button mat-icon-button [matMenuTriggerFor]="suspCardMenu" class="card-menu-btn" (click)="$event.stopPropagation()">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #suspCardMenu="matMenu">
+              <button mat-menu-item (click)="revealCardDetails(card)">
+                <mat-icon>visibility</mat-icon>
+                <span>Reveal Details</span>
+              </button>
+              <button mat-menu-item (click)="activateCard(card)">
+                <mat-icon>play_circle</mat-icon>
+                <span>Reactivate Card</span>
+              </button>
+              <button mat-menu-item (click)="closeCard(card)" class="danger-item">
+                <mat-icon>cancel</mat-icon>
+                <span>Close Card</span>
+              </button>
+            </mat-menu>
+          </div>
+
+          <div class="card-number" [class.revealed]="revealedCardId === card.paymentInstrumentId">
+            <span *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+              •••• •••• •••• {{ card.lastFour }}
+            </span>
+            <span *ngIf="revealedCardId === card.paymentInstrumentId && revealedData" class="revealed-number">
+              {{ revealedData.pan | formatCardNumber }}
+            </span>
+          </div>
+
+          <div class="card-bottom-row">
+            <div class="card-holder">
+              <span class="label">CARDHOLDER</span>
+              <span class="value">{{ card.cardholderName }}</span>
+            </div>
+            <div class="card-expiry">
+              <span class="label">EXPIRES</span>
+              <span class="value" *ngIf="revealedCardId !== card.paymentInstrumentId || !revealedData">
+                {{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}
+              </span>
+              <span class="value" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+                {{ revealedData.expiryMonth }}/{{ revealedData.expiryYear?.toString()?.slice(-2) }}
+              </span>
+            </div>
+            <div class="card-cvv" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
+              <span class="label">CVV</span>
+              <span class="value">{{ revealedData.cvc }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-actions-quick" *ngIf="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
+          <button class="action-btn" (click)="revealCardDetails(card)" [disabled]="isRevealing">
+            <mat-icon>{{ revealedCardId === card.paymentInstrumentId ? 'visibility_off' : 'visibility' }}</mat-icon>
+            <span>{{ revealedCardId === card.paymentInstrumentId ? 'Hide' : 'Reveal' }}</span>
+          </button>
+          <button class="action-btn" (click)="openRulesPanel(card)">
+            <mat-icon>rule</mat-icon>
+            <span>Rules</span>
+          </button>
+          <button class="action-btn" (click)="copyCardNumber(card)" [disabled]="revealedCardId !== card.paymentInstrumentId">
+            <mat-icon>content_copy</mat-icon>
+            <span>Copy</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Closed Cards Section -->
+  <div class="cards-section closed-section">
+    <button class="show-closed-btn" (click)="loadClosedCards()" *ngIf="!closedCardsLoaded && !isLoadingClosed">
+      <mat-icon>inventory_2</mat-icon>
+      Show Closed Cards
+    </button>
+    <div class="loading-state small" *ngIf="isLoadingClosed">
+      <mat-spinner diameter="24"></mat-spinner>
+      <p>Loading closed cards...</p>
+    </div>
+    <div *ngIf="closedCardsLoaded && closedCards.length > 0">
+      <div class="section-title">
+        <span class="status-dot closed"></span>
+        <h2>Closed</h2>
+        <span class="card-count">{{ closedCards.length }}</span>
+      </div>
+      <div class="cards-grid">
+        <div class="card-item" *ngFor="let card of closedCards">
+          <div class="virtual-card"
+               [class.visa]="card.brand === 'visa'"
+               [class.mc]="card.brand === 'mc'"
+               [class.closed]="true">
+            <div class="card-status-badge">Closed</div>
+            <div class="card-top-row">
+              <div class="card-brand-logo">
+                <svg *ngIf="card.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+                </svg>
+                <svg *ngIf="card.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+                  <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+                  <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+                </svg>
+              </div>
+            </div>
+            <div class="card-number">•••• •••• •••• {{ card.lastFour }}</div>
+            <div class="card-bottom-row">
+              <div class="card-holder">
+                <span class="label">CARDHOLDER</span>
+                <span class="value">{{ card.cardholderName }}</span>
+              </div>
+              <div class="card-expiry">
+                <span class="label">EXPIRES</span>
+                <span class="value">{{ card.expiryMonth }}/{{ card.expiryYear?.slice(-2) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="no-closed" *ngIf="closedCardsLoaded && closedCards.length === 0">No closed cards.</p>
+  </div>
+
+  <!-- Rules Panel -->
+  <div class="rules-panel" *ngIf="showRulesPanel && selectedCard">
+    <div class="panel-fixed-header">
+      <div class="panel-header">
+        <h3>Transaction Rules</h3>
+        <button mat-icon-button (click)="closeRulesPanel()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+      <p class="panel-subtitle">Card ending in {{ selectedCard.lastFour }}</p>
+    </div>
+
+    <div class="panel-scrollable-content">
+      <div class="rules-list" *ngIf="selectedCard?.transactionRules?.length">
+        <div class="rule-item" *ngFor="let rule of selectedCard.transactionRules" [class.mcc-rule]="rule.type === 'blockedMccs'">
+          <div class="rule-info">
+            <mat-icon class="rule-icon">{{ getRuleIcon(rule.type) }}</mat-icon>
+            <div class="rule-details">
+              <span class="rule-name">{{ getRuleName(rule.type) }}</span>
+              <span class="rule-value" *ngIf="rule.type === 'maxTransactions'">
+                {{ rule.value }} transactions
+              </span>
+              <span class="rule-value" *ngIf="rule.type !== 'maxTransactions' && rule.type !== 'blockedMccs'">
+                {{ (rule.value || 0) / 100 | number:'1.2-2' }} {{ rule.currencyCode }}
+              </span>
+              <div class="mcc-list" *ngIf="rule.type === 'blockedMccs' && rule.blockedMccs">
+                <span class="mcc-tag" *ngFor="let mcc of rule.blockedMccs">
+                  <span class="mcc-code">{{ mcc }}</span>
+                  <span class="mcc-label">{{ getMccLabel(mcc) }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div class="rule-actions">
+            <span class="rule-status" [class.active]="rule.status === 'active'" [class.inactive]="rule.status === 'inactive'">
+              {{ rule.status }}
+            </span>
+            <button mat-icon-button [matMenuTriggerFor]="ruleMenu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #ruleMenu="matMenu">
+              <button mat-menu-item (click)="toggleRuleStatus(rule)" *ngIf="rule.status === 'active'">
+                <mat-icon>pause</mat-icon>
+                <span>Disable</span>
+              </button>
+              <button mat-menu-item (click)="toggleRuleStatus(rule)" *ngIf="rule.status === 'inactive'">
+                <mat-icon>play_arrow</mat-icon>
+                <span>Enable</span>
+              </button>
+              <button mat-menu-item (click)="deleteRule(rule)" class="danger-item">
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            </mat-menu>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-rules" *ngIf="!selectedCard.transactionRules || selectedCard.transactionRules.length === 0">
+        <mat-icon>info</mat-icon>
+        <p>No rules configured for this card</p>
+      </div>
+    </div>
+
+    <div class="panel-fixed-footer">
+      <h4>Add New Rule</h4>
+      <form [formGroup]="ruleForm" (ngSubmit)="addRule()">
+        <select class="fintech-input full-width" formControlName="type" (change)="onRuleTypeChange()">
+          <option value="maxTransactions">Transaction limit</option>
+          <option value="maxAmountPerTransaction">Max amount per transaction</option>
+          <option value="maxTotalAmount">Total spending limit</option>
+          <option value="blockedMccs">Block merchant categories</option>
+        </select>
+
+        <div class="rule-form-row" *ngIf="ruleForm.value.type !== 'blockedMccs'">
+          <input type="number" class="fintech-input" formControlName="value"
+                 [step]="ruleForm.value.type === 'maxTransactions' ? '1' : '0.01'"
+                 [placeholder]="ruleForm.value.type === 'maxTransactions' ? 'Count' : 'Amount (e.g. 15.00)'" />
+          <button mat-flat-button class="fintech-btn primary" type="submit"
+                  [disabled]="ruleForm.invalid || isAddingRule">
+            <mat-spinner *ngIf="isAddingRule" diameter="20"></mat-spinner>
+            <span *ngIf="!isAddingRule">Add</span>
+          </button>
+        </div>
+
+        <div class="mcc-form-section" *ngIf="ruleForm.value.type === 'blockedMccs'">
+          <div class="mcc-search-container">
+            <mat-icon class="search-icon">search</mat-icon>
+            <input type="text"
+                   class="fintech-input mcc-search"
+                   placeholder="Search merchant categories..."
+                   [formControl]="mccSearchControl"
+                   [matAutocomplete]="mccAuto" />
+            <mat-autocomplete #mccAuto="matAutocomplete" (optionSelected)="addMccToRule($event)">
+              <mat-option *ngFor="let mcc of filteredMccs" [value]="mcc">
+                <span class="mcc-option" [class.risky]="mcc.risky">
+                  <span class="mcc-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+                  <span class="mcc-label">{{ mcc.label }}</span>
+                  <span class="risky-badge" *ngIf="mcc.risky">⚠ Risk</span>
+                </span>
+              </mat-option>
+            </mat-autocomplete>
+          </div>
+
+          <div class="selected-mccs-panel" *ngIf="selectedMccsForRule.length > 0">
+            <div class="mcc-chip" *ngFor="let mcc of selectedMccsForRule" [class.risky]="mcc.risky">
+              <span class="chip-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+              <span class="chip-label">{{ mcc.label }}</span>
+              <span class="risky-indicator" *ngIf="mcc.risky">⚠</span>
+              <button type="button" class="chip-remove" (click)="removeMccFromRule(mcc)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <button mat-flat-button class="fintech-btn primary full-width mcc-add-btn" type="submit"
+                  [disabled]="selectedMccsForRule.length === 0 || isAddingRule">
+            <mat-spinner *ngIf="isAddingRule" diameter="20"></mat-spinner>
+            <span *ngIf="!isAddingRule">Add MCC Block Rule</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reveal Loading Overlay -->
+  <div class="reveal-overlay" *ngIf="isRevealing">
+    <div class="reveal-content">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Securely revealing card details...</p>
+    </div>
+  </div>
+</div>

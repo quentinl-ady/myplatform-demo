@@ -1,0 +1,54 @@
+<div class="fintech-wrapper">
+
+  <div class="header-section">
+    <h2>Trusted Devices</h2>
+    <p>Manage the devices you use to securely approve transactions.</p>
+  </div>
+
+  <mat-card class="action-card">
+    <div class="action-content">
+      <div class="action-text">
+        <h3>Add this device</h3>
+        <p>Register the device you are currently using to enable SCA.</p>
+      </div>
+      <button mat-flat-button class="fintech-btn primary" (click)="registerDevice()" [disabled]="loading()">
+        <span *ngIf="!loading()">Register</span>
+        <mat-spinner *ngIf="loading()" diameter="20" color="accent"></mat-spinner>
+      </button>
+    </div>
+  </mat-card>
+
+  <div class="device-list" *ngIf="devices().length > 0">
+    <h3 class="section-title">Your Devices</h3>
+
+    <mat-card *ngFor="let d of devices()" class="device-card">
+      <div class="device-info">
+        <div class="device-icon">
+          <mat-icon>devices</mat-icon>
+        </div>
+        <div class="device-details">
+          <h4>{{ d.name || 'Unnamed Device' }}</h4>
+          <span class="device-meta"><strong>Type:</strong> {{ d.type }}</span>
+          <span class="device-meta"><strong>ID:</strong> {{ d.id }}</span>
+          <span class="device-meta"><strong>Payment Instrument:</strong> {{ d.paymentInstrumentId }}</span>
+        </div>
+      </div>
+
+      <div class="device-actions">
+        <button mat-icon-button class="delete-btn" color="warn" (click)="deleteDevice(d)" [disabled]="deletingId() === d.id">
+          <mat-icon *ngIf="deletingId() !== d.id">delete_outline</mat-icon>
+          <mat-spinner *ngIf="deletingId() === d.id" diameter="20"></mat-spinner>
+        </button>
+      </div>
+    </mat-card>
+  </div>
+
+  <mat-card class="empty-state" *ngIf="!devices().length && !loading()">
+    <div class="empty-icon-wrapper">
+      <mat-icon>phonelink_off</mat-icon>
+    </div>
+    <h3>No devices found</h3>
+    <p>You haven't registered any devices yet. Register this one to get started.</p>
+  </mat-card>
+
+</div>

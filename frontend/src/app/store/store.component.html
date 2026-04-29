@@ -1,0 +1,182 @@
+<div class="fintech-wrapper">
+
+  <div class="header-section">
+    <h2>Stores Management</h2>
+    <p>Manage your physical or digital storefronts and configure their payment methods.</p>
+  </div>
+
+  <div class="stores-list-container" *ngIf="stores().length; else noStores">
+    <h3 class="section-title">Your Stores</h3>
+
+    <mat-card *ngFor="let s of stores()" class="store-card">
+      <div class="store-card-header">
+        <div class="store-title-area">
+          <div class="store-icon">
+            <mat-icon>storefront</mat-icon>
+          </div>
+          <div class="store-title-info">
+            <h4>{{ s.storeRef }}</h4>
+            <p class="store-location">{{ s.city }}, {{ s.country }}</p>
+          </div>
+        </div>
+        <div class="balance-info">
+          <span class="label">Balance Account</span>
+          <strong>{{ s.balanceAccountInfoCustomer.description }} ({{ s.balanceAccountInfoCustomer.currencyCode }})</strong>
+        </div>
+      </div>
+
+      <div class="store-card-body">
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">Address</span>
+            <span>{{ s.lineAdresse }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Phone</span>
+            <span>{{ s.phoneNumber }}</span>
+          </div>
+        </div>
+
+        <div class="pm-section">
+          <span class="label">Payment Methods</span>
+          <div class="pm-badges-container">
+            <span *ngFor="let pm of s.paymentMethods" class="pm-badge" [ngClass]="pm.verificationStatus">
+              {{ pm.type | titlecase }}
+              <span class="pm-status-icon">{{ getStatusIcon(pm.verificationStatus) }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </mat-card>
+  </div>
+  <ng-template #noStores>
+    <mat-card class="empty-state">
+      <div class="empty-icon-wrapper">
+        <mat-icon>store_mall_directory</mat-icon>
+      </div>
+      <h3>No stores found</h3>
+      <p>You haven't created any stores yet. Add your first store below to start processing payments.</p>
+    </mat-card>
+  </ng-template>
+
+  <mat-card class="add-store-card">
+    <h3 class="card-title">Add a New Store</h3>
+
+    <mat-vertical-stepper [linear]="true" #stepper class="fintech-stepper">
+
+      <mat-step [stepControl]="generalForm">
+        <form [formGroup]="generalForm">
+          <ng-template matStepLabel>General Information</ng-template>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Store Reference</label>
+              <input type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Paris-HQ" />
+            </div>
+
+            <div class="form-group">
+              <label>Country</label>
+              <select class="fintech-input" formControlName="country" (change)="onCountryChange($event)">
+                <option value="" disabled selected>Select a country</option>
+                <option value="FR">France</option>
+                <option value="UK">United Kingdom</option>
+                <option value="NL">Netherlands</option>
+                <option value="DE">Germany</option>
+                <option value="US">United States</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" class="fintech-input" formControlName="city" />
+            </div>
+
+            <div class="form-group">
+              <label>Postal Code</label>
+              <input type="text" class="fintech-input" formControlName="postalCode" />
+            </div>
+
+            <div class="form-group full-width-grid">
+              <label>Address Line 1</label>
+              <input type="text" class="fintech-input" formControlName="lineAdresse1" />
+            </div>
+
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="text" class="fintech-input" formControlName="phoneNumber" />
+            </div>
+
+            <div class="form-group">
+              <label>Balance Account</label>
+              <select class="fintech-input" formControlName="balanceAccountId">
+                <option value="" disabled selected>Select account</option>
+                <option *ngFor="let b of balanceAccounts()" [value]="b.balanceAccountId">
+                  {{ b.description }} ({{ b.currencyCode }})
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="stepper-actions">
+            <button mat-flat-button class="fintech-btn primary" matStepperNext [disabled]="generalForm.invalid">
+              Next Step
+            </button>
+          </div>
+        </form>
+      </mat-step>
+
+      <mat-step [stepControl]="activityForm">
+        <form [formGroup]="activityForm">
+          <ng-template matStepLabel>Business Activity</ng-template>
+
+          <div class="form-group">
+            <label>Business Activity Profiles</label>
+            <select multiple class="fintech-input multiple-select" formControlName="businessLineIds">
+              <option *ngFor="let bl of businessLines()" [value]="bl.id">
+                {{ getIndustryLabel(bl.industryCode) }} ({{ bl.salesChannels.join(', ') }})
+              </option>
+            </select>
+            <span class="helper-text">Hold Ctrl (or Cmd) to select multiple activities.</span>
+          </div>
+
+          <div class="stepper-actions split">
+            <button mat-stroked-button class="fintech-btn secondary" matStepperPrevious>Back</button>
+            <button mat-flat-button class="fintech-btn primary" matStepperNext [disabled]="activityForm.invalid">
+              Next Step
+            </button>
+          </div>
+        </form>
+      </mat-step>
+
+      <mat-step [stepControl]="paymentsForm">
+        <form [formGroup]="paymentsForm">
+          <ng-template matStepLabel>Payment Methods</ng-template>
+
+          <div class="form-group">
+            <label>Select accepted payment methods for this store</label>
+            <div class="checkbox-grid">
+              <div class="pm-checkbox-card" *ngFor="let p of PAYMENT_METHODS">
+                <mat-checkbox formControlName="{{ p.key }}" color="primary">
+                  <div class="pm-label-content">
+                    <strong>{{ p.label }}</strong>
+                    <span class="pm-fee">10% commission</span>
+                  </div>
+                </mat-checkbox>
+              </div>
+            </div>
+          </div>
+
+          <div class="stepper-actions split">
+            <button mat-stroked-button class="fintech-btn secondary" matStepperPrevious>Back</button>
+            <button mat-flat-button class="fintech-btn primary" (click)="submitCreate(stepper)" [disabled]="paymentsForm.invalid || isSubmitting">
+              <span *ngIf="!isSubmitting">Create Store</span>
+              <mat-spinner *ngIf="isSubmitting" diameter="20" color="accent"></mat-spinner>
+            </button>
+          </div>
+        </form>
+      </mat-step>
+
+    </mat-vertical-stepper>
+  </mat-card>
+
+</div>

@@ -1,0 +1,306 @@
+:host {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-border: #e5e5e5;
+  --fintech-radius: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.fintech-wrapper {
+  max-width: 720px;
+  margin: 40px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Header */
+.header-section {
+  text-align: left;
+}
+.header-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+.header-section p {
+  color: var(--fintech-text-secondary);
+  font-size: 15px;
+  margin: 0;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fintech-text);
+  margin: 0 0 16px 0;
+}
+
+mat-card {
+  background: var(--fintech-surface);
+  border-radius: var(--fintech-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+  padding: 24px;
+}
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: var(--fintech-text);
+}
+
+/* Store Cards */
+.stores-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.store-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.store-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--fintech-border);
+  padding-bottom: 16px;
+}
+.store-title-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.store-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--fintech-bg);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fintech-text);
+}
+.store-title-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.store-location {
+  margin: 0;
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+}
+.balance-info {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+}
+.balance-info .label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--fintech-text-secondary);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.store-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.info-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+.info-item .label {
+  color: var(--fintech-text-secondary);
+  margin-bottom: 2px;
+}
+
+.pm-section .label {
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
+  display: block;
+  margin-bottom: 8px;
+}
+.pm-badges-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--fintech-bg);
+  color: var(--fintech-text);
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--fintech-border);
+}
+.pm-status-icon {
+  font-size: 10px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.empty-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  background: var(--fintech-bg);
+  color: var(--fintech-text-secondary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.empty-state h3 { margin: 0 0 8px 0; font-size: 18px; font-weight: 600; }
+.empty-state p { margin: 0; font-size: 14px; color: var(--fintech-text-secondary); max-width: 300px; }
+
+/* Forms */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.full-width-grid {
+  grid-column: 1 / -1;
+}
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fintech-text-secondary);
+  margin-bottom: 8px;
+}
+.fintech-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 10px;
+  font-size: 15px;
+  box-sizing: border-box;
+  background: var(--fintech-surface);
+  transition: border-color 0.2s;
+}
+select.fintech-input {
+  appearance: none;
+}
+.fintech-input.multiple-select {
+  height: 120px;
+  padding: 8px;
+}
+.fintech-input.multiple-select option {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 2px;
+}
+.fintech-input:focus {
+  outline: none;
+  border-color: var(--fintech-primary);
+}
+.helper-text {
+  font-size: 11px;
+  color: var(--fintech-text-secondary);
+  margin-top: 6px;
+  display: block;
+}
+
+/* Checkboxes grid */
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+.pm-checkbox-card {
+  border: 1px solid var(--fintech-border);
+  border-radius: 10px;
+  padding: 12px;
+  transition: background 0.2s;
+}
+.pm-checkbox-card:hover {
+  background: var(--fintech-bg);
+}
+.pm-label-content {
+  display: flex;
+  flex-direction: column;
+  margin-left: 8px;
+}
+.pm-label-content strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.pm-fee {
+  font-size: 11px;
+  color: var(--fintech-text-secondary);
+}
+
+/* Stepper & Buttons */
+::ng-deep .fintech-stepper .mat-step-header {
+  border-radius: 8px;
+}
+.stepper-actions {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--fintech-border);
+}
+.stepper-actions.split {
+  display: flex;
+  justify-content: space-between;
+}
+
+.fintech-btn {
+  border-radius: 24px !important;
+  padding: 8px 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.fintech-btn.primary {
+  background-color: var(--fintech-primary) !important;
+  color: white !important;
+}
+.fintech-btn.secondary {
+  border-color: var(--fintech-border) !important;
+  color: var(--fintech-text) !important;
+}
+
+@media (max-width: 600px) {
+  .form-grid, .checkbox-grid, .info-grid {
+    grid-template-columns: 1fr;
+  }
+  .store-card-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .balance-info {
+    text-align: left;
+  }
+}

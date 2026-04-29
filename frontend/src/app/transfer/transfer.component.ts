@@ -2,27 +2,21 @@ import { Component, OnInit, OnDestroy, inject, NgZone, ChangeDetectorRef } from 
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MaterialModule } from '../material.module';
 
 import { Subject, Subscription, combineLatest, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter } from 'rxjs/operators';
 
 import ScaWebauthn from '@adyen/bpscaweb';
 import {
-  MyPlatformService,
   InitiateTransferRequest,
   InitiateTransferResponse,
   BankAccountInformationResponse,
   VerifyCounterpartyNameRequest,
   CounterpartyVerificationResponse
-} from "../my-platform-service";
+} from "../models";
+import { AccountService, TransferService } from "../services";
 
 @Component({
   selector: 'app-transfer',
@@ -30,330 +24,16 @@ import {
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatSnackBarModule,
-    MatButtonModule,
-    MatCardModule,
-    MatIconModule,
-    MatSelectModule,
-    MatInputModule,
-    MatFormFieldModule,
-    MatProgressSpinnerModule
+    MaterialModule
   ],
-  template: `
-    <div class="fintech-wrapper">
-
-      <mat-card class="account-card" *ngIf="accountInfo">
-        <div class="account-header">
-          <p class="account-label">Available Balance</p>
-          <h1 class="account-balance">
-            {{ (accountInfo.amount / 100) | number:'1.2-2' }} <span class="currency">{{ accountInfo.currency }}</span>
-          </h1>
-          <p class="account-details">{{ accountInfo.description }} • {{ accountInfo.bankAccountNumber }}</p>
-        </div>
-        <div class="account-actions">
-          <button mat-flat-button class="fintech-btn secondary" (click)="downloadRib()" [disabled]="isDownloadingRib">
-            <mat-icon *ngIf="!isDownloadingRib">download</mat-icon>
-            <mat-spinner *ngIf="isDownloadingRib" diameter="20"></mat-spinner>
-            Download RIB
-          </button>
-        </div>
-      </mat-card>
-
-      <mat-card class="transfer-card success-state" *ngIf="isSuccess">
-        <div class="success-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-          </svg>
-        </div>
-        <h2>Transfer Successful</h2>
-        <p>Your money is on its way to the recipient.</p>
-        <button mat-flat-button class="fintech-btn primary" (click)="resetForm()">Send another transfer</button>
-      </mat-card>
-
-      <mat-card class="transfer-card" *ngIf="!isSuccess">
-        <h2>Send Money</h2>
-
-        <form [formGroup]="form" (ngSubmit)="submit()">
-
-          <div class="amount-wrapper">
-            <span class="currency-symbol">€</span>
-            <input type="number" class="amount-input" formControlName="amount" placeholder="0.00" step="0.01" />
-          </div>
-
-          <div class="form-grid">
-
-            <div class="form-group">
-              <label>Account Holder Name</label>
-              <input type="text" class="fintech-input" formControlName="accountHolderName" placeholder="e.g. John Doe / Acme Corp" />
-            </div>
-
-            <div class="form-group">
-              <label>Recipient Country</label>
-              <select class="fintech-input" formControlName="counterpartyCountry" (change)="onCountryChange($event)">
-                <option value="" disabled selected>Select a country</option>
-                <option value="FR">France</option>
-                <option value="UK">United Kingdom</option>
-                <option value="US">United States</option>
-                <option value="DE">Germany</option>
-                <option value="NL">Netherlands</option>
-              </select>
-            </div>
-
-            <div class="loading-format" *ngIf="isLoadingFormat">
-              <mat-spinner diameter="20"></mat-spinner>
-              <span>Loading banking requirements...</span>
-            </div>
-
-            <ng-container *ngIf="bankAccountFormat && !isLoadingFormat">
-
-              <div class="form-group" *ngIf="bankAccountFormat === 'iban'">
-                <label>Recipient IBAN</label>
-                <input type="text" class="fintech-input" formControlName="iban" placeholder="FR76 1234..." />
-              </div>
-
-              <ng-container *ngIf="bankAccountFormat === 'accountNumberRoutingNumber'">
-                <div class="form-group">
-                  <label>Account Number</label>
-                  <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 123456789" />
-                </div>
-                <div class="form-group">
-                  <label>Routing Number</label>
-                  <input type="text" class="fintech-input" formControlName="routingNumber" placeholder="e.g. 122105278" />
-                </div>
-              </ng-container>
-
-              <ng-container *ngIf="bankAccountFormat === 'accountNumberSortCode'">
-                <div class="form-group">
-                  <label>Account Number</label>
-                  <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 12345678" />
-                </div>
-                <div class="form-group">
-                  <label>Sort Code</label>
-                  <input type="text" class="fintech-input" formControlName="sortCode" placeholder="e.g. 20-00-00" />
-                </div>
-              </ng-container>
-
-              <div class="validation-status" *ngIf="isCheckingAccountFormat || isAccountFormatValid || accountFormatError">
-                <mat-spinner *ngIf="isCheckingAccountFormat" diameter="16"></mat-spinner>
-                <mat-icon *ngIf="isAccountFormatValid && !isCheckingAccountFormat" class="success-icon-small">check_circle</mat-icon>
-                <mat-icon *ngIf="accountFormatError && !isCheckingAccountFormat" class="error-icon-small">error</mat-icon>
-                <span [ngClass]="{'success-text': isAccountFormatValid, 'error-text': accountFormatError, 'pending-text': isCheckingAccountFormat}">
-                  {{ isCheckingAccountFormat ? 'Verifying account format...' : (isAccountFormatValid ? 'Valid account format' : accountFormatError) }}
-                </span>
-              </div>
-
-            </ng-container>
-
-            <div class="form-group">
-              <label>Transfer Type</label>
-              <select class="fintech-input" formControlName="transferType">
-                <option value="regular">Regular Transfer (1-2 days)</option>
-                <option value="instant">Instant Transfer (Immediate)</option>
-              </select>
-            </div>
-
-            <div class="fee-warning" *ngIf="form.get('transferType')?.value === 'instant'">
-              <mat-icon class="fee-icon">info</mat-icon>
-              <span>A 1% additional commission will be applied and deducted from your account at the end of the month.</span>
-            </div>
-
-            <div class="form-group">
-              <label>Reference</label>
-              <input type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Rent payment" />
-              <span class="hint-text">Note: You can use "noNameMatch" or "partialNameMatch" here to test different verification use-cases.</span>
-            </div>
-          </div>
-
-          <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                  [disabled]="form.invalid || isProcessing || isLoadingFormat || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
-            <span *ngIf="!isProcessing">Review Transfer</span>
-            <mat-spinner *ngIf="isProcessing" diameter="24" color="accent"></mat-spinner>
-          </button>
-        </form>
-      </mat-card>
-
-      <div class="modal-overlay" *ngIf="showExactMatchModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3 style="color: #4caf50;">Name Verified Successfully</h3>
-          </div>
-          <div class="modal-body" style="margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-              <mat-icon style="color: #4caf50;">check_circle</mat-icon>
-              <span>The beneficiary name perfectly matches the account details.</span>
-            </div>
-            <p>Name confirmed: <strong>{{ form.value.accountHolderName }}</strong></p>
-          </div>
-          <div class="actions">
-            <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()" [disabled]="isProcessing">Modify</button>
-            <button mat-flat-button class="fintech-btn primary" (click)="proceedAfterExactMatch()" [disabled]="isProcessing">Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-overlay" *ngIf="showPartialMatchModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3 style="color: var(--fintech-warning);">Name Mismatch Warning</h3>
-          </div>
-          <div class="modal-body" style="margin-bottom: 24px;">
-            <p>The account name is slightly different from what you entered.</p>
-            <p>You entered: <br><strong>{{ form.value.accountHolderName }}</strong></p>
-            <p>Bank verification found: <br><strong style="color: var(--fintech-primary);">{{ suggestedName }}</strong></p>
-            <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Would you like to use the name provided by the bank, modify your transfer, or cancel?</p>
-          </div>
-          <div class="actions" style="flex-direction: column; gap: 8px;">
-            <button mat-flat-button class="fintech-btn primary" (click)="acceptSuggestedName()" [disabled]="isProcessing">Use Found Name & Continue</button>
-            <div style="display: flex; gap: 8px; width: 100%;">
-              <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()" [disabled]="isProcessing">Modify</button>
-              <button mat-stroked-button class="fintech-btn secondary" (click)="cancelEntireTransfer()" [disabled]="isProcessing">Cancel</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-overlay" *ngIf="showNoMatchModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3 style="color: #f44336;">Warning: Invalid Name</h3>
-          </div>
-          <div class="modal-body" style="margin-bottom: 24px;">
-            <p>The name on the destination account <strong>does not match</strong> the beneficiary name you provided.</p>
-            <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Sending money to an incorrect beneficiary can result in loss of funds. Do you still want to proceed at your own risk?</p>
-          </div>
-          <div class="actions" style="flex-direction: column; gap: 8px;">
-             <button mat-flat-button style="background-color: #f44336; color: white;" class="fintech-btn" (click)="proceedWithRisk()" [disabled]="isProcessing">Continue at my own risk</button>
-             <div style="display: flex; gap: 8px; width: 100%;">
-              <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()" [disabled]="isProcessing">Modify</button>
-              <button mat-stroked-button class="fintech-btn secondary" (click)="cancelEntireTransfer()" [disabled]="isProcessing">Cancel</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-overlay" *ngIf="showModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Confirm transfer</h3>
-          </div>
-
-          <div class="modal-body">
-            <div class="summary-row">
-              <span>Amount</span>
-              <strong>{{ (transferResponse?.amount || 0) / 100 | number:'1.2-2' }} {{ accountInfo?.currency }}</strong>
-            </div>
-            <div class="summary-row">
-              <span>Recipient Name</span>
-              <strong>{{ form.value.accountHolderName }}</strong>
-            </div>
-            <div class="summary-row">
-              <span>Country</span>
-              <strong>{{ transferResponse?.counterpartyCountry }}</strong>
-            </div>
-            <div class="summary-row" *ngIf="transferResponse?.iban">
-              <span>IBAN</span>
-              <strong>{{ transferResponse?.iban }}</strong>
-            </div>
-            <div class="summary-row" *ngIf="transferResponse?.accountNumber">
-              <span>Account No.</span>
-              <strong>{{ transferResponse?.accountNumber }}</strong>
-            </div>
-            <div class="summary-row" *ngIf="transferResponse?.sortCode">
-              <span>Sort Code</span>
-              <strong>{{ transferResponse?.sortCode }}</strong>
-            </div>
-            <div class="summary-row" *ngIf="transferResponse?.routingNumber">
-              <span>Routing No.</span>
-              <strong>{{ transferResponse?.routingNumber }}</strong>
-            </div>
-            <div class="summary-row">
-              <span>Type</span>
-              <strong style="text-transform: capitalize;">{{ form.value.transferType }}</strong>
-            </div>
-            <div class="summary-row" *ngIf="form.value.transferType === 'instant'">
-              <span>Fee</span>
-              <strong style="color: var(--fintech-warning);">1% (Billed end of month)</strong>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button mat-stroked-button class="fintech-btn secondary" (click)="decline()" [disabled]="isProcessing">Cancel</button>
-            <button mat-flat-button class="fintech-btn primary" (click)="approve()" [disabled]="isProcessing">
-              <span *ngIf="!isProcessing">Approve</span>
-              <mat-spinner *ngIf="isProcessing" diameter="20" color="accent"></mat-spinner>
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  `,
-  styles: [`
-    :host {
-      --fintech-primary: #000000;
-      --fintech-bg: #f5f6f8;
-      --fintech-surface: #ffffff;
-      --fintech-text: #1a1a1a;
-      --fintech-text-secondary: #737373;
-      --fintech-border: #e5e5e5;
-      --fintech-radius: 16px;
-      --fintech-warning: #f57c00;
-      --fintech-warning-bg: #fff3e0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    .fintech-wrapper { max-width: 480px; margin: 40px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 24px; }
-    mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radius); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important; padding: 24px; }
-    .account-header { text-align: center; margin-bottom: 24px; }
-    .account-label { color: var(--fintech-text-secondary); font-size: 14px; font-weight: 500; margin: 0 0 8px 0; }
-    .account-balance { font-size: 40px; font-weight: 700; color: var(--fintech-text); margin: 0 0 8px 0; letter-spacing: -1px; }
-    .account-balance .currency { font-size: 24px; color: var(--fintech-text-secondary); }
-    .account-details { font-size: 13px; color: var(--fintech-text-secondary); margin: 0; }
-    .account-actions { display: flex; justify-content: center; }
-    .transfer-card h2 { font-size: 20px; font-weight: 600; margin: 0 0 24px 0; color: var(--fintech-text); }
-    .amount-wrapper { display: flex; align-items: center; justify-content: center; background: var(--fintech-bg); border-radius: 12px; padding: 16px; margin-bottom: 24px; }
-    .currency-symbol { font-size: 32px; font-weight: 600; color: var(--fintech-text); margin-right: 8px; }
-    .amount-input { background: transparent; border: none; font-size: 40px; font-weight: 700; color: var(--fintech-text); width: 100%; outline: none; }
-    .amount-input::placeholder { color: #ccc; }
-    .form-grid { display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px; }
-    .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--fintech-text-secondary); margin-bottom: 6px; }
-    .fintech-input { width: 100%; padding: 14px 16px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface); transition: border-color 0.2s; }
-    .fintech-input:focus { outline: none; border-color: var(--fintech-primary); }
-    .fee-warning { display: flex; align-items: flex-start; gap: 12px; background-color: var(--fintech-warning-bg); border-left: 4px solid var(--fintech-warning); padding: 12px 16px; border-radius: 8px; font-size: 13px; line-height: 1.4; color: #3e2723; }
-    .fee-icon { color: var(--fintech-warning); font-size: 20px; width: 20px; height: 20px; }
-    .loading-format { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fintech-text-secondary); padding: 8px 0; }
-    .validation-status { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; padding: 4px 8px; margin-top: -4px; border-radius: 8px; }
-    .success-icon-small { color: #4caf50; font-size: 18px; width: 18px; height: 18px; }
-    .error-icon-small { color: #f44336; font-size: 18px; width: 18px; height: 18px; }
-    .success-text { color: #4caf50; }
-    .error-text { color: #f44336; }
-    .pending-text { color: var(--fintech-text-secondary); }
-    .hint-text { font-size: 12px; color: var(--fintech-text-secondary); margin-top: 6px; display: block; font-style: italic; }
-    .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
-    .fintech-btn:disabled { background-color: var(--fintech-border) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; opacity: 0.7; box-shadow: none !important; }
-    .fintech-btn.secondary { background-color: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
-    .fintech-btn.full-width { width: 100%; padding: 12px 24px !important; font-size: 16px !important; }
-    .success-state { text-align: center; padding: 48px 24px; }
-    .success-icon { width: 64px; height: 64px; background: #e8f5e9; color: #4caf50; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; }
-    .success-icon svg { width: 32px; height: 32px; }
-    .success-state h2 { margin-bottom: 8px; }
-    .success-state p { color: var(--fintech-text-secondary); margin-bottom: 32px; }
-    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-    .modal-content { background: var(--fintech-surface); padding: 32px; border-radius: 20px; width: 100%; max-width: 360px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
-    .modal-header h3 { margin: 0 0 24px 0; font-size: 20px; font-weight: 600; }
-    .summary-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--fintech-border); font-size: 15px; }
-    .summary-row:last-child { border-bottom: none; margin-bottom: 24px; }
-    .summary-row span { color: var(--fintech-text-secondary); }
-    .actions { display: flex; gap: 12px; }
-    .actions button { flex: 1; }
-  `]
+  templateUrl: './transfer.component.html',
+  styleUrl: './transfer.component.css'
 })
 export class TransferComponent implements OnInit, OnDestroy {
 
   private route = inject(ActivatedRoute);
-  private authService = inject(MyPlatformService);
+  private accountService = inject(AccountService);
+  private transferService = inject(TransferService);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
   private ngZone = inject(NgZone);
@@ -410,7 +90,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   }
 
   fetchAccountInformation() {
-    this.authService.getBankAccountInformation(Number(this.userId)).subscribe({
+    this.accountService.getBankAccountInformation(Number(this.userId)).subscribe({
       next: (info) => {
         this.accountInfo = info;
         this.cdr.detectChanges();
@@ -431,7 +111,7 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.bankAccountFormat = null;
     this.clearDynamicValidators();
 
-    this.authService.getBankAccountFormat(countryCode).subscribe({
+    this.transferService.getBankAccountFormat(countryCode).subscribe({
       next: (res) => {
         this.bankAccountFormat = res.bankAccountFormat as any;
         this.applyDynamicValidators();
@@ -519,7 +199,7 @@ export class TransferComponent implements OnInit, OnDestroy {
             routingNumber: this.form.value.routingNumber || '',
             sortCode: this.form.value.sortCode || ''
           };
-          return this.authService.isBankAccountValid(req).pipe(
+          return this.transferService.isBankAccountValid(req).pipe(
             catchError(() => of({ isBankAccountValid: 'false' }))
           );
         })
@@ -538,7 +218,7 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   downloadRib() {
     this.isDownloadingRib = true;
-    this.authService.getRibPdf(Number(this.userId)).subscribe({
+    this.accountService.getRibPdf(Number(this.userId)).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -601,7 +281,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       counterpartyCountry: country || ''
     };
 
-    this.authService.verifyCounterpartyName(verifyPayload).subscribe({
+    this.transferService.verifyCounterpartyName(verifyPayload).subscribe({
       next: (res) => {
         this.ngZone.run(() => {
           this.isProcessing = false;
@@ -640,7 +320,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       const sdkOutput = await scaWebauthn.checkAvailability();
       const request = this.buildTransferRequest(String(sdkOutput));
 
-      this.authService.initiateTransfer(request).subscribe({
+      this.transferService.initiateTransfer(request).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
             if (!res.authParam1) {
@@ -715,7 +395,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       const sdkOutput = await scaWebauthn.authenticate(sdkInput);
       const request = this.buildTransferRequest(String(sdkOutput));
 
-      this.authService.finalizeTransfer(request).subscribe({
+      this.transferService.finalizeTransfer(request).subscribe({
         next: () => {
           this.ngZone.run(() => {
             this.isSuccess = true;

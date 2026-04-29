@@ -1,10 +1,11 @@
-import {Component, ElementRef, ViewChild} from '@angular/core';
+import {Component} from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import {MaterialModule} from '../material.module';
 import {CommonModule} from "@angular/common";
 import { AdyenPlatformExperience, ReportsOverview } from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
-import {MyPlatformService} from "../my-platform-service";
+import {SessionService} from "../services";
 
 @Component({
     selector: 'app-report',
@@ -14,14 +15,14 @@ import {MyPlatformService} from "../my-platform-service";
       <div id="report-overview-container"></div>
     </div>
   `,
-    imports: [MatSnackBarModule, CommonModule]
+    imports: [CommonModule, MaterialModule]
 })
 export class ReportComponent {
 
     userId = '';
 
     constructor(private route: ActivatedRoute,
-                private authService: MyPlatformService,
+                private sessionService: SessionService,
                 private matSnackBar: MatSnackBar) {
     }
 
@@ -37,7 +38,7 @@ export class ReportComponent {
     private async initAdyenComponents() {
         const core = await AdyenPlatformExperience({
             onSessionCreate: async () => {
-                const sessionToken = await this.authService.getReportInformation(this.userId).toPromise();
+                const sessionToken = await this.sessionService.getReportInformation(this.userId).toPromise();
                 if (!sessionToken) {
                     throw new Error('Impossible to get report information');
                 }

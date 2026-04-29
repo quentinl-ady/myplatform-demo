@@ -1,0 +1,178 @@
+:host {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-border: #e5e5e5;
+  --fintech-radius: 16px;
+  --fintech-danger: #d32f2f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.fintech-wrapper {
+  max-width: 540px;
+  margin: 40px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header-section {
+  text-align: left;
+  margin-bottom: 8px;
+}
+.header-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+.header-section p {
+  color: var(--fintech-text-secondary);
+  font-size: 15px;
+  margin: 0;
+}
+
+mat-card {
+  background: var(--fintech-surface);
+  border-radius: var(--fintech-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+  padding: 24px;
+}
+
+/* Action Card */
+.action-card {
+  padding: 20px 24px;
+}
+.action-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.action-text h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--fintech-text);
+}
+.action-text p {
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+  margin: 0;
+}
+
+/* Buttons */
+.fintech-btn {
+  border-radius: 24px !important;
+  padding: 8px 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fintech-btn.primary {
+  background-color: var(--fintech-primary) !important;
+  color: white !important;
+}
+
+/* Device List */
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fintech-text);
+  margin: 32px 0 16px 0;
+}
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.device-card {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+}
+.device-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.device-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--fintech-bg);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fintech-text);
+  flex-shrink: 0;
+}
+.device-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.device-details h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fintech-text);
+}
+.device-meta {
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
+}
+.delete-btn {
+  color: var(--fintech-text-secondary) !important;
+  transition: color 0.2s ease;
+}
+.delete-btn:hover {
+  color: var(--fintech-danger) !important;
+  background: rgba(211, 47, 47, 0.04);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 16px;
+}
+.empty-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  background: var(--fintech-bg);
+  color: var(--fintech-text-secondary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.empty-icon-wrapper mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--fintech-text);
+}
+.empty-state p {
+  font-size: 14px;
+  color: var(--fintech-text-secondary);
+  margin: 0;
+  max-width: 280px;
+}

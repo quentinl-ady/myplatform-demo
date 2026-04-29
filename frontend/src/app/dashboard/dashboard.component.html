@@ -1,0 +1,195 @@
+<div class="fintech-wrapper">
+
+  <div class="header-section">
+    <h2>Onboarding & Profile</h2>
+    <p>Complete your business profile to unlock all platform features.</p>
+  </div>
+
+  <mat-card class="action-card">
+    <div class="action-row">
+      <div class="action-text">
+        <h3>Complete your profile</h3>
+        <p>Access the secure hosted environment to fill out your details.</p>
+      </div>
+      <button mat-flat-button class="fintech-btn primary" (click)="openHostedOnboarding()">
+        Go to Onboarding
+      </button>
+    </div>
+
+    <hr class="divider">
+
+    <div class="action-row">
+      <div class="action-text">
+        <h3>Refresh Status</h3>
+        <p>Check if your account features have been validated.</p>
+      </div>
+      <button mat-flat-button class="fintech-btn secondary" (click)="checkOnboarding()" [disabled]="loading()">
+        <mat-icon *ngIf="!loading()">refresh</mat-icon>
+        <mat-spinner *ngIf="loading()" diameter="20"></mat-spinner>
+        <span *ngIf="!loading()">Check Status</span>
+      </button>
+    </div>
+  </mat-card>
+
+  <mat-card class="status-card" *ngIf="status() as s">
+    <div class="success-state" *ngIf="allValid(s); else details">
+      <div class="success-icon">
+        <mat-icon>check_circle</mat-icon>
+      </div>
+      <h3>All set!</h3>
+      <p>All services are validated. You can now use the platform without restrictions.</p>
+    </div>
+
+    <ng-template #details>
+      <h3 class="card-title">Services Status</h3>
+      <div class="status-list">
+        <div class="status-item">
+          <span class="status-label">Acquiring</span>
+          <span class="status-value">{{ getMessage(s.acquiringStatus) }}</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Payout</span>
+          <span class="status-value">{{ getMessage(s.payoutStatus) }}</span>
+        </div>
+        <div class="status-item" *ngIf="user()?.capital">
+          <span class="status-label">Business Loans</span>
+          <span class="status-value">{{ getMessage(s.capitalStatus) }}</span>
+        </div>
+        <div class="status-item" *ngIf="user()?.bank">
+          <span class="status-label">Bank Account</span>
+          <span class="status-value">{{ getMessage(s.bankingStatus) }}</span>
+        </div>
+        <div class="status-item" *ngIf="user()?.issuing">
+          <span class="status-label">Issuing</span>
+          <span class="status-value">{{ getMessage(s.issuingStatus) }}</span>
+        </div>
+      </div>
+    </ng-template>
+  </mat-card>
+
+  <!-- Business Bank Account -->
+  <mat-card class="banking-card" *ngIf="bankStatus() as bs">
+    <div class="banking-header">
+      <div class="banking-title-row">
+        <mat-icon>account_balance</mat-icon>
+        <h3>Business Bank Account</h3>
+      </div>
+      <p class="banking-subtitle">Your dedicated business bank account.</p>
+    </div>
+
+    <!-- STATE 1: Account already created -->
+    <div class="bank-active" *ngIf="bs.bankAccountCreated">
+      <div class="bank-info-card">
+        <div class="bank-info-row">
+          <span class="bank-label">Account Number</span>
+          <span class="bank-value mono">{{ bs.bankAccountNumber }}</span>
+        </div>
+        <div class="bank-info-row" *ngIf="bs.bankAccountId">
+          <span class="bank-label">Payment Instrument ID</span>
+          <span class="bank-value mono small">{{ bs.bankAccountId }}</span>
+        </div>
+        <div class="bank-status-badge">
+          <mat-icon>check_circle</mat-icon>
+          <span>Account active</span>
+        </div>
+      </div>
+      <button class="bank-cta-btn" (click)="goToTransfers()">
+        <mat-icon>send</mat-icon>
+        <span>See my account</span>
+        <mat-icon class="cta-arrow">arrow_forward</mat-icon>
+      </button>
+    </div>
+
+    <!-- STATE 2: Not created yet -->
+    <div class="bank-provision" *ngIf="!bs.bankAccountCreated">
+      <div class="bank-provision-visual">
+        <div class="bank-provision-icon" [class.locked]="!bs.bankingAllowed">
+          <mat-icon>{{ bs.bankingAllowed ? 'account_balance_wallet' : 'lock' }}</mat-icon>
+        </div>
+        <h4>{{ bs.bankingAllowed ? 'Ready to create' : 'Not available yet' }}</h4>
+        <p>{{ bs.bankingAllowed ? 'No bank account has been created yet.' : 'Banking capability is not yet allowed. Complete your onboarding and check your status.' }}</p>
+      </div>
+      <button class="bank-create-btn" [class.disabled]="!bs.bankingAllowed || creatingBankAccount()"
+              (click)="bs.bankingAllowed && !creatingBankAccount() && createBankAccount()">
+        <mat-spinner *ngIf="creatingBankAccount()" diameter="18" color="accent"></mat-spinner>
+        <mat-icon *ngIf="!creatingBankAccount()">{{ bs.bankingAllowed ? 'add' : 'lock_outline' }}</mat-icon>
+        <span *ngIf="!creatingBankAccount()">Create Bank Account</span>
+      </button>
+    </div>
+  </mat-card>
+
+  <mat-card class="business-card" *ngIf="user()?.activityReason === 'embeddedPayment'">
+    <h3 class="card-title">Business Activity</h3>
+
+    <div class="business-lines-container" *ngIf="businessLines().length; else noBusinessLines">
+      <div *ngFor="let bl of businessLines()" class="business-line-item">
+        <div class="bl-header">
+          <span class="bl-industry">{{ getIndustryLabel(bl.industryCode) }}</span>
+          <span class="bl-id">ID: {{ bl.id }}</span>
+        </div>
+        <div class="bl-channels">
+          <span *ngFor="let ch of bl.salesChannels" class="channel-pill">{{ ch }}</span>
+        </div>
+      </div>
+    </div>
+    <ng-template #noBusinessLines>
+      <p class="empty-text">No business activity registered yet.</p>
+    </ng-template>
+
+    <hr class="divider">
+
+    <form [formGroup]="businessForm" (ngSubmit)="addBusinessLine()" class="business-form">
+      <h4 class="form-title">Add new activity</h4>
+
+      <div class="form-group">
+        <label>Industry</label>
+        <select class="fintech-input" formControlName="industryCode">
+          <option value="" disabled selected>Select an industry...</option>
+          <option *ngFor="let ind of INDUSTRY_CODES" [value]="ind.code">
+            {{ ind.label }} ({{ ind.code }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Sales Channels</label>
+        <div class="checkbox-group">
+          <mat-checkbox formControlName="pos" color="primary">POS</mat-checkbox>
+          <mat-checkbox formControlName="eCommerce" color="primary">eCommerce</mat-checkbox>
+          <mat-checkbox formControlName="payByLink" color="primary">Pay By Link</mat-checkbox>
+        </div>
+      </div>
+
+      <button mat-flat-button class="fintech-btn primary full-width" type="submit" [disabled]="businessForm.invalid || submitting">
+        <span *ngIf="!submitting">Add Business Activity</span>
+        <mat-spinner *ngIf="submitting" diameter="20" color="accent"></mat-spinner>
+      </button>
+    </form>
+  </mat-card>
+
+  <mat-card class="bank-account-card" *ngIf="user()?.legalEntityId">
+    <div class="bank-account-header">
+      <div class="bank-account-title">
+        <mat-icon>account_balance</mat-icon>
+        <h3>External Bank Accounts</h3>
+      </div>
+      <p class="bank-account-subtitle">Manage bank accounts linked to your legal entity for payouts.</p>
+    </div>
+
+    <div id="ti-management-container"></div>
+  </mat-card>
+
+  <mat-card class="dev-tool-card">
+    <div class="dev-tool-content">
+      <div class="dev-tool-text">
+        <h4><mat-icon>science</mat-icon> Developer Tool</h4>
+        <p>Bypass the real KYC process for testing purposes.</p>
+      </div>
+      <button mat-flat-button class="fintech-btn warn-outline" (click)="validateKyc(userId)" [disabled]="loadingKyc()">
+        <span *ngIf="!loadingKyc()">Validate KYC</span>
+        <mat-spinner *ngIf="loadingKyc()" diameter="20" color="warn"></mat-spinner>
+      </button>
+    </div>
+  </mat-card>
+
+</div>

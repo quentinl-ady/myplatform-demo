@@ -1,0 +1,227 @@
+<div class="fintech-wrapper">
+  <div class="page-header">
+    <h1>Create Virtual Card</h1>
+    <p class="subtitle">Issue a new virtual card for online payments</p>
+  </div>
+
+  <mat-card class="create-card-form" *ngIf="!isSuccess">
+    <form [formGroup]="form" (ngSubmit)="submit()">
+
+      <div class="card-preview" [class.visa]="form.value.brand === 'visa'" [class.mc]="form.value.brand === 'mc'">
+        <div class="card-brand-logo">
+          <svg *ngIf="form.value.brand === 'visa'" viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+            <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#fff"/>
+          </svg>
+          <svg *ngIf="form.value.brand === 'mc'" viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+            <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+            <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+          </svg>
+        </div>
+        <div class="card-number">•••• •••• •••• ••••</div>
+        <div class="card-details-row">
+          <div class="card-holder">
+            <span class="label">CARDHOLDER</span>
+            <span class="value">{{ form.value.cardholderName || 'YOUR NAME' }}</span>
+          </div>
+          <div class="card-expiry">
+            <span class="label">EXPIRES</span>
+            <span class="value">••/••</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Card Information</h3>
+
+        <div class="form-group">
+          <label>Cardholder Name</label>
+          <input type="text" class="fintech-input" formControlName="cardholderName"
+                 placeholder="Enter cardholder name" />
+        </div>
+
+        <div class="form-group">
+          <label>Card Network</label>
+          <div class="brand-selector">
+            <button type="button" class="brand-option"
+                    [class.selected]="form.value.brand === 'visa'"
+                    (click)="selectBrand('visa')">
+              <svg viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg">
+                <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#1a1f71"/>
+              </svg>
+              <span>Visa Debit</span>
+            </button>
+            <button type="button" class="brand-option"
+                    [class.selected]="form.value.brand === 'mc'"
+                    (click)="selectBrand('mc')">
+              <svg viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#eb001b"/>
+                <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
+                <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
+              </svg>
+              <span>Mastercard Debit</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-header">
+          <h3>Authentication</h3>
+          <span class="optional-badge">Optional</span>
+        </div>
+        <p class="section-description">Add email and phone for 3D Secure card authentication.</p>
+
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" class="fintech-input" formControlName="email"
+                 placeholder="cardholder@example.com" />
+          <span class="field-error" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
+            Please enter a valid email address
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number</label>
+          <div class="phone-input-row">
+            <select class="fintech-input phone-prefix-select" formControlName="phonePrefix">
+              <option *ngFor="let p of phonePrefixes" [value]="p.code">
+                {{ p.flag }} {{ p.code }} {{ p.country }}
+              </option>
+            </select>
+            <input type="tel" class="fintech-input phone-number-input" formControlName="phoneNumber"
+                   placeholder="6 11 22 33 44" />
+          </div>
+          <span class="field-error" *ngIf="form.get('phoneNumber')?.invalid && form.get('phoneNumber')?.touched">
+            Please enter a valid phone number (digits, spaces, dashes)
+          </span>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-header">
+          <h3>Transaction Rules</h3>
+          <span class="optional-badge">Optional</span>
+        </div>
+        <p class="section-description">Set spending limits and restrictions to control card usage. Rules can be added later.</p>
+
+        <!-- Spending Limits -->
+        <div class="rules-subsection">
+          <h4 class="subsection-title">
+            <mat-icon>account_balance_wallet</mat-icon>
+            Spending Limits
+          </h4>
+          <div class="rules-container" formArrayName="rules">
+            <div class="rule-item" *ngFor="let rule of rulesArray.controls; let i = index" [formGroupName]="i">
+              <div class="rule-type">
+                <select class="fintech-input" formControlName="type">
+                  <option value="maxTransactions">Transaction limit</option>
+                  <option value="maxAmountPerTransaction">Max amount per transaction</option>
+                  <option value="maxTotalAmount">Total spending limit</option>
+                </select>
+              </div>
+              <div class="rule-value">
+                <input type="number" class="fintech-input" formControlName="value"
+                       [step]="rule.value.type === 'maxTransactions' ? '1' : '0.01'"
+                       [placeholder]="rule.value.type === 'maxTransactions' ? 'Number of transactions' : 'Amount (e.g. 100.00)'" />
+                <span class="currency-hint" *ngIf="rule.value.type !== 'maxTransactions'">{{ user?.currencyCode }}</span>
+              </div>
+              <button type="button" class="remove-rule-btn" (click)="removeRule(i)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <button type="button" class="add-rule-btn" (click)="addRule()" [disabled]="rulesArray.length >= 3">
+            <mat-icon>add</mat-icon>
+            Add Spending Limit
+          </button>
+        </div>
+
+        <!-- Blocked Merchant Categories -->
+        <div class="rules-subsection mcc-subsection">
+          <h4 class="subsection-title">
+            <mat-icon>block</mat-icon>
+            Blocked Merchant Categories (MCC)
+          </h4>
+
+          <div class="mcc-selector">
+            <div class="mcc-search-container">
+              <mat-icon class="search-icon">search</mat-icon>
+              <input type="text"
+                     class="fintech-input mcc-search"
+                     placeholder="Search merchant categories to block..."
+                     [formControl]="mccSearchControl"
+                     [matAutocomplete]="mccAuto" />
+              <mat-autocomplete #mccAuto="matAutocomplete" (optionSelected)="addMcc($event)">
+                <mat-option *ngFor="let mcc of filteredMccs" [value]="mcc">
+                  <span class="mcc-option" [class.risky]="mcc.risky">
+                    <span class="mcc-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+                    <span class="mcc-label">{{ mcc.label }}</span>
+                    <span class="risky-badge" *ngIf="mcc.risky">⚠ Risk</span>
+                  </span>
+                </mat-option>
+              </mat-autocomplete>
+            </div>
+
+            <div class="selected-mccs" *ngIf="selectedMccs.length > 0">
+              <div class="mcc-chip" *ngFor="let mcc of selectedMccs" [class.risky]="mcc.risky">
+                <span class="chip-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
+                <span class="chip-label">{{ mcc.label }}</span>
+                <span class="risky-indicator" *ngIf="mcc.risky">⚠</span>
+                <button type="button" class="chip-remove" (click)="removeMcc(mcc)">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <p class="mcc-hint" *ngIf="selectedMccs.length === 0">
+              <mat-icon>info</mat-icon>
+              No merchant categories blocked. The card can be used everywhere.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button mat-flat-button class="fintech-btn primary full-width" type="submit"
+              [disabled]="form.invalid || isProcessing">
+        <span *ngIf="!isProcessing">Create Card</span>
+        <mat-spinner *ngIf="isProcessing" diameter="24" color="accent"></mat-spinner>
+      </button>
+    </form>
+  </mat-card>
+
+  <mat-card class="success-card" *ngIf="isSuccess">
+    <div class="success-icon">
+      <mat-icon>check_circle</mat-icon>
+    </div>
+    <h2>Card Created Successfully!</h2>
+    <p>Your new virtual card is ready to use.</p>
+
+    <div class="success-details">
+      <div class="detail-row">
+        <span class="label">Card Number</span>
+        <span class="value">•••• •••• •••• {{ createdCard?.lastFour }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Cardholder</span>
+        <span class="value">{{ createdCard?.cardholderName }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="label">Network</span>
+        <span class="value brand-badge" [class.visa]="createdCard?.brand === 'visa'" [class.mc]="createdCard?.brand === 'mc'">
+          {{ createdCard?.brand === 'visa' ? 'Visa' : 'Mastercard' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="success-actions">
+      <button mat-stroked-button class="fintech-btn secondary" (click)="createAnother()">
+        Create Another
+      </button>
+      <button mat-flat-button class="fintech-btn primary" (click)="viewCards()">
+        View My Cards
+      </button>
+    </div>
+  </mat-card>
+</div>
