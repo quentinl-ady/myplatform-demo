@@ -24,7 +24,7 @@
             "styles": [
               "@angular/material/prebuilt-themes/deeppurple-amber.css",
               "node_modules/@adyen/adyen-web/styles/adyen.css",
-              "node_modules/@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css",
+              "node_modules/@adyen/adyen-platform-experience-web/dist/adyen-platform-experience-web.css",
               "node_modules/@adyen/kyc-components/dist/style.css",
               "src/styles.css"
             ],
