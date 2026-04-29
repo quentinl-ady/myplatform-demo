@@ -12,6 +12,8 @@ import '@adyen/adyen-web/styles/adyen.css';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+const log = (...args: any[]) => { if (!environment.production) console.log(...args); };
+
 @Component({
   selector: 'app-checkout',
   standalone: true,
@@ -72,7 +74,7 @@ export class CheckoutComponent implements OnInit {
       next: (u) => {
         this.user.set(u);
         this.countryCode = u.countryCode;
-        console.log("countryCode : " + this.countryCode);
+        log("countryCode : " + this.countryCode);
 
         if (u.activityReason === 'embeddedPayment') {
           this.loadStores();
@@ -82,7 +84,6 @@ export class CheckoutComponent implements OnInit {
         }
       },
       error: (err) => {
-        console.error('Error fetching user', err);
         this.matSnackBar.open('Error while fetching user', 'Close', { duration: 3000 });
         this.loading.set(false);
       }
@@ -100,7 +101,6 @@ export class CheckoutComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Error loading stores', err);
         this.matSnackBar.open('Error while loading stores', 'Close', { duration: 3000 });
         this.loading.set(false);
       }
@@ -135,13 +135,12 @@ export class CheckoutComponent implements OnInit {
     this.submitting.set(true);
     this.paymentService.sendPayment(payload).subscribe({
       next: (res) => {
-        console.log('sendPayment response:', res);
+        log('sendPayment response:', res);
         this.matSnackBar.open('Request sent successfully', 'Close', { duration: 3000 });
         this.submitting.set(false);
         this.initAdyenCheckout(res);
       },
       error: (err) => {
-        console.error('sendPayment error', err);
         this.matSnackBar.open('Error while sending request', 'Close', { duration: 3000 });
         this.submitting.set(false);
       }
@@ -163,7 +162,7 @@ export class CheckoutComponent implements OnInit {
         const jwtResponse = await firstValueFrom(
           this.paymentService.getGooglePayJwt(hostname)
         );
-        console.log('googlePayJwt : ' + jwtResponse.googlePayJwtToken);
+        log('googlePayJwt : ' + jwtResponse.googlePayJwtToken);
         googlePayConfiguration = {
           configuration: {
             merchantName: 'testQuentin',
@@ -189,9 +188,9 @@ export class CheckoutComponent implements OnInit {
           currency: sendPaymentResponse.currency
         },
         clientKey: this.clientKey,
-        onPaymentCompleted: (result, component) => console.info(result, component),
-        onPaymentFailed: (result, component) => console.info(result, component),
-        onError: (error, component) => console.error(error.name, error.message, error.stack, component)
+        onPaymentCompleted: (result, component) => log('Payment completed', result),
+        onPaymentFailed: (result, component) => log('Payment failed', result),
+        onError: (error, component) => { if (!environment.production) console.error(error.name, error.message, error.stack, component); }
       };
 
       const checkout = await AdyenCheckout(globalConfiguration);
@@ -208,7 +207,7 @@ export class CheckoutComponent implements OnInit {
 
       this.dropin = new Dropin(checkout, dropinConfiguration).mount('#dropin-container');
     } catch (e) {
-      console.error("Failed to initialize Adyen Dropin", e);
+      if (!environment.production) console.error("Failed to initialize Adyen Dropin", e);
       this.matSnackBar.open('Failed to initialize payment gateway', 'Close', { duration: 3000 });
       this.dropinActive = false;
     }

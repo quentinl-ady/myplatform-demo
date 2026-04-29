@@ -1,37 +1,19 @@
 import { Routes } from '@angular/router';
-import {LoginComponent} from "./login/login.component";
-import {MainComponent} from "./main/main.component";
-import {DashboardComponent} from "./dashboard/dashboard.component";
 import {LayoutComponent} from "./layout/layout.component";
-import {PaymentComponent} from "./payment/payment.component";
-import {ReportComponent} from "./report/report.component";
-import {PayoutComponent} from "./payout/payout.component";
-import {DisputeComponent} from "./dispute/dispute.component";
-import {BusinessLoansComponent} from "./business-loans/business-loans.component";
-import {StoreComponent} from "./store/store.component";
-import {CheckoutComponent} from "./checkout/checkout.component";
-import {PaymentResultComponent} from "./result/paymentresult.component";
-import {PayByLinkComponent} from "./paybylink/paybylink.component";
-import {DeviceComponent} from "./device/device.component";
-import {TransferComponent} from "./transfer/transfer.component"
-import {PosComponent} from "./pos/pos.component"
-import {CardCreateComponent} from "./card-create/card-create.component"
-import {CardListComponent} from "./card-list/card-list.component"
-import {CardTransactionsComponent} from "./card-transactions/card-transactions.component"
 
 const routeConfig: Routes = [
   {
     path: '',
-    component: MainComponent,
+    loadComponent: () => import('./main/main.component').then(m => m.MainComponent),
     title: 'Homepage'
   },
   {
     path: 'result/:status',
-    component: PaymentResultComponent
+    loadComponent: () => import('./result/paymentresult.component').then(m => m.PaymentResultComponent)
   },
   {
     path: 'login',
-    component: LoginComponent,
+    loadComponent: () => import('./login/login.component').then(m => m.LoginComponent),
     title: 'Login'
   },
   {
@@ -40,77 +22,77 @@ const routeConfig: Routes = [
     children: [
       {
         path: 'dashboard',
-        component: DashboardComponent,
+        loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent),
         title: 'Dashboard'
       },
       {
         path: 'payment',
-        component: PaymentComponent,
+        loadComponent: () => import('./payment/payment.component').then(m => m.PaymentComponent),
         title: 'Payment'
       },
       {
         path: 'report',
-        component: ReportComponent,
+        loadComponent: () => import('./report/report.component').then(m => m.ReportComponent),
         title: 'Report'
       },
       {
         path: 'payout',
-        component: PayoutComponent,
+        loadComponent: () => import('./payout/payout.component').then(m => m.PayoutComponent),
         title: 'Payout'
       },
       {
         path: 'dispute',
-        component: DisputeComponent,
+        loadComponent: () => import('./dispute/dispute.component').then(m => m.DisputeComponent),
         title: 'Dispute'
       },
       {
         path: 'businessloans',
-        component: BusinessLoansComponent,
+        loadComponent: () => import('./business-loans/business-loans.component').then(m => m.BusinessLoansComponent),
         title: 'BusinessLoans'
       },
       {
         path: 'store',
-        component: StoreComponent,
+        loadComponent: () => import('./store/store.component').then(m => m.StoreComponent),
         title: 'Store'
       },
       {
         path: 'checkout',
-        component: CheckoutComponent,
+        loadComponent: () => import('./checkout/checkout.component').then(m => m.CheckoutComponent),
         title: 'Checkout'
       },
       {
          path: 'paybylink',
-         component: PayByLinkComponent,
+         loadComponent: () => import('./paybylink/paybylink.component').then(m => m.PayByLinkComponent),
          title: 'Pay-by-Link'
       },
       {
         path: 'device',
-        component: DeviceComponent,
+        loadComponent: () => import('./device/device.component').then(m => m.DeviceComponent),
         title: 'Device'
       },
       {
         path: 'transfer',
-        component: TransferComponent,
+        loadComponent: () => import('./transfer/transfer.component').then(m => m.TransferComponent),
         title: 'Transfer'
       },
       {
         path: 'pos',
-        component: PosComponent,
+        loadComponent: () => import('./pos/pos.component').then(m => m.PosComponent),
         title: 'POS'
       },
       {
         path: 'cards',
-        component: CardListComponent,
+        loadComponent: () => import('./card-list/card-list.component').then(m => m.CardListComponent),
         title: 'My Cards'
       },
       {
         path: 'card-create',
-        component: CardCreateComponent,
+        loadComponent: () => import('./card-create/card-create.component').then(m => m.CardCreateComponent),
         title: 'Create Card'
       },
       {
         path: 'card-transactions',
-        component: CardTransactionsComponent,
+        loadComponent: () => import('./card-transactions/card-transactions.component').then(m => m.CardTransactionsComponent),
         title: 'Card Transactions'
       }
     ]

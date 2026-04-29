@@ -220,7 +220,6 @@ export class CardListComponent implements OnInit {
 
       // Parse the decrypted JSON data
       const parsedData = JSON.parse(cardData);
-      console.log('Revealed card data:', parsedData);
 
       // Map Adyen response fields to our expected format
       this.revealedCardId = card.paymentInstrumentId;
@@ -241,7 +240,6 @@ export class CardListComponent implements OnInit {
       }, 30000);
 
     } catch (error) {
-      console.error('Failed to reveal card details:', error);
       this.isRevealing = false;
       this.snack.open('Failed to reveal card details', 'Close', { duration: 3000 });
       this.cdr.detectChanges();

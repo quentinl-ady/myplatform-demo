@@ -24,7 +24,9 @@ import '@adyen/kyc-components/transfer-instrument-configuration';
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  private bankStatusInterval: ReturnType<typeof setInterval> | null = null;
+  private bankStatusInterval: ReturnType<typeof setTimeout> | null = null;
+  private bankStatusDelay = 5000;
+  private static readonly BANK_STATUS_MAX_DELAY = 60000;
   userId = '';
   readonly status = signal<OnboardingResponse | null>(null);
   readonly loading = signal(false);
@@ -212,7 +214,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.showConfigurationComponent(transferInstrumentId);
     });
     el.addEventListener('remove', (e: any) => {
-      console.log('Transfer instrument removed', e.detail);
     });
 
     container.appendChild(el);
@@ -256,12 +257,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private startBankStatusPolling() {
     this.stopBankStatusPolling();
-    this.bankStatusInterval = setInterval(() => this.loadBankAccountStatus(), 5000);
+    this.bankStatusDelay = 5000;
+    this.scheduleBankStatusPoll();
+  }
+
+  private scheduleBankStatusPoll() {
+    this.bankStatusInterval = setTimeout(() => {
+      this.loadBankAccountStatus();
+      this.bankStatusDelay = Math.min(this.bankStatusDelay * 2, DashboardComponent.BANK_STATUS_MAX_DELAY);
+      this.scheduleBankStatusPoll();
+    }, this.bankStatusDelay);
   }
 
   private stopBankStatusPolling() {
     if (this.bankStatusInterval) {
-      clearInterval(this.bankStatusInterval);
+      clearTimeout(this.bankStatusInterval);
       this.bankStatusInterval = null;
     }
   }
@@ -281,7 +291,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.matSnackBar.open('✅ Bank account created: ' + res.bankAccountNumber, 'Close', { duration: 5000 });
       },
       error: (err) => {
-        console.error(err);
         this.creatingBankAccount.set(false);
         this.matSnackBar.open('❌ Error creating bank account', 'Close', { duration: 3000 });
       }
@@ -304,7 +313,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.checkOnboarding();
       },
       error: (err) => {
-        console.error(err);
         this.loadingKyc.set(false);
         this.matSnackBar.open('❌ Error validating KYC', 'Close', { duration: 3000 });
       }

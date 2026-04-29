@@ -159,7 +159,6 @@ export class MainComponent {
   readonly view = signal<'login' | 'signup'>('login');
 
   onAuthSuccess(data: unknown) {
-    console.log('Authentication successful!', data);
   }
 
   toggleView() {
