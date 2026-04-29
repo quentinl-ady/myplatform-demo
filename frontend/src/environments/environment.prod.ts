@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://your-production-url.com',
-  frontendUrl: 'https://your-production-url.com'
+  apiBaseUrl: 'https://myplatform-demo.onrender.com',
+  frontendUrl: 'https://myplatform-demo.vercel.app'
 };
