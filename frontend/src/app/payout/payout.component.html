@@ -1,96 +1,115 @@
-<div class="payout-container">
+<div class="fintech-wrapper">
 
-<h1>Payout Configurations</h1>
+  <div class="header-section">
+    <h2>Payouts</h2>
+    <p>Configure and monitor your automatic payouts.</p>
+  </div>
 
-<!-- Balance Account Selector -->
-<mat-form-field appearance="outline" class="full-width">
-  <mat-label>Select Balance Account</mat-label>
-  <mat-select [(ngModel)]="selectedBalanceAccount" (selectionChange)="loadConfigurations()">
-    <mat-option *ngFor="let acc of balanceAccounts()" [value]="acc.balanceAccountId">
-      {{ acc.description }} {{ acc.currencyCode }}
-    </mat-option>
-  </mat-select>
-</mat-form-field>
-
-<!-- Tabs -->
-<mat-tab-group>
-  <!-- Existing Configurations -->
-  <mat-tab label="Existing Configurations">
-    <div class="tab-content">
-      <ng-container *ngIf="loadingConfigurations; else configsList">
-        <div class="loading-container">
-          <mat-progress-spinner diameter="40" mode="indeterminate"></mat-progress-spinner>
-          <span>Loading configurations...</span>
-        </div>
-      </ng-container>
-
-      <ng-template #configsList>
-        <ng-container *ngIf="payoutConfigurations().length; else noConfigs">
-          <mat-card *ngFor="let config of payoutConfigurations()" class="config-card">
-            <div><strong>Currency:</strong> {{ config.currencyCode }}</div>
-            <div><strong>Type:</strong> {{ config | payoutType }}</div>
-            <div><strong>Schedule:</strong> {{ config.schedule }}</div>
-            <div><strong>Payout Account:</strong> {{ config.accountIdentifier }}</div>
-           </mat-card>
-        </ng-container>
-        <ng-template #noConfigs>
-          <p>No payout configurations yet for this account.</p>
-        </ng-template>
-      </ng-template>
+  <!-- Balance Account Selector -->
+  <mat-card>
+    <h3 class="card-title">Balance Account</h3>
+    <div class="form-group">
+      <label>Select an account to view its payout configurations</label>
+      <select class="fintech-input" [(ngModel)]="selectedBalanceAccount" (change)="loadConfigurations()">
+        <option value="" disabled selected>Choose a balance account...</option>
+        <option *ngFor="let acc of balanceAccounts()" [value]="acc.balanceAccountId">
+          {{ acc.description }} — {{ acc.currencyCode }}
+        </option>
+      </select>
     </div>
-  </mat-tab>
+  </mat-card>
+
+  <!-- Existing Configurations -->
+  <mat-card *ngIf="selectedBalanceAccount">
+    <h3 class="card-title">Active Configurations</h3>
+
+    <div class="loading-container" *ngIf="loadingConfigurations">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Loading configurations...</span>
+    </div>
+
+    <ng-container *ngIf="!loadingConfigurations">
+      <div class="config-list" *ngIf="payoutConfigurations().length; else noConfigs">
+        <div *ngFor="let config of payoutConfigurations()" class="config-item">
+          <div class="config-row">
+            <span class="config-label">Currency</span>
+            <span class="config-value">{{ config.currencyCode }}</span>
+          </div>
+          <div class="config-row">
+            <span class="config-label">Type</span>
+            <span class="config-value">{{ config | payoutType }}</span>
+          </div>
+          <div class="config-row">
+            <span class="config-label">Schedule</span>
+            <span class="config-value schedule-pill">{{ config.schedule }}</span>
+          </div>
+          <div class="config-row">
+            <span class="config-label">Payout Account</span>
+            <span class="config-value mono">{{ config.accountIdentifier }}</span>
+          </div>
+        </div>
+      </div>
+      <ng-template #noConfigs>
+        <p class="empty-text">No payout configurations yet for this account.</p>
+      </ng-template>
+    </ng-container>
+  </mat-card>
 
   <!-- Add New Configuration -->
-  <mat-tab label="Add New Configuration">
-    <div class="tab-content">
-      <mat-card>
-        <form [formGroup]="configForm" (ngSubmit)="addConfiguration()">
+  <mat-card>
+    <h3 class="card-title">Add New Configuration</h3>
+    <form [formGroup]="configForm" (ngSubmit)="addConfiguration()" class="config-form">
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Currency</mat-label>
-            <mat-select formControlName="currencyCode">
-              <mat-option value="EUR">EUR</mat-option>
-              <mat-option value="GBP">GBP</mat-option>
-              <mat-option value="USD">USD</mat-option>
-            </mat-select>
-          </mat-form-field>
+      <div class="form-group">
+        <label>Currency</label>
+        <select class="fintech-input" formControlName="currencyCode">
+          <option value="" disabled selected>Select currency...</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
 
-          <div class="checkbox-group">
-            <mat-checkbox formControlName="regular">Regular</mat-checkbox>
-            <mat-checkbox formControlName="instant">Instant</mat-checkbox>
-          </div>
+      <div class="form-group">
+        <label>Payout Type</label>
+        <div class="checkbox-group">
+          <mat-checkbox formControlName="regular" color="primary">Regular</mat-checkbox>
+          <mat-checkbox formControlName="instant" color="primary">Instant</mat-checkbox>
+        </div>
+      </div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Schedule</mat-label>
-            <mat-select formControlName="schedule">
-              <mat-option value="daily">Daily</mat-option>
-              <mat-option value="weekly">Weekly</mat-option>
-              <mat-option value="monthly">Monthly</mat-option>
-            </mat-select>
-          </mat-form-field>
+      <div class="form-group">
+        <label>Schedule</label>
+        <select class="fintech-input" formControlName="schedule">
+          <option value="" disabled selected>Select schedule...</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Payout Account</mat-label>
-            <mat-select formControlName="transferInstrumentId">
-              <mat-option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
-                {{ acc.accountIdentifier }}
-              </mat-option>
-            </mat-select>
-          </mat-form-field>
+      <div class="form-group">
+        <label>Payout Account</label>
+        <select class="fintech-input" formControlName="transferInstrumentId">
+          <option value="" disabled selected>Select payout account...</option>
+          <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
+            {{ acc.accountIdentifier }}
+          </option>
+        </select>
+      </div>
 
-          <button mat-raised-button color="primary" type="submit"
-            [disabled]="configForm.invalid || submitting || (!configForm.value.regular && !configForm.value.instant)">
-            Add Configuration
-          </button>
-        </form>
-      </mat-card>
-    </div>
-  </mat-tab>
-</mat-tab-group>
+      <button mat-flat-button class="fintech-btn primary full-width" type="submit"
+        [disabled]="configForm.invalid || submitting || (!configForm.value.regular && !configForm.value.instant)">
+        <span *ngIf="!submitting">Add Configuration</span>
+        <mat-spinner *ngIf="submitting" diameter="20" color="accent"></mat-spinner>
+      </button>
+    </form>
+  </mat-card>
 
-<!-- Adyen component -->
-<div id="adyen-component" class="main-container">
-  <div id="payout-overview-container"></div>
+  <!-- Adyen Payouts Overview -->
+  <mat-card>
+    <h3 class="card-title">Payouts Overview</h3>
+    <div id="payout-overview-container"></div>
+  </mat-card>
+
 </div>
-
-  </div>

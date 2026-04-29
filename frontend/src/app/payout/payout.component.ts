@@ -3,7 +3,6 @@ import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import {CommonModule} from "@angular/common";
 import {MatSnackBar} from '@angular/material/snack-bar';
-import {MatTabsModule} from '@angular/material/tabs';
 import {MaterialModule} from '../material.module';
 import {PayoutConfiguration, BalanceAccount, PayoutAccount} from "../models";
 import {AccountService, PayoutService, SessionService} from "../services";
@@ -19,7 +18,6 @@ import {PayoutTypePipe} from "./payout-type-pipe";
         ReactiveFormsModule,
         FormsModule,
         MaterialModule,
-        MatTabsModule,
         PayoutTypePipe
     ],
     templateUrl: './payout.component.html',

@@ -1,21 +1,153 @@
-.payout-container {
+:host {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-border: #e5e5e5;
+  --fintech-radius: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.fintech-wrapper {
+  max-width: 1200px;
+  margin: 40px 0 40px 40px;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
+  gap: 24px;
 }
-.full-width { width: 100%; }
-.checkbox-group { display: flex; gap: 1rem; margin: 0.5rem 0; }
-.config-card {
-  border: 1px solid #ddd;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: 6px;
-  background-color: #fafafa;
+
+/* Header */
+.header-section h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
-.tab-content { padding: 1rem 0; }
+.header-section p {
+  color: var(--fintech-text-secondary);
+  font-size: 15px;
+  margin: 0;
+}
+
+/* Cards */
+mat-card {
+  background: var(--fintech-surface);
+  border-radius: var(--fintech-radius);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
+  padding: 24px;
+}
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: var(--fintech-text);
+}
+
+/* Form */
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fintech-text-secondary);
+  margin-bottom: 8px;
+}
+.fintech-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 10px;
+  font-size: 15px;
+  box-sizing: border-box;
+  background: var(--fintech-surface);
+  transition: border-color 0.2s;
+  appearance: none;
+}
+.fintech-input:focus {
+  outline: none;
+  border-color: var(--fintech-primary);
+}
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* Buttons */
+.fintech-btn {
+  border-radius: 24px !important;
+  padding: 8px 24px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.fintech-btn.primary {
+  background-color: var(--fintech-primary) !important;
+  color: white !important;
+}
+.fintech-btn.full-width {
+  width: 100%;
+  padding: 12px 24px !important;
+  font-size: 15px !important;
+}
+
+/* Config list */
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.config-item {
+  padding: 16px;
+  background: var(--fintech-bg);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.config-label {
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+  font-weight: 500;
+}
+.config-value {
+  font-size: 14px;
+  color: var(--fintech-text);
+  font-weight: 600;
+}
+.config-value.mono {
+  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fintech-text-secondary);
+}
+.schedule-pill {
+  text-transform: capitalize;
+}
+
+/* Empty / Loading */
+.empty-text {
+  color: var(--fintech-text-secondary);
+  font-size: 14px;
+  font-style: italic;
+}
 .loading-container {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 12px;
+  color: var(--fintech-text-secondary);
+  font-size: 14px;
 }
