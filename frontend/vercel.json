@@ -1,5 +1,4 @@
 {
-  "rootDirectory": "frontend",
   "buildCommand": "npm install && npm run build",
   "outputDirectory": "dist/browser",
   "framework": null,
