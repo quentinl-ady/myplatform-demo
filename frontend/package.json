@@ -9,7 +9,10 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "e2e": "ng e2e"
+    "e2e": "ng e2e",
+    "e2e:pw": "npx playwright test --config=playwright.config.ts",
+    "e2e:pw:headed": "npx playwright test --config=playwright.config.ts --headed",
+    "e2e:pw:ui": "npx playwright test --config=playwright.config.ts --ui"
   },
   "private": true,
   "dependencies": {
@@ -36,6 +39,7 @@
     "@angular-devkit/build-angular": "17.2.3",
     "@angular/cli": "17.2.3",
     "@angular/compiler-cli": "17.2.4",
+    "@playwright/test": "^1.59.1",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^16.11.35",
     "copyfiles": "^2.4.1",
