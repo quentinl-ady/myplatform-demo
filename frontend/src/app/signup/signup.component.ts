@@ -31,6 +31,7 @@ import { AuthService } from '../services';
 export class SignupComponent {
     form: FormGroup;
     error: string | null = null;
+    loading = false;
 
     userTypes = [
         { value: 'organization', label: 'Organization', disabled: false },
@@ -152,6 +153,7 @@ export class SignupComponent {
     onSubmit() {
         if (!this.form.valid) return;
         this.error = null;
+        this.loading = true;
 
         let payload = { ...this.form.value };
         if (payload.userType === 'individual') {
@@ -163,12 +165,15 @@ export class SignupComponent {
 
         this.authService.signup(payload).subscribe({
             next: (res) => {
+                this.loading = false;
                 if (res.id) {
                     this.router.navigate([`/${res.id}/dashboard`]);
                     this.signupSuccess.emit(res);
                 }
+                this.cdr.markForCheck();
             },
             error: (err) => {
+                this.loading = false;
                 if (err.status === 409 || err.error === 'ErrorEmailAlreadyExists') {
                     this.error = 'Email already exists';
                 } else if (err.status === 400) {

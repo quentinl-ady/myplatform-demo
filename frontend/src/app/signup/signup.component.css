@@ -28,3 +28,8 @@
   margin-bottom: 0.3rem;
   display: block;
 }
+.button-spinner {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
