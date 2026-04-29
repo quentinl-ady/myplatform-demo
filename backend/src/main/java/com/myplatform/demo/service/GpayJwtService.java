@@ -5,6 +5,7 @@ import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.NumericDate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
@@ -21,11 +22,10 @@ public class GpayJwtService {
 
     public static final String MERCHANT_ID = "BCR2DN5TRCO6VRS6";
 
-    public GpayJwtService(){
+    @Value("${adyen.gpay.privateKey:}")
+    private String gpayPrivateKey;
 
-    }
-
-    public static String generateAuthJwt(String hostname) {
+    public String generateAuthJwt(String hostname) {
         try {
             PrivateKey privateKey = loadPrivateKey();
 
@@ -51,29 +51,34 @@ public class GpayJwtService {
         }
     }
 
-    private static PrivateKey loadPrivateKey() throws Exception {
-        try (InputStream is =
-                     GpayJwtService.class
-                             .getClassLoader()
-                             .getResourceAsStream("gpay-key.pem")) {
+    private PrivateKey loadPrivateKey() throws Exception {
+        String pem;
 
-            if (is == null) {
-                throw new IllegalStateException("Private key not found in resources");
+        if (gpayPrivateKey != null && !gpayPrivateKey.isBlank()) {
+            pem = gpayPrivateKey;
+        } else {
+            try (InputStream is =
+                         GpayJwtService.class
+                                 .getClassLoader()
+                                 .getResourceAsStream("gpay-key.pem")) {
+
+                if (is == null) {
+                    throw new IllegalStateException("Google Pay private key not found: set adyen.gpay.privateKey or provide gpay-key.pem");
+                }
+                pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
             }
-
-            String pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-
-            String privateKeyPem = pem
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .replaceAll("\\s+", "");
-
-            byte[] keyBytes = Base64.getDecoder().decode(privateKeyPem);
-
-            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-            KeyFactory keyFactory = KeyFactory.getInstance("EC");
-
-            return keyFactory.generatePrivate(keySpec);
         }
+
+        String privateKeyPem = pem
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s+", "");
+
+        byte[] keyBytes = Base64.getDecoder().decode(privateKeyPem);
+
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("EC");
+
+        return keyFactory.generatePrivate(keySpec);
     }
 }

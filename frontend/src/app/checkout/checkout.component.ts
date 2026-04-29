@@ -158,12 +158,24 @@ export class CheckoutComponent implements OnInit {
     const hostname = window.location.hostname;
 
     try {
-      const jwtResponse = await firstValueFrom(
-        this.paymentService.getGooglePayJwt(hostname)
-      );
-
-      const googlePayJwt = jwtResponse.googlePayJwtToken;
-      console.log('googlePayJwt : ' + jwtResponse.googlePayJwtToken);
+      let googlePayConfiguration = {};
+      try {
+        const jwtResponse = await firstValueFrom(
+          this.paymentService.getGooglePayJwt(hostname)
+        );
+        console.log('googlePayJwt : ' + jwtResponse.googlePayJwtToken);
+        googlePayConfiguration = {
+          configuration: {
+            merchantName: 'testQuentin',
+            merchantId: 'BCR2DN5TRCO6VRS6',
+            gatewayMerchantId: 'QuentinLecornuTEST',
+            authJwt: jwtResponse.googlePayJwtToken,
+            merchantOrigin: new URL(environment.frontendUrl).hostname
+          },
+        };
+      } catch (e) {
+        console.warn('Google Pay JWT fetch failed, Drop-in will load without Google Pay config', e);
+      }
 
       const globalConfiguration: CoreConfiguration = {
         session: {
@@ -183,16 +195,6 @@ export class CheckoutComponent implements OnInit {
       };
 
       const checkout = await AdyenCheckout(globalConfiguration);
-
-      const googlePayConfiguration = {
-        configuration: {
-          merchantName: 'testQuentin',
-          merchantId: 'BCR2DN5TRCO6VRS6',
-          gatewayMerchantId: 'QuentinLecornuTEST',
-          authJwt: googlePayJwt,
-          merchantOrigin: new URL(environment.frontendUrl).hostname
-        },
-      };
 
       const dropinConfiguration = {
         hasHolderName: true,
