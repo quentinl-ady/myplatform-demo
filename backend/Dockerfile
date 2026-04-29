@@ -4,8 +4,6 @@ COPY .mvn .mvn
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 COPY src src
-# Use the default properties as base (env vars will override at runtime)
-COPY src/main/resources/application.properties src/main/resources/application.properties
 RUN ./mvnw package -DskipTests -B
 
 FROM eclipse-temurin:17-jre-alpine
