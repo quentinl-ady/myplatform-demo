@@ -17,20 +17,23 @@ public class AdyenSessionService {
 
     private final String balancePlatformApiKey;
     private final String lemApiKey;
+    private final String frontendUrl;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
     public AdyenSessionService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
-                               @Value("${adyen.lemApiKey}") String lemApiKey) {
+                               @Value("${adyen.lemApiKey}") String lemApiKey,
+                               @Value("${app.frontend.url}") String frontendUrl) {
         this.balancePlatformApiKey = balancePlatformApiKey;
         this.lemApiKey = lemApiKey;
+        this.frontendUrl = frontendUrl;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
     }
 
     public String createSession(String accountHolderId, String[] roles) throws Exception {
         Map<String, Object> requestBody = Map.of(
-                "allowOrigin", "http://localhost",
+                "allowOrigin", frontendUrl,
                 "product", "platform",
                 "policy", Map.of(
                         "resources", new Map[]{Map.of(
@@ -61,7 +64,7 @@ public class AdyenSessionService {
 
     public String createSessionWithLemKey(String legalEntityId, String[] roles) throws Exception {
         Map<String, Object> requestBody = Map.of(
-                "allowOrigin", "http://localhost",
+                "allowOrigin", frontendUrl,
                 "product", "onboarding",
                 "policy", Map.of(
                         "resources", new Map[]{Map.of(

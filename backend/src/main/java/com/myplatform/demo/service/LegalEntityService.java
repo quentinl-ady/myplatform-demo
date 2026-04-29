@@ -30,11 +30,15 @@ public class LegalEntityService {
             "US", "en-US"
     );
 
+    private final String frontendUrl;
+
     public LegalEntityService(@Qualifier("lemClient") Client lemClient,
-                              @Value("${adyen.lemVersion}") String lemVersion) {
+                              @Value("${adyen.lemVersion}") String lemVersion,
+                              @Value("${app.frontend.url}") String frontendUrl) {
         this.lem = new LegalEntitiesApi(lemClient, "https://kyc-test.adyen.com/lem/" + lemVersion);
         this.hop = new HostedOnboardingApi(lemClient);
         this.businessLinesApi = new BusinessLinesApi(lemClient);
+        this.frontendUrl = frontendUrl;
     }
 
     public String createLegalEntity(User user) throws IOException, ApiException {
@@ -110,7 +114,7 @@ public class LegalEntityService {
         OnboardingLinkInfo onboardingLinkInfo = new OnboardingLinkInfo()
                 .locale(languageCode)
                 .settings(onboardingLinkSettings)
-                .redirectUrl("http://localhost:4200/" + userId + "/dashboard");
+                .redirectUrl(frontendUrl + "/" + userId + "/dashboard");
 
         OnboardingLink link = hop.getLinkToAdyenhostedOnboardingPage(legalEntityId, onboardingLinkInfo);
         return link.getUrl();
@@ -171,7 +175,7 @@ public class LegalEntityService {
                 .legalEntityId(legalEntityId)
                 .industryCode(activity.getIndustryCode())
                 .salesChannels(activity.getSalesChannels())
-                .addWebDataItem(new WebData().webAddress("http://localhost"))
+                .addWebDataItem(new WebData().webAddress(frontendUrl))
                 .service(BusinessLineInfo.ServiceEnum.PAYMENTPROCESSING);
 
         BusinessLine businessLine = businessLinesApi.createBusinessLine(businessLineInfo);

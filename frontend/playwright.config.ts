@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env['BASE_URL'] || 'http://localhost:4200';
+
 export default defineConfig({
   testDir: './e2e/playwright',
   fullyParallel: false,
@@ -12,7 +14,7 @@ export default defineConfig({
     timeout: 15_000,
   },
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -25,7 +27,7 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run start',
-    url: 'http://localhost:4200',
+    url: baseURL,
     reuseExistingServer: true,
     timeout: 120_000,
   },

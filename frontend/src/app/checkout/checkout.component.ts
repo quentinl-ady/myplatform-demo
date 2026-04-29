@@ -10,6 +10,7 @@ import { AccountService, PaymentService, StoreService } from '../services';
 import { AdyenCheckout, CoreConfiguration, Dropin } from '@adyen/adyen-web/auto';
 import '@adyen/adyen-web/styles/adyen.css';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Component({
   selector: 'app-checkout',
@@ -189,7 +190,7 @@ export class CheckoutComponent implements OnInit {
           merchantId: 'BCR2DN5TRCO6VRS6',
           gatewayMerchantId: 'QuentinLecornuTEST',
           authJwt: googlePayJwt,
-          merchantOrigin: "localhost"
+          merchantOrigin: new URL(environment.frontendUrl).hostname
         },
       };
 

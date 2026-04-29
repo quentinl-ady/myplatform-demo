@@ -9,6 +9,7 @@ import com.adyen.service.balanceplatform.PaymentInstrumentsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.BusinessLinesApi;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -29,16 +30,20 @@ public class BankingProvisioningService {
             "GB", "GBP", "UK", "GBP"
     );
 
+    private final String frontendUrl;
+
     public BankingProvisioningService(@Qualifier("lemClient") Client lemClient,
-                                      @Qualifier("balancePlatformClient") Client balancePlatformClient) {
+                                      @Qualifier("balancePlatformClient") Client balancePlatformClient,
+                                      @Value("${app.frontend.url}") String frontendUrl) {
         this.businessLinesApi = new BusinessLinesApi(lemClient);
         this.balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
+        this.frontendUrl = frontendUrl;
     }
 
     public void createBusinessLine(String legalEntityId, BusinessLineInfo.ServiceEnum service) throws IOException, ApiException {
         List<WebData> webDataList = new ArrayList<>(
-                List.of(new WebData().webAddress("http://localhost/"))
+                List.of(new WebData().webAddress(frontendUrl))
         );
 
         BusinessLineInfo businessLineInfo = new BusinessLineInfo()

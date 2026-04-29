@@ -28,13 +28,17 @@ public class PaymentCheckoutService {
     private final String clientKey;
     private final StoreCustomerRepository storeCustomerRepository;
 
+    private final String backendUrl;
+
     public PaymentCheckoutService(@Qualifier("pspClient") Client pspClient,
                                   @Value("${adyen.merchantAccount}") String merchantAccount,
                                   @Value("${adyen.clientKey}") String clientKey,
+                                  @Value("${app.backend.url}") String backendUrl,
                                   StoreCustomerRepository storeCustomerRepository) {
         this.paymentsApi = new PaymentsApi(pspClient);
         this.merchantAccount = merchantAccount;
         this.clientKey = clientKey;
+        this.backendUrl = backendUrl;
         this.storeCustomerRepository = storeCustomerRepository;
     }
 
@@ -81,7 +85,7 @@ public class PaymentCheckoutService {
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0)
                 .telephoneNumber("+33610101010")
-                .returnUrl("http://localhost:8080/api/payments/redirect");
+                .returnUrl(backendUrl + "/api/payments/redirect");
 
         if (activityReason.equals("embeddedPayment")) {
             createCheckoutSessionRequest.setStore(storeRef);
