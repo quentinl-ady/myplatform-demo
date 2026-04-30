@@ -20,60 +20,60 @@
       </a>
 
       <p class="nav-section-title">Payments & Commerce</p>
-      <a mat-list-item [routerLink]="['/', userId, 'payment']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="['/', userId, 'transactions']" routerLinkActive="active-link">
         <mat-icon matListItemIcon>payment</mat-icon>
-        <span matListItemTitle>Payments</span>
+        <span matListItemTitle>Transactions</span>
       </a>
       <a mat-list-item [routerLink]="['/', userId, 'checkout']" routerLinkActive="active-link">
         <mat-icon matListItemIcon>shop</mat-icon>
         <span matListItemTitle>Checkout</span>
       </a>
-       <a mat-list-item [routerLink]="['/', userId, 'pos']" routerLinkActive="active-link">
+       <a mat-list-item [routerLink]="isEmbeddedPayment ? ['/', userId, 'pos'] : null" routerLinkActive="active-link" [class.nav-disabled]="!isEmbeddedPayment">
           <mat-icon matListItemIcon>computer</mat-icon>
-          <span matListItemTitle>POS</span>
+          <span matListItemTitle>Point of Sale</span>
        </a>
-      <a mat-list-item [routerLink]="['/', userId, 'paybylink']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="isEmbeddedPayment ? ['/', userId, 'paybylink'] : null" routerLinkActive="active-link" [class.nav-disabled]="!isEmbeddedPayment">
          <mat-icon matListItemIcon>link</mat-icon>
          <span matListItemTitle>Pay-by-Link</span>
       </a>
-      <a mat-list-item [routerLink]="['/', userId, 'store']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="isEmbeddedPayment ? ['/', userId, 'store'] : null" routerLinkActive="active-link" [class.nav-disabled]="!isEmbeddedPayment">
         <mat-icon matListItemIcon>store</mat-icon>
         <span matListItemTitle>Stores</span>
       </a>
 
-      <p class="nav-section-title">Banking & Finance</p>
-      <a mat-list-item [routerLink]="['/', userId, 'transfer']" routerLinkActive="active-link">
+      <p class="nav-section-title">Banking</p>
+      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'business-account'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
           <mat-icon matListItemIcon>sync_alt</mat-icon>
-          <span matListItemTitle>Transfers</span>
+          <span matListItemTitle>Business Account</span>
       </a>
-      <a mat-list-item [routerLink]="['/', userId, 'payout']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="!bankEnabled ? ['/', userId, 'payout'] : null" routerLinkActive="active-link" [class.nav-disabled]="bankEnabled">
         <mat-icon matListItemIcon>account_balance</mat-icon>
         <span matListItemTitle>Payouts</span>
       </a>
-      <a mat-list-item [routerLink]="['/', userId, 'businessloans']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="capitalEnabled ? ['/', userId, 'businessloans'] : null" routerLinkActive="active-link" [class.nav-disabled]="!capitalEnabled">
         <mat-icon matListItemIcon>attach_money</mat-icon>
-        <span matListItemTitle>Extra money ?</span>
+        <span matListItemTitle>Loans</span>
       </a>
-
-      <p class="nav-section-title">Cards</p>
-      <a mat-list-item [routerLink]="['/', userId, 'cards']" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>credit_card</mat-icon>
-        <span matListItemTitle>My Cards</span>
-      </a>
-      <a mat-list-item [routerLink]="['/', userId, 'card-create']" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>add_card</mat-icon>
-        <span matListItemTitle>Create Card</span>
-      </a>
-      <a mat-list-item [routerLink]="['/', userId, 'card-transactions']" routerLinkActive="active-link">
-        <mat-icon matListItemIcon>receipt_long</mat-icon>
-        <span matListItemTitle>Transactions</span>
-      </a>
-
-      <p class="nav-section-title">Security & Risk</p>
-      <a mat-list-item [routerLink]="['/', userId, 'device']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'business-account-device'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
          <mat-icon matListItemIcon>devices</mat-icon>
          <span matListItemTitle>Trusted Devices</span>
       </a>
+
+      <p class="nav-section-title">Cards</p>
+      <a mat-list-item [routerLink]="issuingEnabled ? ['/', userId, 'cards'] : null" routerLinkActive="active-link" [class.nav-disabled]="!issuingEnabled">
+        <mat-icon matListItemIcon>credit_card</mat-icon>
+        <span matListItemTitle>My Cards</span>
+      </a>
+      <a mat-list-item [routerLink]="issuingEnabled ? ['/', userId, 'card-create'] : null" routerLinkActive="active-link" [class.nav-disabled]="!issuingEnabled">
+        <mat-icon matListItemIcon>add_card</mat-icon>
+        <span matListItemTitle>Create Card</span>
+      </a>
+      <a mat-list-item [routerLink]="issuingEnabled ? ['/', userId, 'card-transactions'] : null" routerLinkActive="active-link" [class.nav-disabled]="!issuingEnabled">
+        <mat-icon matListItemIcon>receipt_long</mat-icon>
+        <span matListItemTitle>Card Transactions</span>
+      </a>
+
+      <p class="nav-section-title">Risk</p>
       <a mat-list-item [routerLink]="['/', userId, 'dispute']" routerLinkActive="active-link">
         <mat-icon matListItemIcon>gavel</mat-icon>
         <span matListItemTitle>Disputes</span>

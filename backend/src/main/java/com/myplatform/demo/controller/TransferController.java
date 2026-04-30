@@ -39,7 +39,7 @@ public class TransferController {
     @PostMapping("/devices/register")
     public ResponseEntity<RegisterSCAResponse> initiateDeviceRegistration(@RequestBody InitiateDeviceRegistrationRequest request) throws Exception {
         User user = findUser(request.getUserId());
-        return ResponseEntity.ok(transferService.registerDevice(request.getSdkOutput(), user.getBankAccountId()));
+        return ResponseEntity.ok(transferService.registerDevice(request.getSdkOutput(), user.getBankAccountId(), request.getDeviceName()));
     }
 
     @PostMapping("/devices/register/finalize")
@@ -62,6 +62,10 @@ public class TransferController {
             InitiateTransferResponse response = transferService.initiateTransfer(request, user.getBankAccountId());
             return ResponseEntity.ok(response);
         } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() != 401) {
+                throw e;
+            }
+
             HttpHeaders errorHeaders = e.getResponseHeaders();
 
             InitiateTransferResponse res = new InitiateTransferResponse();

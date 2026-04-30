@@ -84,10 +84,6 @@
           <span class="bank-label">Account Number</span>
           <span class="bank-value mono">{{ bs.bankAccountNumber }}</span>
         </div>
-        <div class="bank-info-row" *ngIf="bs.bankAccountId">
-          <span class="bank-label">Payment Instrument ID</span>
-          <span class="bank-value mono small">{{ bs.bankAccountId }}</span>
-        </div>
         <div class="bank-status-badge">
           <mat-icon>check_circle</mat-icon>
           <span>Account active</span>
@@ -119,13 +115,12 @@
   </mat-card>
 
   <mat-card class="business-card" *ngIf="user()?.activityReason === 'embeddedPayment'">
-    <h3 class="card-title">Business Activity</h3>
+    <h3 class="card-title">What do you sell?</h3>
 
     <div class="business-lines-container" *ngIf="businessLines().length; else noBusinessLines">
       <div *ngFor="let bl of businessLines()" class="business-line-item">
         <div class="bl-header">
           <span class="bl-industry">{{ getIndustryLabel(bl.industryCode) }}</span>
-          <span class="bl-id">ID: {{ bl.id }}</span>
         </div>
         <div class="bl-channels">
           <span *ngFor="let ch of bl.salesChannels" class="channel-pill">{{ ch }}</span>
@@ -139,16 +134,23 @@
     <hr class="divider">
 
     <form [formGroup]="businessForm" (ngSubmit)="addBusinessLine()" class="business-form">
-      <h4 class="form-title">Add new activity</h4>
+      <h4 class="form-title">Add new industry</h4>
 
       <div class="form-group">
-        <label>Industry</label>
-        <select class="fintech-input" formControlName="industryCode">
-          <option value="" disabled selected>Select an industry...</option>
-          <option *ngFor="let ind of INDUSTRY_CODES" [value]="ind.code">
-            {{ ind.label }} ({{ ind.code }})
-          </option>
-        </select>
+        <mat-form-field appearance="outline" class="full-width">
+          <input matInput
+                 [(ngModel)]="industrySearch"
+                 [ngModelOptions]="{standalone: true}"
+                 [matAutocomplete]="dashboardIndustryAuto"
+                 (ngModelChange)="filterIndustries()"
+                 placeholder="Search an industry..." />
+          <mat-autocomplete #dashboardIndustryAuto="matAutocomplete"
+                            (optionSelected)="onIndustrySelected($event.option.value)">
+            <mat-option *ngFor="let ind of filteredIndustries" [value]="ind.code">
+              {{ ind.label }} ({{ ind.code }})
+            </mat-option>
+          </mat-autocomplete>
+        </mat-form-field>
       </div>
 
       <div class="form-group">
@@ -161,7 +163,7 @@
       </div>
 
       <button mat-flat-button class="fintech-btn primary full-width" type="submit" [disabled]="businessForm.invalid || submitting">
-        <span *ngIf="!submitting">Add Business Activity</span>
+        <span *ngIf="!submitting">Add Activity</span>
         <mat-spinner *ngIf="submitting" diameter="20" color="accent"></mat-spinner>
       </button>
     </form>

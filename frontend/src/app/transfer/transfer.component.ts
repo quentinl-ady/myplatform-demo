@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy, inject, NgZone, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, NgZone, ChangeDetectorRef, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
+import { DeviceRegistrationComponent } from '../device/device-registration.component';
 
 import { Subject, Subscription, combineLatest, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter } from 'rxjs/operators';
@@ -24,7 +25,8 @@ import { AccountService, TransferService } from "../services";
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MaterialModule
+    MaterialModule,
+    DeviceRegistrationComponent
   ],
   templateUrl: './transfer.component.html',
   styleUrl: './transfer.component.css'
@@ -41,6 +43,7 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   userId = '';
   accountInfo?: BankAccountInformationResponse;
+  hasDevices = signal<boolean | null>(null);
 
   showExactMatchModal = false;
   showPartialMatchModal = false;
@@ -79,6 +82,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.fetchAccountInformation();
+        this.checkDevices();
       }
     });
   }
@@ -418,6 +422,25 @@ export class TransferComponent implements OnInit, OnDestroy {
       this.isProcessing = false;
       this.snack.open('SCA authentication failed', 'Close', { duration: 3000 });
     }
+  }
+
+  checkDevices() {
+    this.transferService.listDevices(Number(this.userId)).subscribe({
+      next: (devices) => {
+        this.hasDevices.set(devices && devices.length > 0);
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.hasDevices.set(false);
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  onDeviceRegistered() {
+    this.hasDevices.set(true);
+    this.snack.open('Device registered successfully! You can now make transfers.', 'Close', { duration: 4000 });
+    this.cdr.detectChanges();
   }
 
   resetForm() {

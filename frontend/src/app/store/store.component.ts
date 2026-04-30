@@ -18,6 +18,14 @@ export const PAYMENT_METHODS = [
   { key: 'googlepay', label: 'Google Pay' }
 ];
 
+const COUNTRY_LABELS: Record<string, string> = {
+  FR: 'France',
+  UK: 'United Kingdom',
+  DE: 'Germany',
+  US: 'United States',
+  NL: 'Netherlands'
+};
+
 const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone: string, lineAdresse1: string }> = {
   FR: { city: 'Paris', postal: '75001', phone: '+33123456789', lineAdresse1: '6 Bd Haussmann' },
   UK: { city: 'London', postal: 'EC1A1BB', phone: '+442012345678', lineAdresse1: '12-13 Wells Mews' },
@@ -41,6 +49,8 @@ const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone:
 export class StoreComponent implements OnInit {
   userId = 0;
   isSubmitting = false;
+  userCountryCode = '';
+  userCountryLabel = '';
 
   readonly PAYMENT_METHODS = PAYMENT_METHODS;
 
@@ -84,6 +94,18 @@ export class StoreComponent implements OnInit {
         this.loadStores();
         this.loadBalanceAccounts();
         this.loadBusinessLines();
+        this.loadUserCountry();
+      }
+    });
+  }
+
+  loadUserCountry() {
+    this.accountService.getUserById(this.userId).subscribe({
+      next: user => {
+        this.userCountryCode = user.countryCode;
+        this.userCountryLabel = COUNTRY_LABELS[user.countryCode] || user.countryCode;
+        this.generalForm.patchValue({ country: user.countryCode });
+        this.applySuggestions(user.countryCode);
       }
     });
   }
@@ -181,6 +203,8 @@ export class StoreComponent implements OnInit {
         this.stores.set([...this.stores(), res]);
         this.snack.open('Store created successfully', 'Close', { duration: 3000 });
         this.generalForm.reset();
+        this.generalForm.patchValue({ country: this.userCountryCode });
+        this.applySuggestions(this.userCountryCode);
         this.activityForm.reset({ businessLineIds: [] });
         for (const p of PAYMENT_METHODS) this.paymentsForm.get(p.key)?.setValue(false);
         stepper.reset();

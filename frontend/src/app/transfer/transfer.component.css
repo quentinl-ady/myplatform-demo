@@ -56,3 +56,11 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .summary-row span { color: var(--fintech-text-secondary); }
 .actions { display: flex; gap: 12px; }
 .actions button { flex: 1; }
+
+/* No device warning */
+.no-device-warning { border-left: 4px solid var(--fintech-warning) !important; display: flex; flex-direction: column; gap: 20px; }
+.warning-banner { display: flex; align-items: flex-start; gap: 16px; }
+.warning-icon-wrapper { width: 48px; height: 48px; background: var(--fintech-warning-bg); color: var(--fintech-warning); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.warning-icon-wrapper mat-icon { font-size: 28px; width: 28px; height: 28px; }
+.warning-text h3 { font-size: 17px; font-weight: 600; margin: 0 0 6px 0; color: var(--fintech-text); }
+.warning-text p { font-size: 13px; color: var(--fintech-text-secondary); margin: 0; line-height: 1.5; }

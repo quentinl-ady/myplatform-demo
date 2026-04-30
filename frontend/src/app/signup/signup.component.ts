@@ -10,11 +10,13 @@ import {
     FormBuilder,
     Validators,
     ReactiveFormsModule,
+    FormsModule,
 } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MaterialModule } from '../material.module';
 import { AuthService } from '../services';
+import { INDUSTRY_CODES } from '../industry-codes';
 
 @Component({
     selector: 'app-signup',
@@ -22,6 +24,7 @@ import { AuthService } from '../services';
     imports: [
         CommonModule,
         ReactiveFormsModule,
+        FormsModule,
         MaterialModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +47,14 @@ export class SignupComponent {
     // flags UI
     disableEmbeddedPayment = false;
     disableExtraOptions = false;
+
+    // business activities for embedded payment
+    readonly INDUSTRY_CODES = INDUSTRY_CODES;
+    filteredIndustries = [...INDUSTRY_CODES];
+    industrySearch = '';
+    businessActivities: { industryCode: string; salesChannels: string[] }[] = [];
+    newActivity = { industryCode: '' };
+    businessActivityError: string | null = null;
 
     @Output() signupSuccess = new EventEmitter<unknown>();
 
@@ -126,6 +137,11 @@ export class SignupComponent {
         this.disableEmbeddedPayment = userType === 'individual';
         this.disableExtraOptions = userType === 'individual';
 
+        if (activity !== 'embeddedPayment') {
+            this.businessActivities = [];
+            this.businessActivityError = null;
+        }
+
         this.cdr.markForCheck();
     }
 
@@ -150,17 +166,78 @@ export class SignupComponent {
         return c && c.invalid && (c.dirty || c.touched);
     }
 
+    isEmbeddedPayment(): boolean {
+        return this.form.get('activityReason')!.value === 'embeddedPayment';
+    }
+
+    filterIndustries() {
+        const term = this.industrySearch.toLowerCase();
+        this.filteredIndustries = INDUSTRY_CODES.filter(
+            i => i.label.toLowerCase().includes(term) || i.code.toLowerCase().includes(term)
+        );
+        this.cdr.markForCheck();
+    }
+
+    onIndustrySelected(code: string) {
+        this.newActivity.industryCode = code;
+        this.industrySearch = this.getIndustryLabel(code);
+        this.cdr.markForCheck();
+    }
+
+    addActivity() {
+        if (!this.newActivity.industryCode) {
+            this.businessActivityError = 'Select an industry.';
+            this.cdr.markForCheck();
+            return;
+        }
+
+        this.businessActivities.push({
+            industryCode: this.newActivity.industryCode,
+            salesChannels: ['pos', 'eCommerce', 'payByLink'],
+        });
+        this.newActivity = { industryCode: '' };
+        this.industrySearch = '';
+        this.filteredIndustries = [...INDUSTRY_CODES];
+        this.businessActivityError = null;
+        this.cdr.markForCheck();
+    }
+
+    removeActivity(index: number) {
+        this.businessActivities.splice(index, 1);
+        this.cdr.markForCheck();
+    }
+
+    getIndustryLabel(code: string): string {
+        const ind = INDUSTRY_CODES.find(i => i.code === code);
+        return ind ? ind.label : code;
+    }
+
+    canSubmit(): boolean {
+        if (this.form.invalid || this.loading) return false;
+        if (this.isEmbeddedPayment() && this.businessActivities.length === 0) return false;
+        return true;
+    }
+
     onSubmit() {
         if (!this.form.valid) return;
+        if (this.isEmbeddedPayment() && this.businessActivities.length === 0) {
+            this.businessActivityError = 'At least one business activity is required for Embedded Payment.';
+            this.cdr.markForCheck();
+            return;
+        }
         this.error = null;
         this.loading = true;
 
-        let payload = { ...this.form.value };
+        let payload: any = { ...this.form.value };
         if (payload.userType === 'individual') {
             delete payload.legalEntityName;
         } else if (payload.userType === 'organization') {
             delete payload.firstName;
             delete payload.lastName;
+        }
+
+        if (this.isEmbeddedPayment()) {
+            payload.businessActivities = this.businessActivities;
         }
 
         this.authService.signup(payload).subscribe({

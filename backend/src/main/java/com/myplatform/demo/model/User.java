@@ -32,6 +32,9 @@ public class User {
     private String bankAccountId;
     private String bankAccountNumber;
 
+    @Transient
+    private List<Activity> businessActivities;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StoreCustomer> storesCustomer;
 }

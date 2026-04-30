@@ -1,6 +1,20 @@
 <div class="fintech-wrapper">
 
-  <mat-card class="account-card" *ngIf="accountInfo">
+  <!-- No device warning -->
+  <mat-card class="no-device-warning" *ngIf="hasDevices() === false">
+    <div class="warning-banner">
+      <div class="warning-icon-wrapper">
+        <mat-icon>warning_amber</mat-icon>
+      </div>
+      <div class="warning-text">
+        <h3>No trusted device registered</h3>
+        <p>You need to register a device before you can make transfers. This device will be used for Strong Customer Authentication (SCA) to secure your transactions.</p>
+      </div>
+    </div>
+    <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
+  </mat-card>
+
+  <mat-card class="account-card" *ngIf="accountInfo && hasDevices()">
     <div class="account-header">
       <p class="account-label">Available Balance</p>
       <h1 class="account-balance">
@@ -17,7 +31,7 @@
     </div>
   </mat-card>
 
-  <mat-card class="transfer-card success-state" *ngIf="isSuccess">
+  <mat-card class="transfer-card success-state" *ngIf="isSuccess && hasDevices()">
     <div class="success-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
@@ -29,7 +43,7 @@
     <button mat-flat-button class="fintech-btn primary" (click)="resetForm()">Send another transfer</button>
   </mat-card>
 
-  <mat-card class="transfer-card" *ngIf="!isSuccess">
+  <mat-card class="transfer-card" *ngIf="!isSuccess && hasDevices()">
     <h2>Send Money</h2>
 
     <form [formGroup]="form" (ngSubmit)="submit()">

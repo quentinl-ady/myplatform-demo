@@ -33,3 +33,46 @@
   margin-right: 8px;
   vertical-align: middle;
 }
+.business-activities-section {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fafafa;
+}
+.required-badge {
+  font-size: 0.75rem;
+  color: #fff;
+  background: #f44336;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.activities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.activity-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #e8f5e9;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+.activity-chip .remove-btn {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+}
+.add-activity-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.add-activity-btn {
+  align-self: flex-start;
+}

@@ -224,6 +224,12 @@ hr.divider {
   outline: none;
   border-color: var(--fintech-primary);
 }
+.full-width {
+  width: 100%;
+}
+.business-form mat-form-field {
+  width: 100%;
+}
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;

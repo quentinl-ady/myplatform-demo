@@ -41,12 +41,12 @@ public class TransferService {
         return searchRegisteredDevicesResponse.getData();
     }
 
-    public RegisterSCAResponse registerDevice(String sdkOutput, String paymentInstrumentId) throws IOException, ApiException {
+    public RegisterSCAResponse registerDevice(String sdkOutput, String paymentInstrumentId, String deviceName) throws IOException, ApiException {
         DelegatedAuthenticationData delegatedAuthenticationData = new DelegatedAuthenticationData();
         delegatedAuthenticationData.setSdkOutput(sdkOutput);
 
         RegisterSCARequest registerSCARequest = new RegisterSCARequest()
-                .name("macbook adyen")
+                .name(deviceName != null && !deviceName.isBlank() ? deviceName : "My Device")
                 .paymentInstrumentId(paymentInstrumentId)
                 .strongCustomerAuthentication(delegatedAuthenticationData);
 

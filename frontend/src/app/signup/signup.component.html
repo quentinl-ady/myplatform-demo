@@ -120,6 +120,44 @@
     <mat-error *ngIf="lastNameInvalid()">Last name required.</mat-error>
   </mat-form-field>
 
+  <!-- BUSINESS ACTIVITIES (required for Embedded Payment) -->
+  <div *ngIf="isEmbeddedPayment()" class="business-activities-section">
+    <label class="section-label">What do you sell?</label>
+
+    <div *ngIf="businessActivities.length" class="activities-list">
+      <div *ngFor="let act of businessActivities; let i = index" class="activity-chip">
+        <span>{{ getIndustryLabel(act.industryCode) }}</span>
+        <button type="button" mat-icon-button (click)="removeActivity(i)" class="remove-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="add-activity-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Industry</mat-label>
+        <input matInput
+               [(ngModel)]="industrySearch"
+               [ngModelOptions]="{standalone: true}"
+               [matAutocomplete]="industryAuto"
+               (ngModelChange)="filterIndustries()"
+               placeholder="Search an industry..." />
+        <mat-autocomplete #industryAuto="matAutocomplete"
+                          (optionSelected)="onIndustrySelected($event.option.value)">
+          <mat-option *ngFor="let ind of filteredIndustries" [value]="ind.code">
+            {{ ind.label }} ({{ ind.code }})
+          </mat-option>
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <button type="button" mat-stroked-button color="primary" (click)="addActivity()" class="add-activity-btn">
+        <mat-icon>add</mat-icon> Add Activity
+      </button>
+    </div>
+
+    <div *ngIf="businessActivityError" class="error">{{ businessActivityError }}</div>
+  </div>
+
   <!-- COUNTRY -->
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>Country</mat-label>
@@ -162,7 +200,7 @@
     mat-raised-button
     color="accent"
     class="full-width"
-    [disabled]="form.invalid || loading"
+    [disabled]="!canSubmit()"
   >
     <mat-spinner *ngIf="loading" diameter="20" class="button-spinner"></mat-spinner>
     <span *ngIf="!loading">Sign Up</span>

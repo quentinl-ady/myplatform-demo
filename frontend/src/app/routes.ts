@@ -26,9 +26,9 @@ const routeConfig: Routes = [
         title: 'Dashboard'
       },
       {
-        path: 'payment',
+        path: 'transactions',
         loadComponent: () => import('./payment/payment.component').then(m => m.PaymentComponent),
-        title: 'Payment'
+        title: 'Transactions'
       },
       {
         path: 'report',
@@ -48,7 +48,7 @@ const routeConfig: Routes = [
       {
         path: 'businessloans',
         loadComponent: () => import('./business-loans/business-loans.component').then(m => m.BusinessLoansComponent),
-        title: 'BusinessLoans'
+        title: 'Loans'
       },
       {
         path: 'store',
@@ -66,19 +66,19 @@ const routeConfig: Routes = [
          title: 'Pay-by-Link'
       },
       {
-        path: 'device',
+        path: 'business-account-device',
         loadComponent: () => import('./device/device.component').then(m => m.DeviceComponent),
-        title: 'Device'
+        title: 'Trusted Devices'
       },
       {
-        path: 'transfer',
+        path: 'business-account',
         loadComponent: () => import('./transfer/transfer.component').then(m => m.TransferComponent),
-        title: 'Transfer'
+        title: 'Business Account'
       },
       {
         path: 'pos',
         loadComponent: () => import('./pos/pos.component').then(m => m.PosComponent),
-        title: 'POS'
+        title: 'Point of Sale'
       },
       {
         path: 'cards',

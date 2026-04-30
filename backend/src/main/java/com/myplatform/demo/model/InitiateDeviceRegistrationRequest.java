@@ -8,4 +8,5 @@ import lombok.Setter;
 public class InitiateDeviceRegistrationRequest {
     private String sdkOutput;
     private Long userId;
+    private String deviceName;
 }

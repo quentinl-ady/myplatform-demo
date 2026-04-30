@@ -2,6 +2,7 @@ package com.myplatform.demo.controller;
 
 import com.myplatform.demo.exception.ConflictException;
 import com.myplatform.demo.exception.UnauthorizedException;
+import com.myplatform.demo.model.Activity;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.AccountHolderService;
@@ -10,6 +11,7 @@ import com.myplatform.demo.service.LegalEntityService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -39,6 +41,14 @@ public class AuthController {
         }
 
         String legalEntityId = legalEntityService.createLegalEntity(user);
+
+        List<Activity> activities = user.getBusinessActivities();
+        if (activities != null && !activities.isEmpty()) {
+            for (Activity activity : activities) {
+                legalEntityService.createBusinessLine(activity, legalEntityId);
+            }
+        }
+
         String accountHolderId = accountHolderService.createAccountHolder(legalEntityId, user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing(), user.getFirstName(), user.getLastName(), user.getLegalEntityName(), user.getUserType());
         String balanceAccountId = balanceAccountService.createBalanceAccountId(accountHolderId, user.getCurrencyCode());
 

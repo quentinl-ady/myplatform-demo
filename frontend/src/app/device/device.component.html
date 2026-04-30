@@ -5,18 +5,7 @@
     <p>Manage the devices you use to securely approve transactions.</p>
   </div>
 
-  <mat-card class="action-card">
-    <div class="action-content">
-      <div class="action-text">
-        <h3>Add this device</h3>
-        <p>Register the device you are currently using to enable SCA.</p>
-      </div>
-      <button mat-flat-button class="fintech-btn primary" (click)="registerDevice()" [disabled]="loading()">
-        <span *ngIf="!loading()">Register</span>
-        <mat-spinner *ngIf="loading()" diameter="20" color="accent"></mat-spinner>
-      </button>
-    </div>
-  </mat-card>
+  <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
 
   <div class="device-list" *ngIf="devices().length > 0">
     <h3 class="section-title">Your Devices</h3>
@@ -43,7 +32,7 @@
     </mat-card>
   </div>
 
-  <mat-card class="empty-state" *ngIf="!devices().length && !loading()">
+  <mat-card class="empty-state" *ngIf="!devices().length">
     <div class="empty-icon-wrapper">
       <mat-icon>phonelink_off</mat-icon>
     </div>

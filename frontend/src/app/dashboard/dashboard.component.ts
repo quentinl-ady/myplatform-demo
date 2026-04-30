@@ -1,7 +1,7 @@
 import { Component, signal, inject, OnInit, OnDestroy, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from "@angular/common";
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { OnboardingPart, OnboardingResponse, User, BankAccountStatus, BusinessLine } from "../models";
@@ -18,7 +18,8 @@ import '@adyen/kyc-components/transfer-instrument-configuration';
   imports: [
     CommonModule,
     MaterialModule,
-    ReactiveFormsModule
+    ReactiveFormsModule,
+    FormsModule
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
@@ -38,6 +39,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   submitting = false;
 
   readonly INDUSTRY_CODES = INDUSTRY_CODES;
+  filteredIndustries = [...INDUSTRY_CODES];
+  industrySearch = '';
 
   businessForm: FormGroup;
 
@@ -145,6 +148,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return ind ? ind.label : code;
   }
 
+  filterIndustries() {
+    const term = this.industrySearch.toLowerCase();
+    this.filteredIndustries = INDUSTRY_CODES.filter(
+      i => i.label.toLowerCase().includes(term) || i.code.toLowerCase().includes(term)
+    );
+  }
+
+  onIndustrySelected(code: string) {
+    this.businessForm.get('industryCode')!.setValue(code);
+    this.industrySearch = this.getIndustryLabel(code);
+  }
+
   loadBusinessLines() {
     this.activityService.getBusinessLines(Number(this.userId)).subscribe({
       next: (res) => this.businessLines.set(res),
@@ -172,6 +187,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.businessLines.set([...this.businessLines(), res]);
         this.matSnackBar.open('Business line added successfully', 'Close', { duration: 3000 });
         this.businessForm.reset({ industryCode: '', pos: false, eCommerce: false, payByLink: false });
+        this.industrySearch = '';
+        this.filteredIndustries = [...INDUSTRY_CODES];
         this.submitting = false;
       },
       error: () => {
@@ -298,7 +315,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   goToTransfers() {
-    this.router.navigate(['/', this.userId, 'transfer']);
+    this.router.navigate(['/', this.userId, 'business-account']);
   }
 
   validateKyc(userId: string) {

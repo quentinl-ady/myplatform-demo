@@ -16,6 +16,7 @@ import {MatButtonToggleModule} from "@angular/material/button-toggle";
 import {MatCheckboxModule} from "@angular/material/checkbox";
 import {MatChipsModule} from "@angular/material/chips";
 import {MatBadgeModule} from "@angular/material/badge";
+import {MatAutocompleteModule} from "@angular/material/autocomplete";
 
 @NgModule({
     exports: [
@@ -34,7 +35,8 @@ import {MatBadgeModule} from "@angular/material/badge";
     MatTooltipModule,
         MatButtonToggleModule,
         MatChipsModule,
-        MatBadgeModule
+        MatBadgeModule,
+        MatAutocompleteModule
 
     ]
 

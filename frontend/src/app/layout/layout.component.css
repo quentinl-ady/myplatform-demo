@@ -78,6 +78,17 @@
   margin-right: 12px !important;
 }
 
+/* Disabled State */
+::ng-deep .fintech-nav-list .nav-disabled {
+  pointer-events: none !important;
+  opacity: 0.4 !important;
+  cursor: default !important;
+}
+::ng-deep .fintech-nav-list .nav-disabled .mat-mdc-list-item-title,
+::ng-deep .fintech-nav-list .nav-disabled .mat-mdc-list-item-icon {
+  color: var(--fintech-text-secondary) !important;
+}
+
 /* Active State (The Pill) */
 ::ng-deep .fintech-nav-list .active-link {
   background-color: var(--fintech-primary) !important;

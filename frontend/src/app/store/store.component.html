@@ -76,14 +76,8 @@
 
             <div class="form-group">
               <label>Country</label>
-              <select class="fintech-input" formControlName="country" (change)="onCountryChange($event)">
-                <option value="" disabled selected>Select a country</option>
-                <option value="FR">France</option>
-                <option value="UK">United Kingdom</option>
-                <option value="NL">Netherlands</option>
-                <option value="DE">Germany</option>
-                <option value="US">United States</option>
-              </select>
+              <input type="text" class="fintech-input" [value]="userCountryLabel" readonly disabled />
+              <input type="hidden" formControlName="country" />
             </div>
 
             <div class="form-group">
