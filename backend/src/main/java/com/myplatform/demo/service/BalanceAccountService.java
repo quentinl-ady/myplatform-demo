@@ -71,6 +71,11 @@ public class BalanceAccountService {
                 .orElse(null);
     }
 
+    public String getBalanceAccountIdForPaymentInstrument(String paymentInstrumentId) throws IOException, ApiException {
+        PaymentInstrument paymentInstrument = paymentInstrumentsApi.getPaymentInstrument(paymentInstrumentId);
+        return paymentInstrument.getBalanceAccountId();
+    }
+
     public BankAccountInformationResponse getBankAccountInformation(String bankAccountId, String userCurrency) throws IOException, ApiException {
         BankAccountInformationResponse bankAccountInformationResponse = new BankAccountInformationResponse();
         PaymentInstrument paymentInstrument = paymentInstrumentsApi.getPaymentInstrument(bankAccountId);

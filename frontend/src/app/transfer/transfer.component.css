@@ -11,7 +11,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.fintech-wrapper { max-width: 480px; margin: 40px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 24px; }
+.fintech-wrapper { max-width: 640px; margin: 40px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 24px; }
 mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radius); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important; padding: 24px; }
 .account-header { text-align: center; margin-bottom: 24px; }
 .account-label { color: var(--fintech-text-secondary); font-size: 14px; font-weight: 500; margin: 0 0 8px 0; }

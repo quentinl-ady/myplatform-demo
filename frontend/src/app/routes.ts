@@ -76,6 +76,11 @@ const routeConfig: Routes = [
         title: 'Business Account'
       },
       {
+        path: 'standing-orders',
+        loadComponent: () => import('./standing-orders/standing-orders.component').then(m => m.StandingOrdersComponent),
+        title: 'Standing Orders'
+      },
+      {
         path: 'pos',
         loadComponent: () => import('./pos/pos.component').then(m => m.PosComponent),
         title: 'Point of Sale'

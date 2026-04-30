@@ -58,6 +58,10 @@
          <mat-icon matListItemIcon>devices</mat-icon>
          <span matListItemTitle>Trusted Devices</span>
       </a>
+      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'standing-orders'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
+        <mat-icon matListItemIcon>schedule_send</mat-icon>
+        <span matListItemTitle>Standing Orders</span>
+      </a>
 
       <p class="nav-section-title">Cards</p>
       <a mat-list-item [routerLink]="issuingEnabled ? ['/', userId, 'cards'] : null" routerLinkActive="active-link" [class.nav-disabled]="!issuingEnabled">
