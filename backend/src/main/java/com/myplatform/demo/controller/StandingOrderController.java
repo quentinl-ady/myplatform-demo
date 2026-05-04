@@ -91,10 +91,7 @@ public class StandingOrderController {
         if (bankAccountId == null || bankAccountId.isBlank()) {
             throw new BadRequestException("User has no bank account");
         }
-        String resolvedBA = balanceAccountService.getBalanceAccountIdForPaymentInstrument(bankAccountId);
-        log.info("[StandingOrder] User {} -> bankAccountId (PI): {}, balanceAccountId (main): {}, resolved banking BA: {}",
-                user.getId(), bankAccountId, user.getBalanceAccountId(), resolvedBA);
-        return resolvedBA;
+        return balanceAccountService.getBalanceAccountIdForPaymentInstrument(bankAccountId);
     }
 
     private User findUser(Long userId) {

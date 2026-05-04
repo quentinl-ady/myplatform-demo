@@ -76,6 +76,18 @@ public class BalanceAccountService {
         return paymentInstrument.getBalanceAccountId();
     }
 
+    public String getPhysicalBankAccountId(String balanceAccountId) throws IOException, ApiException {
+        PaginatedPaymentInstrumentsResponse response =
+                balanceAccountsApi.getPaymentInstrumentsLinkedToBalanceAccount(balanceAccountId);
+        if (response.getPaymentInstruments() == null) return null;
+        return response.getPaymentInstruments().stream()
+                .filter(pi -> pi.getType() == PaymentInstrument.TypeEnum.BANKACCOUNT)
+                .filter(pi -> pi.getBankAccount() != null && "physical".equalsIgnoreCase(pi.getBankAccount().getFormFactor()))
+                .map(PaymentInstrument::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
     public BankAccountInformationResponse getBankAccountInformation(String bankAccountId, String userCurrency) throws IOException, ApiException {
         BankAccountInformationResponse bankAccountInformationResponse = new BankAccountInformationResponse();
         PaymentInstrument paymentInstrument = paymentInstrumentsApi.getPaymentInstrument(bankAccountId);

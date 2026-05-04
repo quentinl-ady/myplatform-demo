@@ -158,13 +158,12 @@ public class TransferService {
         transferInfo.setCategory(TransferInfo.CategoryEnum.BANK);
         CounterpartyInfoV3 counterpartyInfo = new CounterpartyInfoV3();
         BankAccountV3 bankAccount = new BankAccountV3();
-        bankAccount.setAccountHolder(new PartyIdentification().fullName("Quentin Lecornu"));
+        bankAccount.setAccountHolder(new PartyIdentification().fullName(request.getCounterpartyName()));
         bankAccount.setAccountIdentification(accountIdentification);
         counterpartyInfo.setBankAccount(bankAccount);
         transferInfo.setCounterparty(counterpartyInfo);
-        transferInfo.setDescription(request.getReference());
+        transferInfo.setDescription(request.getDescription() != null ? request.getDescription() : request.getReference());
         transferInfo.setReference(request.getReference());
-        transferInfo.setReferenceForBeneficiary(request.getReference());
         transferInfo.setPriority(TransferInfo.PriorityEnum.fromValue(request.getTransferType()));
         return transferInfo;
     }

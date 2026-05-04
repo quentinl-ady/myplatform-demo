@@ -10,6 +10,7 @@ public class TransferRequest {
     String sdkOutput;
     Long amount;
     String reference;
+    String description;
     Long userId;
     String transferType;
     String counterpartyCountry;
@@ -17,4 +18,5 @@ public class TransferRequest {
     String sortCode;
     String iban;
     String routingNumber;
+    String counterpartyName;
 }

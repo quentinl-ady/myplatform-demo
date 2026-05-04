@@ -12,6 +12,7 @@ import {
   IsCrossBorderRequest,
   RegisterSCAFinalResponse,
   RegisterSCAResponse,
+  TransferDetail,
   VerifyCounterpartyNameRequest
 } from '../models';
 
@@ -60,5 +61,17 @@ export class TransferService {
     return this.http.post<CounterpartyVerificationResponse>(`${this.baseUrl}/api/bank-validation/verify-counterparty`, payload, {
       responseType: 'json'
     });
+  }
+
+  initiateBankTransactions(userId: number, sdkOutput: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/initiate`, { sdkOutput });
+  }
+
+  finalizeBankTransactions(userId: number, sdkOutput: string, createdSince: string, createdUntil: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/finalize`, { sdkOutput, createdSince, createdUntil });
+  }
+
+  getTransferDetail(userId: number, transferId: string): Observable<TransferDetail> {
+    return this.http.get<TransferDetail>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/detail/${transferId}`);
   }
 }
