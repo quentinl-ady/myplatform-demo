@@ -38,6 +38,10 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .page-header h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px 0; color: var(--fintech-text); }
 .page-header .subtitle { font-size: 15px; color: var(--fintech-text-secondary); margin: 0; }
 
+/* Header actions */
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.last-updated-label { font-size: 12px; color: var(--fintech-text-secondary); white-space: nowrap; }
+
 /* Loading & Empty & Error */
 .loading-state, .empty-state { text-align: center; padding: 64px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); }
 .loading-state mat-spinner { margin: 0 auto 16px; }

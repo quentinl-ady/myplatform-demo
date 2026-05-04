@@ -41,10 +41,13 @@
         <h1>Bank Transactions</h1>
         <p class="subtitle">Transfers, incoming payments and more</p>
       </div>
-      <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
-        <mat-icon>refresh</mat-icon>
-        Refresh
-      </button>
+      <div class="header-actions">
+        <span class="last-updated-label" *ngIf="lastUpdated && !isLoadingTransactions">{{ getLastUpdatedLabel() }}</span>
+        <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
+          <mat-icon>refresh</mat-icon>
+          Refresh
+        </button>
+      </div>
     </div>
 
     <!-- Loading -->

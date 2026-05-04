@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectorRef, NgZone, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -20,7 +20,7 @@ import { AccountService, TransferService } from "../services";
   templateUrl: './transfer.component.html',
   styleUrl: './transfer.component.css'
 })
-export class TransferComponent implements OnInit {
+export class TransferComponent implements OnInit, OnDestroy {
 
   private route = inject(ActivatedRoute);
   private accountService = inject(AccountService);
@@ -42,6 +42,9 @@ export class TransferComponent implements OnInit {
   transferDetail?: TransferDetail;
   isLoadingDetail = false;
   detailError = '';
+
+  lastUpdated: number | null = null;
+  private lastUpdatedTimer: any = null;
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -88,7 +91,21 @@ export class TransferComponent implements OnInit {
     this.cdr.detectChanges();
   }
 
-  async loadTransactions() {
+  async loadTransactions(forceRefresh = false) {
+    if (!forceRefresh) {
+      const cached = this.transferService.getCachedTransactions(Number(this.userId));
+      if (cached) {
+        this.transactions = cached;
+        this.lastUpdated = this.transferService.getCacheTimestamp(Number(this.userId));
+        this.isLoadingTransactions = false;
+        this.startLastUpdatedTimer();
+        this.cdr.detectChanges();
+        return;
+      }
+    } else {
+      this.transferService.invalidateTransactionCache(Number(this.userId));
+    }
+
     this.isLoadingTransactions = true;
     this.transactionsError = '';
     this.cdr.detectChanges();
@@ -102,6 +119,9 @@ export class TransferComponent implements OnInit {
           this.ngZone.run(() => {
             if (res.status === 'completed') {
               this.transactions = res.transactions || [];
+              this.transferService.setCachedTransactions(Number(this.userId), this.transactions);
+              this.lastUpdated = Date.now();
+              this.startLastUpdatedTimer();
               this.isLoadingTransactions = false;
             } else if (res.status === 'sca_required') {
               this.handleScaChallenge(res.authParam1, res.createdSince, res.createdUntil);
@@ -136,6 +156,9 @@ export class TransferComponent implements OnInit {
         next: (res) => {
           this.ngZone.run(() => {
             this.transactions = res.transactions || [];
+            this.transferService.setCachedTransactions(Number(this.userId), this.transactions);
+            this.lastUpdated = Date.now();
+            this.startLastUpdatedTimer();
             this.isLoadingTransactions = false;
             this.cdr.detectChanges();
           });
@@ -156,7 +179,7 @@ export class TransferComponent implements OnInit {
   }
 
   refresh() {
-    this.loadTransactions();
+    this.loadTransactions(true);
   }
 
   openDetail(tx: BankTransaction) {
@@ -255,5 +278,33 @@ export class TransferComponent implements OnInit {
 
   getDirectionLabel(direction: string): string {
     return direction === 'incoming' ? 'Incoming' : 'Outgoing';
+  }
+
+  getLastUpdatedLabel(): string {
+    if (!this.lastUpdated) return '';
+    const seconds = Math.floor((Date.now() - this.lastUpdated) / 1000);
+    if (seconds < 60) return 'Updated just now';
+    const minutes = Math.floor(seconds / 60);
+    return `Updated ${minutes} min ago`;
+  }
+
+  private startLastUpdatedTimer() {
+    this.stopLastUpdatedTimer();
+    this.lastUpdatedTimer = setInterval(() => {
+      if (this.lastUpdated) {
+        this.cdr.detectChanges();
+      }
+    }, 30_000);
+  }
+
+  private stopLastUpdatedTimer() {
+    if (this.lastUpdatedTimer) {
+      clearInterval(this.lastUpdatedTimer);
+      this.lastUpdatedTimer = null;
+    }
+  }
+
+  ngOnDestroy() {
+    this.stopLastUpdatedTimer();
   }
 }

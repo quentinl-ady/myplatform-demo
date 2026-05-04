@@ -478,6 +478,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             if (!res.authParam1) {
               this.isOneshotSuccess = true;
               this.isOneshotProcessing = false;
+              this.transferService.invalidateTransactionCache(Number(this.userId));
               this.fetchAccountInformation();
             } else {
               this.transferResponse = res;
@@ -521,6 +522,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.isOneshotSuccess = true;
             this.showOneshotScaModal = false;
             this.isOneshotProcessing = false;
+            this.transferService.invalidateTransactionCache(Number(this.userId));
             this.fetchAccountInformation();
             this.cdr.detectChanges();
           });

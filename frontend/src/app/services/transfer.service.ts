@@ -1,6 +1,7 @@
 import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
+import {BankTransaction} from '../models';
 import {environment} from '../../environments/environment';
 import {
   CounterpartyVerificationResponse,
@@ -16,10 +17,41 @@ import {
   VerifyCounterpartyNameRequest
 } from '../models';
 
+interface TransactionCache {
+  transactions: BankTransaction[];
+  timestamp: number;
+}
+
 @Injectable({providedIn: 'root'})
 export class TransferService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
+
+  private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private transactionCache = new Map<number, TransactionCache>();
+
+  getCachedTransactions(userId: number): BankTransaction[] | null {
+    const entry = this.transactionCache.get(userId);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > TransferService.CACHE_TTL_MS) {
+      this.transactionCache.delete(userId);
+      return null;
+    }
+    return entry.transactions;
+  }
+
+  setCachedTransactions(userId: number, transactions: BankTransaction[]): void {
+    this.transactionCache.set(userId, { transactions, timestamp: Date.now() });
+  }
+
+  invalidateTransactionCache(userId: number): void {
+    this.transactionCache.delete(userId);
+  }
+
+  getCacheTimestamp(userId: number): number | null {
+    const entry = this.transactionCache.get(userId);
+    return entry ? entry.timestamp : null;
+  }
 
   listDevices(userId: number): Observable<Device[]> {
     return this.http.get<Device[]>(`${this.baseUrl}/api/transfers/${userId}/devices`);
