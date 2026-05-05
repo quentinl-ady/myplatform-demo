@@ -20,6 +20,7 @@ public class IssuingService {
     private final ManageCardPinApi manageCardPinApi;
     private final PaymentInstrumentsApi paymentInstrumentsApi;
     private final TransactionRulesApi transactionRulesApi;
+    private final BalanceAccountsApi balanceAccountsApi;
     private final String issuingCountry;
     private final String visaSubvariant;
     private final String mcSubvariant;
@@ -31,6 +32,7 @@ public class IssuingService {
         this.manageCardPinApi = new ManageCardPinApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
         this.transactionRulesApi = new TransactionRulesApi(balancePlatformClient);
+        this.balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
 
         this.issuingCountry = issuingCountry;
         this.visaSubvariant = visaSubvariant;
@@ -81,6 +83,15 @@ public class IssuingService {
         CardResponse response = new CardResponse();
         response.setPaymentInstrumentId(pi.getId());
         response.setStatus(pi.getStatus() != null ? pi.getStatus().getValue() : "unknown");
+
+        if (pi.getBalanceAccountId() != null) {
+            try {
+                BalanceAccount ba = balanceAccountsApi.getBalanceAccount(pi.getBalanceAccountId());
+                response.setBalanceAccountDescription(ba.getDescription());
+            } catch (Exception e) {
+                response.setBalanceAccountDescription(pi.getBalanceAccountId());
+            }
+        }
 
         if (pi.getCard() != null) {
             response.setCardholderName(pi.getCard().getCardholderName());

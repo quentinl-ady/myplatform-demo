@@ -7,6 +7,7 @@ export interface TransactionRuleRequest {
 
 export interface CreateCardRequest {
   userId: string;
+  balanceAccountId: string;
   cardholderName: string;
   brand: string;
   email?: string;
@@ -38,6 +39,7 @@ export interface CardResponse {
   expiryMonth: string;
   expiryYear: string;
   status: string;
+  balanceAccountDescription: string;
   transactionRules: TransactionRuleResponse[];
 }
 

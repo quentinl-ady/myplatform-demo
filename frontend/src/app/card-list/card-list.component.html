@@ -134,6 +134,10 @@
             <span class="value">{{ revealedData.cvc }}</span>
           </div>
         </div>
+        <div class="card-balance-account" *ngIf="card.balanceAccountDescription">
+          <span class="label">BALANCE ACCOUNT</span>
+          <span class="value">{{ card.balanceAccountDescription }}</span>
+        </div>
       </div>
 
       <div class="card-actions-quick" *ngIf="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
@@ -230,6 +234,10 @@
               <span class="value">{{ revealedData.cvc }}</span>
             </div>
           </div>
+          <div class="card-balance-account" *ngIf="card.balanceAccountDescription">
+            <span class="label">BALANCE ACCOUNT</span>
+            <span class="value">{{ card.balanceAccountDescription }}</span>
+          </div>
         </div>
 
         <div class="card-actions-quick" *ngIf="selectedCard?.paymentInstrumentId === card.paymentInstrumentId">
@@ -295,6 +303,10 @@
                 <span class="label">EXPIRES</span>
                 <span class="value">{{ card.expiryMonth }}/{{ card.expiryYear.slice(-2) }}</span>
               </div>
+            </div>
+            <div class="card-balance-account" *ngIf="card.balanceAccountDescription">
+              <span class="label">BALANCE ACCOUNT</span>
+              <span class="value">{{ card.balanceAccountDescription }}</span>
             </div>
           </div>
         </div>

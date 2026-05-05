@@ -35,6 +35,16 @@
         <h3>Card Information</h3>
 
         <div class="form-group">
+          <label>Balance Account</label>
+          <select class="fintech-input" formControlName="balanceAccountId">
+            <option value="" disabled>Select a balance account</option>
+            <option *ngFor="let ba of balanceAccounts" [value]="ba.balanceAccountId">
+              {{ ba.description }} ({{ ba.currencyCode }})
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label>Cardholder Name</label>
           <input type="text" class="fintech-input" formControlName="cardholderName"
                  placeholder="Enter cardholder name" />
@@ -212,6 +222,10 @@
         <span class="value brand-badge" [class.visa]="createdCard?.brand === 'visa'" [class.mc]="createdCard?.brand === 'mc'">
           {{ createdCard?.brand === 'visa' ? 'Visa' : 'Mastercard' }}
         </span>
+      </div>
+      <div class="detail-row" *ngIf="createdCard?.balanceAccountDescription">
+        <span class="label">Balance Account</span>
+        <span class="value">{{ createdCard?.balanceAccountDescription }}</span>
       </div>
     </div>
 

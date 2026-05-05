@@ -40,12 +40,12 @@ public class IssuingController {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (user.getBalanceAccountId() == null) {
-            throw new BadRequestException("User has no balance account");
+        if (request.getBalanceAccountId() == null || request.getBalanceAccountId().isBlank()) {
+            throw new BadRequestException("Balance account is required");
         }
 
         String paymentInstrumentId = issuingService.createVirtualCard(
-                user.getBalanceAccountId(),
+                request.getBalanceAccountId(),
                 request.getCardholderName(),
                 request.getBrand(),
                 request.getEmail(),

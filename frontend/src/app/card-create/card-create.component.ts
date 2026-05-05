@@ -8,6 +8,7 @@ import { MaterialModule } from '../material.module';
 
 import {
   User,
+  BalanceAccount,
   CreateCardRequest,
   TransactionRuleRequest,
   PhonePrefix
@@ -42,6 +43,7 @@ export class CardCreateComponent implements OnInit {
   isSuccess = false;
   createdCard?: any;
 
+  balanceAccounts: BalanceAccount[] = [];
   phonePrefixes: PhonePrefix[] = [];
   allMccs = MCC_CODES;
   selectedMccs: { code: string; label: string; risky?: boolean }[] = [];
@@ -49,6 +51,7 @@ export class CardCreateComponent implements OnInit {
   mccSearchControl = new FormControl('');
 
   form = this.fb.group({
+    balanceAccountId: ['', Validators.required],
     cardholderName: ['', [Validators.required, Validators.minLength(2)]],
     brand: ['visa', Validators.required],
     email: ['', [Validators.email]],
@@ -117,10 +120,26 @@ export class CardCreateComponent implements OnInit {
         if (user.email) {
           this.form.patchValue({ email: user.email });
         }
+        this.loadBalanceAccounts();
         this.cdr.detectChanges();
       },
       error: () => {
         this.snack.open('Failed to load user information', 'Close', { duration: 3000 });
+      }
+    });
+  }
+
+  loadBalanceAccounts() {
+    this.accountService.getBalanceAccounts(this.userId).subscribe({
+      next: (accounts) => {
+        this.balanceAccounts = accounts;
+        if (accounts.length === 1) {
+          this.form.patchValue({ balanceAccountId: accounts[0].balanceAccountId });
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.snack.open('Failed to load balance accounts', 'Close', { duration: 3000 });
       }
     });
   }
@@ -169,6 +188,7 @@ export class CardCreateComponent implements OnInit {
 
     const request: CreateCardRequest = {
       userId: this.userId,
+      balanceAccountId: this.form.value.balanceAccountId!,
       cardholderName: this.form.value.cardholderName!,
       brand: this.form.value.brand!,
       email,
@@ -194,7 +214,7 @@ export class CardCreateComponent implements OnInit {
   createAnother() {
     this.isSuccess = false;
     this.createdCard = null;
-    this.form.reset({ brand: 'visa', cardholderName: '', email: this.user?.email || '', phonePrefix: '+31', phoneNumber: '' });
+    this.form.reset({ balanceAccountId: this.balanceAccounts.length === 1 ? this.balanceAccounts[0].balanceAccountId : '', brand: 'visa', cardholderName: '', email: this.user?.email || '', phonePrefix: '+31', phoneNumber: '' });
     this.rulesArray.clear();
     this.selectedMccs = [];
     this.filterMccs('');
