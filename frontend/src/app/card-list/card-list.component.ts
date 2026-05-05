@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
+import * as forge from 'node-forge';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
@@ -215,13 +216,43 @@ export class CardListComponent implements OnInit {
     this.cdr.detectChanges();
 
     try {
-      // All crypto is now handled server-side
-      const { cardData } = await this.issuingService.revealCardData(card.paymentInstrumentId).toPromise() as { cardData: string };
+      // Step 1: Get RSA public key from Adyen (via backend)
+      const { publicKey: publicKeyRaw } = await this.issuingService.getPublicKey('panReveal').toPromise() as { publicKey: string };
 
-      // Parse the decrypted JSON data
-      const parsedData = JSON.parse(cardData);
+      // Ensure PEM format
+      let publicKeyPem = publicKeyRaw;
+      if (!publicKeyPem.includes('-----BEGIN')) {
+        publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKeyPem}\n-----END PUBLIC KEY-----`;
+      }
 
-      // Map Adyen response fields to our expected format
+      // Step 2: Generate AES-256 key (32 random bytes)
+      const aesKeyBytes = forge.random.getBytesSync(32);
+
+      // Step 3: Encrypt AES key with RSA public key (PKCS1 v1.5)
+      const rsaPublicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+      const encryptedAesKey = rsaPublicKey.encrypt(aesKeyBytes, 'RSAES-PKCS1-V1_5');
+
+      // Step 4: Convert encrypted key to hex
+      const encryptedKeyHex = forge.util.bytesToHex(encryptedAesKey);
+
+      // Step 5: Send to backend, which proxies to Adyen and returns encryptedData
+      const { encryptedData: encryptedDataHex } = await this.issuingService.revealCardData(card.paymentInstrumentId, encryptedKeyHex).toPromise() as { encryptedData: string };
+
+      // Step 6: Decrypt encryptedData with AES-256-CBC (IV = 16 zero bytes)
+      const encryptedDataBytes = forge.util.hexToBytes(encryptedDataHex);
+      const iv = forge.util.createBuffer('\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0');
+      const decipher = forge.cipher.createDecipher('AES-CBC', aesKeyBytes);
+      decipher.start({ iv });
+      decipher.update(forge.util.createBuffer(encryptedDataBytes));
+      const success = decipher.finish();
+      if (!success) {
+        throw new Error('AES decryption failed');
+      }
+
+      // Step 7: Parse decrypted JSON
+      const decryptedJson = decipher.output.toString();
+      const parsedData = JSON.parse(decryptedJson);
+
       this.revealedCardId = card.paymentInstrumentId;
       this.revealedData = {
         pan: parsedData.pan,

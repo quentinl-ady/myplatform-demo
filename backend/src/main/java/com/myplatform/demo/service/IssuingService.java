@@ -10,16 +10,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 import java.io.IOException;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 
 @Service
@@ -69,6 +61,7 @@ public class IssuingService {
                         .number(phone)
                         .type(Phone.TypeEnum.MOBILE));
             }
+            authentication.setPassword("123456");
             cardInfo.authentication(authentication);
         }
 
@@ -288,67 +281,12 @@ public class IssuingService {
         transactionRulesApi.deleteTransactionRule(ruleId);
     }
 
-    public String revealCardData(String paymentInstrumentId) throws Exception {
-        // Step 1: Get public key from Adyen
-        String publicKeyPem = getPublicKey("panReveal");
-
-        // Step 2: Generate AES-256 key
-        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-        keyGen.init(256);
-        SecretKey aesKey = keyGen.generateKey();
-        byte[] aesKeyBytes = aesKey.getEncoded();
-
-        // Step 3: Encrypt AES key with RSA public key (PKCS1 padding)
-        String publicKeyBase64 = publicKeyPem
-                .replace("-----BEGIN PUBLIC KEY-----", "")
-                .replace("-----END PUBLIC KEY-----", "")
-                .replaceAll("\\s", "");
-        byte[] publicKeyBytes = Base64.getDecoder().decode(publicKeyBase64);
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        PublicKey rsaPublicKey = keyFactory.generatePublic(keySpec);
-
-        Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        rsaCipher.init(Cipher.ENCRYPT_MODE, rsaPublicKey);
-        byte[] encryptedAesKey = rsaCipher.doFinal(aesKeyBytes);
-
-        // Step 4: Convert encrypted key to hex (as required by Adyen API)
-        String encryptedKeyHex = bytesToHex(encryptedAesKey);
-
-        // Step 5: Call Adyen reveal API
+    public String revealCardData(String paymentInstrumentId, String encryptedKey) throws Exception {
         PaymentInstrumentRevealRequest revealRequest = new PaymentInstrumentRevealRequest()
-                .encryptedKey(encryptedKeyHex)
+                .encryptedKey(encryptedKey)
                 .paymentInstrumentId(paymentInstrumentId);
 
         PaymentInstrumentRevealResponse revealResponse = paymentInstrumentsApi.revealDataOfPaymentInstrument(revealRequest);
-        String encryptedDataHex = revealResponse.getEncryptedData();
-
-        // Step 6: Decrypt the response with AES-256-CBC (IV = 16 zero bytes)
-        byte[] encryptedData = hexToBytes(encryptedDataHex);
-        byte[] iv = new byte[16]; // 16 zero bytes
-
-        Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-        aesCipher.init(Cipher.DECRYPT_MODE, aesKey, new IvParameterSpec(iv));
-        byte[] decryptedData = aesCipher.doFinal(encryptedData);
-
-        return new String(decryptedData, "UTF-8");
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
-
-    private byte[] hexToBytes(String hex) {
-        int len = hex.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                    + Character.digit(hex.charAt(i + 1), 16));
-        }
-        return data;
+        return revealResponse.getEncryptedData();
     }
 }

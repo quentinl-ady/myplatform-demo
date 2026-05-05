@@ -56,8 +56,12 @@ export class IssuingService {
     return this.http.delete<{ status: string }>(`${this.baseUrl}/api/issuing/rules/${ruleId}`);
   }
 
-  revealCardData(paymentInstrumentId: string): Observable<{ cardData: string }> {
-    return this.http.post<{ cardData: string }>(`${this.baseUrl}/api/issuing/reveal`, {paymentInstrumentId});
+  getPublicKey(purpose: string): Observable<{ publicKey: string }> {
+    return this.http.get<{ publicKey: string }>(`${this.baseUrl}/api/issuing/publicKey?purpose=${purpose}`);
+  }
+
+  revealCardData(paymentInstrumentId: string, encryptedKey: string): Observable<{ encryptedData: string }> {
+    return this.http.post<{ encryptedData: string }>(`${this.baseUrl}/api/issuing/reveal`, {paymentInstrumentId, encryptedKey});
   }
 
   getCardTransfers(userId: number, paymentInstrumentId?: string): Observable<CardTransfer[]> {

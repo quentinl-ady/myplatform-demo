@@ -160,8 +160,11 @@ public class IssuingController {
 
     @PostMapping("/reveal")
     public ResponseEntity<Map<String, String>> revealCardData(@RequestBody Map<String, String> request) throws Exception {
-        String decryptedData = issuingService.revealCardData(request.get("paymentInstrumentId"));
-        return ResponseEntity.ok(Map.of("cardData", decryptedData));
+        String encryptedData = issuingService.revealCardData(
+                request.get("paymentInstrumentId"),
+                request.get("encryptedKey")
+        );
+        return ResponseEntity.ok(Map.of("encryptedData", encryptedData));
     }
 
     @GetMapping("/transfers")
