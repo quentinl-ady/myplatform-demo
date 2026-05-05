@@ -24,7 +24,7 @@ export class IssuingService {
     return this.http.get<PhonePrefix[]>(`${this.baseUrl}/api/issuing/phone-prefixes`);
   }
 
-  getCards(userId: number, status?: string): Observable<CardResponse[]> {
+  getCards(userId: string, status?: string): Observable<CardResponse[]> {
     const params = status ? `?status=${status}` : '';
     return this.http.get<CardResponse[]>(`${this.baseUrl}/api/issuing/cards/${userId}${params}`);
   }
@@ -64,7 +64,7 @@ export class IssuingService {
     return this.http.post<{ encryptedData: string }>(`${this.baseUrl}/api/issuing/reveal`, {paymentInstrumentId, encryptedKey});
   }
 
-  getCardTransfers(userId: number, paymentInstrumentId?: string): Observable<CardTransfer[]> {
+  getCardTransfers(userId: string, paymentInstrumentId?: string): Observable<CardTransfer[]> {
     let params = `?userId=${userId}`;
     if (paymentInstrumentId) {
       params += `&paymentInstrumentId=${paymentInstrumentId}`;

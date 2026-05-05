@@ -26,7 +26,7 @@ export interface InitiateTransferRequest {
   amount: number;
   reference: string;
   description: string;
-  userId: number;
+  userId: string;
   transferType: string;
   counterpartyCountry: string;
   accountNumber: string;
@@ -47,7 +47,7 @@ export interface InitiateTransferResponse {
 }
 
 export interface IsCrossBorderRequest {
-  userId: number;
+  userId: string;
   countryCodeCounterparty: string;
 }
 

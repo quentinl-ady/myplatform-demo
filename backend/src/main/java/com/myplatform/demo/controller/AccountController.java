@@ -39,7 +39,7 @@ public class AccountController {
     }
 
     @GetMapping("/{userId}/balance")
-    public ResponseEntity<List<BalanceAccountInfoCustomer>> getAllBalanceAccounts(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<List<BalanceAccountInfoCustomer>> getAllBalanceAccounts(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getAccountHolderId() == null) {
@@ -54,7 +54,7 @@ public class AccountController {
     }
 
     @GetMapping("/{userId}/bank")
-    public ResponseEntity<BankAccountInformationResponse> getBankAccountInformation(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<BankAccountInformationResponse> getBankAccountInformation(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         BankAccountInformationResponse response = balanceAccountService.getBankAccountInformation(user.getBankAccountId(), user.getCurrencyCode());
@@ -63,7 +63,7 @@ public class AccountController {
     }
 
     @GetMapping("/{userId}/bank/status")
-    public ResponseEntity<Map<String, Object>> getBankAccountStatus(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<Map<String, Object>> getBankAccountStatus(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -90,7 +90,7 @@ public class AccountController {
     }
 
     @PostMapping("/{userId}/bank")
-    public ResponseEntity<Map<String, String>> createBankAccount(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<Map<String, String>> createBankAccount(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (!Boolean.TRUE.equals(user.getBank())) {

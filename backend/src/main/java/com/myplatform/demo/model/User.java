@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.security.SecureRandom;
 import java.util.List;
 
 @Entity
@@ -11,9 +12,23 @@ import java.util.List;
 @Getter
 @Setter
 public class User {
+    private static final String ALPHANUMERIC = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(length = 10)
+    private String id;
+
+    @PrePersist
+    public void generateId() {
+        if (this.id == null) {
+            StringBuilder sb = new StringBuilder(10);
+            for (int i = 0; i < 10; i++) {
+                sb.append(ALPHANUMERIC.charAt(RANDOM.nextInt(ALPHANUMERIC.length())));
+            }
+            this.id = sb.toString();
+        }
+    }
     private String email;
     private String password;
     private String legalEntityName; //mapping 1-1 AH <-> LE <-> BA

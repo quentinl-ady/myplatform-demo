@@ -9,7 +9,7 @@ export class PayoutService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
 
-  getPayoutAccounts(userId: number): Observable<PayoutAccount[]> {
+  getPayoutAccounts(userId: string): Observable<PayoutAccount[]> {
     return this.http.get<PayoutAccount[]>(`${this.baseUrl}/api/payouts/${userId}/accounts`);
   }
 
@@ -19,7 +19,7 @@ export class PayoutService {
     });
   }
 
-  getPayoutConfigurations(userId: number, balanceAccountId: string): Observable<PayoutConfiguration[]> {
+  getPayoutConfigurations(userId: string, balanceAccountId: string): Observable<PayoutConfiguration[]> {
     return this.http.get<PayoutConfiguration[]>(`${this.baseUrl}/api/payouts/${userId}/configurations/${balanceAccountId}`);
   }
 }

@@ -32,20 +32,20 @@ public class StandingOrderController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<Map<String, Object>> list(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<Map<String, Object>> list(@PathVariable String userId) throws Exception {
         User user = findUser(userId);
         return ResponseEntity.ok(service.listStandingOrders(getBankingBalanceAccountId(user)));
     }
 
     @GetMapping("/{userId}/{standingOrderId}")
-    public ResponseEntity<Map<String, Object>> get(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> get(@PathVariable String userId,
                                                    @PathVariable String standingOrderId) throws Exception {
         User user = findUser(userId);
         return ResponseEntity.ok(service.getStandingOrder(getBankingBalanceAccountId(user), standingOrderId));
     }
 
     @PatchMapping("/{userId}/{standingOrderId}")
-    public ResponseEntity<Map<String, Object>> update(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> update(@PathVariable String userId,
                                                       @PathVariable String standingOrderId,
                                                       @RequestBody Map<String, Object> body) throws Exception {
         User user = findUser(userId);
@@ -53,7 +53,7 @@ public class StandingOrderController {
     }
 
     @DeleteMapping("/{userId}/{standingOrderId}")
-    public ResponseEntity<Void> delete(@PathVariable Long userId,
+    public ResponseEntity<Void> delete(@PathVariable String userId,
                                        @PathVariable String standingOrderId) throws Exception {
         User user = findUser(userId);
         service.deleteStandingOrder(getBankingBalanceAccountId(user), standingOrderId);
@@ -63,7 +63,7 @@ public class StandingOrderController {
     // ---- SCA flow ----
 
     @PostMapping("/{userId}/initiate")
-    public ResponseEntity<Map<String, Object>> initiate(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> initiate(@PathVariable String userId,
                                                         @RequestBody Map<String, Object> payload) throws Exception {
         User user = findUser(userId);
         @SuppressWarnings("unchecked")
@@ -75,7 +75,7 @@ public class StandingOrderController {
     }
 
     @PostMapping("/{userId}/finalize")
-    public ResponseEntity<Map<String, Object>> finalizeOrder(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> finalizeOrder(@PathVariable String userId,
                                                              @RequestBody Map<String, Object> payload) throws Exception {
         User user = findUser(userId);
         @SuppressWarnings("unchecked")
@@ -94,7 +94,7 @@ public class StandingOrderController {
         return balanceAccountService.getBalanceAccountIdForPaymentInstrument(bankAccountId);
     }
 
-    private User findUser(Long userId) {
+    private User findUser(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }

@@ -28,9 +28,9 @@ export class TransferService {
   private readonly http = inject(HttpClient);
 
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-  private transactionCache = new Map<number, TransactionCache>();
+  private transactionCache = new Map<string, TransactionCache>();
 
-  getCachedTransactions(userId: number): BankTransaction[] | null {
+  getCachedTransactions(userId: string): BankTransaction[] | null {
     const entry = this.transactionCache.get(userId);
     if (!entry) return null;
     if (Date.now() - entry.timestamp > TransferService.CACHE_TTL_MS) {
@@ -40,28 +40,28 @@ export class TransferService {
     return entry.transactions;
   }
 
-  setCachedTransactions(userId: number, transactions: BankTransaction[]): void {
+  setCachedTransactions(userId: string, transactions: BankTransaction[]): void {
     this.transactionCache.set(userId, { transactions, timestamp: Date.now() });
   }
 
-  invalidateTransactionCache(userId: number): void {
+  invalidateTransactionCache(userId: string): void {
     this.transactionCache.delete(userId);
   }
 
-  getCacheTimestamp(userId: number): number | null {
+  getCacheTimestamp(userId: string): number | null {
     const entry = this.transactionCache.get(userId);
     return entry ? entry.timestamp : null;
   }
 
-  listDevices(userId: number): Observable<Device[]> {
+  listDevices(userId: string): Observable<Device[]> {
     return this.http.get<Device[]>(`${this.baseUrl}/api/transfers/${userId}/devices`);
   }
 
-  initiateDeviceRegistration(sdkOutput: string, userId: number, deviceName: string): Observable<RegisterSCAResponse> {
+  initiateDeviceRegistration(sdkOutput: string, userId: string, deviceName: string): Observable<RegisterSCAResponse> {
     return this.http.post<RegisterSCAResponse>(`${this.baseUrl}/api/transfers/devices/register`, {sdkOutput, userId, deviceName});
   }
 
-  finalizeRegistration(id: string, sdkOutput: string, userId: number): Observable<RegisterSCAFinalResponse> {
+  finalizeRegistration(id: string, sdkOutput: string, userId: string): Observable<RegisterSCAFinalResponse> {
     return this.http.post<RegisterSCAFinalResponse>(`${this.baseUrl}/api/transfers/devices/register/finalize`, {id, sdkOutput, userId});
   }
 
@@ -95,15 +95,15 @@ export class TransferService {
     });
   }
 
-  initiateBankTransactions(userId: number, sdkOutput: string): Observable<any> {
+  initiateBankTransactions(userId: string, sdkOutput: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/initiate`, { sdkOutput });
   }
 
-  finalizeBankTransactions(userId: number, sdkOutput: string, createdSince: string, createdUntil: string): Observable<any> {
+  finalizeBankTransactions(userId: string, sdkOutput: string, createdSince: string, createdUntil: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/finalize`, { sdkOutput, createdSince, createdUntil });
   }
 
-  getTransferDetail(userId: number, transferId: string): Observable<TransferDetail> {
+  getTransferDetail(userId: string, transferId: string): Observable<TransferDetail> {
     return this.http.get<TransferDetail>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/detail/${transferId}`);
   }
 }

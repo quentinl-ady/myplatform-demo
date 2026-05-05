@@ -1,10 +1,9 @@
 package com.myplatform.demo.repository;
 
-import com.myplatform.demo.model.User;
+import com.myplatform.demo.model.UserBranding;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface UserRepository extends JpaRepository<User, String> {
-    User findByEmail(String email);
+public interface UserBrandingRepository extends JpaRepository<UserBranding, String> {
 }

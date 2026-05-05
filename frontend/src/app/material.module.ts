@@ -19,6 +19,7 @@ import {MatBadgeModule} from "@angular/material/badge";
 import {MatAutocompleteModule} from "@angular/material/autocomplete";
 import {MatTabsModule} from "@angular/material/tabs";
 import {MatSlideToggleModule} from "@angular/material/slide-toggle";
+import {MatDialogModule} from "@angular/material/dialog";
 
 @NgModule({
     exports: [
@@ -40,8 +41,8 @@ import {MatSlideToggleModule} from "@angular/material/slide-toggle";
         MatBadgeModule,
         MatAutocompleteModule,
         MatTabsModule,
-        MatSlideToggleModule
-
+        MatSlideToggleModule,
+        MatDialogModule
     ]
 
 })

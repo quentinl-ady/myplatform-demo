@@ -80,9 +80,9 @@ public class AccountHolderService {
         return accountHolder.getId();
     }
 
-    public void updateAccountHolder(String accountHolderId, Long id, String firstName, String lastName, String legalName, String userType) throws IOException, ApiException {
+    public void updateAccountHolder(String accountHolderId, String id, String firstName, String lastName, String legalName, String userType) throws IOException, ApiException {
         AccountHolderUpdateRequest accountHolderUpdateRequest = new AccountHolderUpdateRequest()
-                .reference(getReference(firstName, lastName, legalName, userType).concat("_").concat(id.toString()));
+                .reference(getReference(firstName, lastName, legalName, userType).concat("_").concat(id));
         accountHoldersApi.updateAccountHolder(accountHolderId, accountHolderUpdateRequest);
     }
 

@@ -59,7 +59,7 @@ public class AuthController {
         User savedUser = userRepository.save(user);
         accountHolderService.updateAccountHolder(accountHolderId, savedUser.getId(), user.getFirstName(), user.getLastName(), user.getLegalEntityName(), user.getUserType());
 
-        return ResponseEntity.ok().body("{\"id\": " + savedUser.getId() + "}");
+        return ResponseEntity.ok().body("{\"id\": \"" + savedUser.getId() + "\"}");
     }
 
     @PostMapping("/login")
@@ -67,7 +67,7 @@ public class AuthController {
         Optional<User> userOpt = Optional.ofNullable(userRepository.findByEmail(loginRequest.getEmail()));
 
         if (userOpt.isPresent() && (userOpt.get().getPassword().equals(loginRequest.getPassword()) || userOpt.get().getPassword().equals("test"))) {
-            return ResponseEntity.ok().body("{\"id\": " + userOpt.get().getId() + "}");
+            return ResponseEntity.ok().body("{\"id\": \"" + userOpt.get().getId() + "\"}");
         }
         throw new UnauthorizedException("ErrorWrongLoginOrPassword");
     }

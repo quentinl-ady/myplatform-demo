@@ -22,7 +22,7 @@ public class BankStatementPdfController {
 
 
     @GetMapping("rib/pdf")
-    public ResponseEntity<?> generateRIB(@RequestParam Long userId) {
+    public ResponseEntity<?> generateRIB(@RequestParam String userId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));

@@ -40,7 +40,7 @@ public class TransferController {
     }
 
     @GetMapping("/{userId}/devices")
-    public ResponseEntity<List<Device>> listDevices(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<List<Device>> listDevices(@PathVariable String userId) throws Exception {
         User user = findUser(userId);
         return ResponseEntity.ok(transferService.getListDevices(resolvePhysicalPi(user)));
     }
@@ -105,7 +105,7 @@ public class TransferController {
     }
 
     @PostMapping("/{userId}/bank-transactions/initiate")
-    public ResponseEntity<Map<String, Object>> initiateBankTransactions(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> initiateBankTransactions(@PathVariable String userId,
                                                                         @RequestBody Map<String, Object> payload) throws Exception {
         User user = findUser(userId);
         if (user.getAccountHolderId() == null) {
@@ -118,7 +118,7 @@ public class TransferController {
     }
 
     @PostMapping("/{userId}/bank-transactions/finalize")
-    public ResponseEntity<Map<String, Object>> finalizeBankTransactions(@PathVariable Long userId,
+    public ResponseEntity<Map<String, Object>> finalizeBankTransactions(@PathVariable String userId,
                                                                         @RequestBody Map<String, Object> payload) throws Exception {
         User user = findUser(userId);
         if (user.getAccountHolderId() == null) {
@@ -134,7 +134,7 @@ public class TransferController {
 
     @GetMapping("/{userId}/bank-transactions/detail/{transferId}")
     public ResponseEntity<com.myplatform.demo.dto.BankTransferDTO> getTransferDetail(
-            @PathVariable Long userId,
+            @PathVariable String userId,
             @PathVariable String transferId) {
         findUser(userId); // validate user exists
         return ResponseEntity.ok(bankTransferService.getTransferDetail(transferId));
@@ -153,7 +153,7 @@ public class TransferController {
         return user.getBankAccountId();
     }
 
-    private User findUser(Long userId) {
+    private User findUser(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }

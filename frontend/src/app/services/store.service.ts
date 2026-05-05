@@ -9,13 +9,13 @@ export class StoreService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
 
-  createStore(userId: number, payload: StorePayload): Observable<Store> {
+  createStore(userId: string, payload: StorePayload): Observable<Store> {
     return this.http.post<Store>(`${this.baseUrl}/api/stores/${userId}`, payload, {
       headers: {'Content-Type': 'application/json'}
     });
   }
 
-  getStores(userId: number): Observable<Store[]> {
+  getStores(userId: string): Observable<Store[]> {
     return this.http.get<Store[]>(`${this.baseUrl}/api/stores/${userId}`);
   }
 

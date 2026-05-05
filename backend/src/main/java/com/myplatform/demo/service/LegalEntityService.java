@@ -101,7 +101,7 @@ public class LegalEntityService {
         }
     }
 
-    public String createHOP(String legalEntityId, String countryCode, Long userId, String activityReason) throws IOException, ApiException {
+    public String createHOP(String legalEntityId, String countryCode, String userId, String activityReason) throws IOException, ApiException {
         String languageCode = LANGUAGE_MAP.getOrDefault(countryCode.toUpperCase(), "en-US");
 
         OnboardingLinkSettings onboardingLinkSettings = new OnboardingLinkSettings();

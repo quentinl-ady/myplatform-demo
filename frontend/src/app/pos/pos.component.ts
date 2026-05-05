@@ -66,7 +66,7 @@ export class PosComponent implements OnInit {
 
   private loadStores(): void {
     this.loadingStores.set(true);
-    this.storeService.getStores(Number(this.userId)).subscribe({
+    this.storeService.getStores(this.userId).subscribe({
       next: (res) => {
         this.stores.set(res || []);
         this.loadingStores.set(false);

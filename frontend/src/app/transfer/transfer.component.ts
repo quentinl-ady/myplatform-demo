@@ -57,7 +57,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   }
 
   fetchAccountInformation() {
-    this.accountService.getBankAccountInformation(Number(this.userId)).subscribe({
+    this.accountService.getBankAccountInformation(this.userId).subscribe({
       next: (info) => {
         this.accountInfo = info;
         this.cdr.detectChanges();
@@ -69,7 +69,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   }
 
   checkDevices() {
-    this.transferService.listDevices(Number(this.userId)).subscribe({
+    this.transferService.listDevices(this.userId).subscribe({
       next: (devices) => {
         this.hasDevices.set(devices && devices.length > 0);
         if (this.hasDevices()) {
@@ -93,17 +93,17 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   async loadTransactions(forceRefresh = false) {
     if (!forceRefresh) {
-      const cached = this.transferService.getCachedTransactions(Number(this.userId));
+      const cached = this.transferService.getCachedTransactions(this.userId);
       if (cached) {
         this.transactions = cached;
-        this.lastUpdated = this.transferService.getCacheTimestamp(Number(this.userId));
+        this.lastUpdated = this.transferService.getCacheTimestamp(this.userId);
         this.isLoadingTransactions = false;
         this.startLastUpdatedTimer();
         this.cdr.detectChanges();
         return;
       }
     } else {
-      this.transferService.invalidateTransactionCache(Number(this.userId));
+      this.transferService.invalidateTransactionCache(this.userId);
     }
 
     this.isLoadingTransactions = true;
@@ -114,12 +114,12 @@ export class TransferComponent implements OnInit, OnDestroy {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.checkAvailability();
 
-      this.transferService.initiateBankTransactions(Number(this.userId), String(sdkOutput)).subscribe({
+      this.transferService.initiateBankTransactions(this.userId, String(sdkOutput)).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
             if (res.status === 'completed') {
               this.transactions = res.transactions || [];
-              this.transferService.setCachedTransactions(Number(this.userId), this.transactions);
+              this.transferService.setCachedTransactions(this.userId, this.transactions);
               this.lastUpdated = Date.now();
               this.startLastUpdatedTimer();
               this.isLoadingTransactions = false;
@@ -152,11 +152,11 @@ export class TransferComponent implements OnInit, OnDestroy {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.authenticate(authParam1);
 
-      this.transferService.finalizeBankTransactions(Number(this.userId), String(sdkOutput), createdSince, createdUntil).subscribe({
+      this.transferService.finalizeBankTransactions(this.userId, String(sdkOutput), createdSince, createdUntil).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
             this.transactions = res.transactions || [];
-            this.transferService.setCachedTransactions(Number(this.userId), this.transactions);
+            this.transferService.setCachedTransactions(this.userId, this.transactions);
             this.lastUpdated = Date.now();
             this.startLastUpdatedTimer();
             this.isLoadingTransactions = false;
@@ -192,7 +192,7 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.isLoadingDetail = true;
     this.cdr.detectChanges();
 
-    this.transferService.getTransferDetail(Number(this.userId), tx.transferId).subscribe({
+    this.transferService.getTransferDetail(this.userId, tx.transferId).subscribe({
       next: (detail) => {
         this.transferDetail = detail;
         this.isLoadingDetail = false;
@@ -215,7 +215,7 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   downloadRib() {
     this.isDownloadingRib = true;
-    this.accountService.getRibPdf(Number(this.userId)).subscribe({
+    this.accountService.getRibPdf(this.userId).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');

@@ -19,7 +19,7 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<UserDTO> user(@PathVariable Long userId) {
+    public ResponseEntity<UserDTO> user(@PathVariable String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return ResponseEntity.ok(DTOMapper.toUserDTO(user));

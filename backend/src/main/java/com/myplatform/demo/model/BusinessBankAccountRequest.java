@@ -10,5 +10,5 @@ public class BusinessBankAccountRequest {
     private String country; //FR //NL
     private String reference;
     private Activity activity;
-    private Long userId;
+    private String userId;
 }

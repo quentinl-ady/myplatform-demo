@@ -29,28 +29,28 @@ public class OnboardingController {
     }
 
     @GetMapping("/{userId}/link")
-    public ResponseEntity<?> getOnboardingLink(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<?> getOnboardingLink(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         String url = legalEntityService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId, user.getActivityReason());
         return ResponseEntity.ok().body("{\"url\": \"" + url + "\"}");
     }
 
     @GetMapping("/{userId}/kyc-status")
-    public ResponseEntity<KycStatus> getKYCStatus(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<KycStatus> getKYCStatus(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         KycStatus status = legalEntityService.getLegalEntityKycDetail(user.getLegalEntityId(), user.getActivityReason(), user.getBank(), user.getCapital(), user.getIssuing());
         return ResponseEntity.ok(status);
     }
 
     @PostMapping("/{userId}/validate-kyc")
-    public ResponseEntity<Map<String, String>> validateKyc(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<Map<String, String>> validateKyc(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         kycService.validateKyc(user.getLegalEntityId(), user.getUserType(), user.getCountryCode());
         kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
         return ResponseEntity.ok(Map.of("status", "success", "message", "KYC processed successfully"));
     }
 
-    private User findUserWithLegalEntity(Long userId) {
+    private User findUserWithLegalEntity(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

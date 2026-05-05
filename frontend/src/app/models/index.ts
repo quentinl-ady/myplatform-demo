@@ -8,3 +8,4 @@ export * from './payout.model';
 export * from './transfer.model';
 export * from './issuing.model';
 export * from './standing-order.model';
+export * from './branding.model';

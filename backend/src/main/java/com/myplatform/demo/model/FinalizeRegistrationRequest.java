@@ -8,5 +8,5 @@ import lombok.Setter;
 public class FinalizeRegistrationRequest {
     private String id;
     private String sdkOutput;
-    private Long userId;
+    private String userId;
 }

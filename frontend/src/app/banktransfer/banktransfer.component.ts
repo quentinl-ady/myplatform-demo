@@ -154,7 +154,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   // ─────────── Shared data loading ───────────
 
   loadUser() {
-    this.accountService.getUserById(Number(this.userId)).subscribe({
+    this.accountService.getUserById(this.userId).subscribe({
       next: (user) => {
         this.user = user;
         this.cdr.detectChanges();
@@ -167,7 +167,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   }
 
   fetchAccountInformation() {
-    this.accountService.getBankAccountInformation(Number(this.userId)).subscribe({
+    this.accountService.getBankAccountInformation(this.userId).subscribe({
       next: (info) => {
         this.accountInfo = info;
         this.cdr.detectChanges();
@@ -179,7 +179,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   }
 
   checkDevices() {
-    this.transferService.listDevices(Number(this.userId)).subscribe({
+    this.transferService.listDevices(this.userId).subscribe({
       next: (devices) => {
         this.hasDevices.set(devices && devices.length > 0);
         this.cdr.detectChanges();
@@ -401,7 +401,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       amount: minorUnitAmount,
       reference: formVals.reference || '',
       description: formVals.description || '',
-      userId: Number(this.userId),
+      userId: this.userId,
       transferType: formVals.transferType!,
       counterpartyCountry: formVals.counterpartyCountry!,
       iban: this.bankAccountFormat === 'iban' ? formVals.iban! : '',
@@ -478,7 +478,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             if (!res.authParam1) {
               this.isOneshotSuccess = true;
               this.isOneshotProcessing = false;
-              this.transferService.invalidateTransactionCache(Number(this.userId));
+              this.transferService.invalidateTransactionCache(this.userId);
               this.fetchAccountInformation();
             } else {
               this.transferResponse = res;
@@ -522,7 +522,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.isOneshotSuccess = true;
             this.showOneshotScaModal = false;
             this.isOneshotProcessing = false;
-            this.transferService.invalidateTransactionCache(Number(this.userId));
+            this.transferService.invalidateTransactionCache(this.userId);
             this.fetchAccountInformation();
             this.cdr.detectChanges();
           });
@@ -559,7 +559,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   loadStandingOrders() {
     this.soLoading = true;
     this.soError = '';
-    this.soService.list(Number(this.userId)).subscribe({
+    this.soService.list(this.userId).subscribe({
       next: (data) => {
         this.standingOrders = data.standingOrders || [];
         this.soLoading = false;
@@ -607,7 +607,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   onDeleteSo(order: StandingOrder) {
     if (!confirm('Delete this scheduled transfer?')) return;
-    this.soService.delete(Number(this.userId), order.id).subscribe({
+    this.soService.delete(this.userId, order.id).subscribe({
       next: () => {
         this.snack.open('Scheduled transfer deleted', 'Close', { duration: 3000 });
         this.loadStandingOrders();
@@ -629,7 +629,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       priorities: [this.editForm.value.priority || 'regular']
     };
 
-    this.soService.update(Number(this.userId), this.editingOrder.id, patch).subscribe({
+    this.soService.update(this.userId, this.editingOrder.id, patch).subscribe({
       next: (updated) => {
         this.editingOrder = updated;
         this.isSaving = false;
@@ -746,7 +746,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       this.scaStatus = 'Initiating scheduled transfer...';
       this.cdr.detectChanges();
 
-      this.soService.initiate(Number(this.userId), standingOrder, String(sdkOutputInit)).subscribe({
+      this.soService.initiate(this.userId, standingOrder, String(sdkOutputInit)).subscribe({
         next: (result) => {
           this.ngZone.run(() => {
             if (result.status === 'completed') {
@@ -799,7 +799,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       this.scaStatus = 'Finalizing scheduled transfer...';
       this.cdr.detectChanges();
 
-      this.soService.finalize(Number(this.userId), this.pendingStandingOrder, String(sdkOutput)).subscribe({
+      this.soService.finalize(this.userId, this.pendingStandingOrder, String(sdkOutput)).subscribe({
         next: () => {
           this.ngZone.run(() => {
             this.showSoScaModal = false;

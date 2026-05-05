@@ -47,7 +47,7 @@ const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone:
   styleUrl: './store.component.css'
 })
 export class StoreComponent implements OnInit {
-  userId = 0;
+  userId = '';
   isSubmitting = false;
   userCountryCode = '';
   userCountryLabel = '';
@@ -89,7 +89,7 @@ export class StoreComponent implements OnInit {
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
-      this.userId = Number(params.get('id')) || 0;
+      this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadStores();
         this.loadBalanceAccounts();

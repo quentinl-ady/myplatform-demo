@@ -7,6 +7,6 @@ import lombok.Setter;
 @Setter
 public class InitiateDeviceRegistrationRequest {
     private String sdkOutput;
-    private Long userId;
+    private String userId;
     private String deviceName;
 }

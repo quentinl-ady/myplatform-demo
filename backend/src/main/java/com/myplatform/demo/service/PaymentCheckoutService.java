@@ -43,7 +43,7 @@ public class PaymentCheckoutService {
     }
 
     public PaymentSessionResponse createPaymentSession(String currencyCode, Long amount, String reference,
-                                                       Long userId, String storeRef, String activityReason,
+                                                       String userId, String storeRef, String activityReason,
                                                        String balanceAccountId) throws IOException, ApiException {
 
         ThreeDSRequestData threeDSRequestData = new ThreeDSRequestData()

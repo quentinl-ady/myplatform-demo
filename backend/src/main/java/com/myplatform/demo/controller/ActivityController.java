@@ -25,18 +25,18 @@ public class ActivityController {
     }
 
     @PostMapping("/{userId}")
-    public ResponseEntity<Activity> createActivity(@PathVariable Long userId, @RequestBody Activity activity) throws Exception {
+    public ResponseEntity<Activity> createActivity(@PathVariable String userId, @RequestBody Activity activity) throws Exception {
         User user = findUserWithLegalEntity(userId);
         return ResponseEntity.ok(legalEntityService.createBusinessLine(activity, user.getLegalEntityId()));
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<List<Activity>> getActivities(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<List<Activity>> getActivities(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         return ResponseEntity.ok(legalEntityService.getBusinessLines(user.getLegalEntityId()));
     }
 
-    private User findUserWithLegalEntity(Long userId) {
+    private User findUserWithLegalEntity(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

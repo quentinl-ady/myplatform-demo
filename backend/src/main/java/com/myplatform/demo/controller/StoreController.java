@@ -35,7 +35,7 @@ public class StoreController {
     }
 
     @PostMapping("/{userId}")
-    public ResponseEntity<StoreCustomerDTO> createStore(@PathVariable Long userId, @RequestBody RequestStore requestStore) throws Exception {
+    public ResponseEntity<StoreCustomerDTO> createStore(@PathVariable String userId, @RequestBody RequestStore requestStore) throws Exception {
         User user = findUserWithLegalEntity(userId);
 
         StoreCustomer storeCustomer = storeManagementService.createStore(
@@ -64,7 +64,7 @@ public class StoreController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<List<StoreCustomerDTO>> getAllStores(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<List<StoreCustomerDTO>> getAllStores(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -96,7 +96,7 @@ public class StoreController {
         return ResponseEntity.ok(storeManagementService.listTerminals(storeId));
     }
 
-    private User findUserWithLegalEntity(Long userId) {
+    private User findUserWithLegalEntity(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

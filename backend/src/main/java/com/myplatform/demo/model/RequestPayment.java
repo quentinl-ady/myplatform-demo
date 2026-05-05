@@ -10,6 +10,6 @@ public class RequestPayment {
     Long amount;
     String currencyCode;
     String storeReference;
-    Long userId;
+    String userId;
     String reference;
 }

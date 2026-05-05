@@ -31,13 +31,13 @@ public class PayoutController {
     }
 
     @GetMapping("/{userId}/accounts")
-    public ResponseEntity<List<PayoutAccount>> getPayoutAccounts(@PathVariable Long userId) throws Exception {
+    public ResponseEntity<List<PayoutAccount>> getPayoutAccounts(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         return ResponseEntity.ok(legalEntityService.getPayoutAccounts(user.getLegalEntityId()));
     }
 
     @GetMapping("/{userId}/configurations/{balanceAccountId}")
-    public ResponseEntity<List<PayoutConfigurationResponse>> getPayoutConfigurations(@PathVariable Long userId, @PathVariable String balanceAccountId) throws Exception {
+    public ResponseEntity<List<PayoutConfigurationResponse>> getPayoutConfigurations(@PathVariable String userId, @PathVariable String balanceAccountId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         return ResponseEntity.ok(payoutConfigurationService.getPayoutConfigurations(user, balanceAccountId));
@@ -60,7 +60,7 @@ public class PayoutController {
                 request.getSchedule()));
     }
 
-    private User findUserWithLegalEntity(Long userId) {
+    private User findUserWithLegalEntity(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

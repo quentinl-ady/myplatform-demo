@@ -65,7 +65,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
-      this.accountService.getUserById(Number(this.userId)).subscribe({
+      this.accountService.getUserById(this.userId).subscribe({
         next: (u) => {
           this.user.set(u);
           if (u.bank) {
@@ -87,7 +87,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   openHostedOnboarding() {
-    this.onboardingService.getOnboardingLink(Number(this.userId)).subscribe({
+    this.onboardingService.getOnboardingLink(this.userId).subscribe({
       next: (res) => window.open(res.url, '_blank'),
       error: () => this.matSnackBar.open('Error fetching onboarding link', 'Close', { duration: 3000 })
     });
@@ -95,7 +95,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   checkOnboarding(): void {
     this.loading.set(true);
-    this.onboardingService.getOnboardingStatus(Number(this.userId)).subscribe({
+    this.onboardingService.getOnboardingStatus(this.userId).subscribe({
       next: (res) => {
         this.status.set(res);
         this.loading.set(false);
@@ -161,7 +161,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadBusinessLines() {
-    this.activityService.getBusinessLines(Number(this.userId)).subscribe({
+    this.activityService.getBusinessLines(this.userId).subscribe({
       next: (res) => this.businessLines.set(res),
       error: () => this.matSnackBar.open('Error loading business lines', 'Close', { duration: 3000 })
     });
@@ -182,7 +182,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
 
     this.submitting = true;
-    this.activityService.addBusinessLine(Number(this.userId), { industryCode, salesChannels }).subscribe({
+    this.activityService.addBusinessLine(this.userId, { industryCode, salesChannels }).subscribe({
       next: (res) => {
         this.businessLines.set([...this.businessLines(), res]);
         this.matSnackBar.open('Business line added successfully', 'Close', { duration: 3000 });
@@ -261,7 +261,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   loadBankAccountStatus() {
-    this.accountService.getBankAccountStatus(Number(this.userId)).subscribe({
+    this.accountService.getBankAccountStatus(this.userId).subscribe({
       next: (status) => {
         this.bankStatus.set(status);
         if (status.bankAccountCreated) {
@@ -301,7 +301,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!this.userId) return;
     this.creatingBankAccount.set(true);
 
-    this.accountService.createBankAccount(Number(this.userId)).subscribe({
+    this.accountService.createBankAccount(this.userId).subscribe({
       next: (res) => {
         this.creatingBankAccount.set(false);
         this.loadBankAccountStatus();
@@ -323,7 +323,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     this.loadingKyc.set(true);
 
-    this.onboardingService.validateKyc(Number(userId)).subscribe({
+    this.onboardingService.validateKyc(userId).subscribe({
       next: () => {
         this.loadingKyc.set(false);
         this.matSnackBar.open('✅ KYC validated', 'Close', { duration: 3000 });

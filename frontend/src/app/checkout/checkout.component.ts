@@ -70,7 +70,7 @@ export class CheckoutComponent implements OnInit {
 
   private loadUserAndMaybeStores(): void {
     this.loading.set(true);
-    this.accountService.getUserById(Number(this.userId)).subscribe({
+    this.accountService.getUserById(this.userId).subscribe({
       next: (u) => {
         this.user.set(u);
         this.countryCode = u.countryCode;
@@ -92,7 +92,7 @@ export class CheckoutComponent implements OnInit {
 
   private loadStores(): void {
     this.loading.set(true);
-    this.storeService.getStores(Number(this.userId)).subscribe({
+    this.storeService.getStores(this.userId).subscribe({
       next: (res) => {
         this.stores.set(res || []);
         if (this.stores().length) {
@@ -128,7 +128,7 @@ export class CheckoutComponent implements OnInit {
       storeReference: (this.user()?.activityReason === 'embeddedPayment')
         ? this.checkoutForm.get('storeReference')?.value
         : '',
-      userId: Number(this.userId),
+      userId: this.userId,
       reference: this.checkoutForm.get('reference')?.value
     };
 

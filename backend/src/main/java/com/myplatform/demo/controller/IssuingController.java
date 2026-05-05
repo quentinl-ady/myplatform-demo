@@ -76,7 +76,7 @@ public class IssuingController {
     }
 
     @GetMapping("/cards/{userId}")
-    public ResponseEntity<List<CardResponse>> getCards(@PathVariable Long userId, @RequestParam(required = false) String status) throws Exception {
+    public ResponseEntity<List<CardResponse>> getCards(@PathVariable String userId, @RequestParam(required = false) String status) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -169,7 +169,7 @@ public class IssuingController {
 
     @GetMapping("/transfers")
     public ResponseEntity<List<CardTransferDTO>> getCardTransfers(
-            @RequestParam Long userId,
+            @RequestParam String userId,
             @RequestParam(required = false) String paymentInstrumentId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

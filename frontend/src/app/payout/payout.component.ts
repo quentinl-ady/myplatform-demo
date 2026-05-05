@@ -64,7 +64,7 @@ export class PayoutComponent {
     }
 
     loadBalanceAccounts() {
-        this.accountService.getBalanceAccounts(Number(this.userId)).subscribe({
+        this.accountService.getBalanceAccounts(this.userId).subscribe({
             next: res => this.balanceAccounts.set(res),
             error: () => this.matSnackBar.open('Error loading balance accounts', 'Close', {duration: 3000})
         });
@@ -73,7 +73,7 @@ export class PayoutComponent {
     loadConfigurations() {
         if (!this.selectedBalanceAccount) return;
         this.loadingConfigurations = true;
-        this.payoutService.getPayoutConfigurations(Number(this.userId), this.selectedBalanceAccount).subscribe({
+        this.payoutService.getPayoutConfigurations(this.userId, this.selectedBalanceAccount).subscribe({
             next: res => {
                 this.payoutConfigurations.set(res);
                 this.loadingConfigurations = false;
@@ -86,7 +86,7 @@ export class PayoutComponent {
     }
 
     loadPayoutAccounts() {
-        this.payoutService.getPayoutAccounts(Number(this.userId)).subscribe({
+        this.payoutService.getPayoutAccounts(this.userId).subscribe({
             next: res => this.payoutAccounts.set(res),
             error: () => this.matSnackBar.open('Error loading payout accounts', 'Close', {duration: 3000})
         });
@@ -107,7 +107,7 @@ export class PayoutComponent {
 
         this.submitting = true;
         const payload = {
-            userId: Number(this.userId),
+            userId: this.userId,
             balanceAccountId: this.selectedBalanceAccount,
             currencyCode,
             regular,

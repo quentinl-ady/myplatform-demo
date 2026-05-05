@@ -2,7 +2,7 @@ export interface SendPaymentPayload {
   amount: number;
   currencyCode: string;
   storeReference: string;
-  userId: number;
+  userId: string;
   reference: string;
 }
 

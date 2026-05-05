@@ -6,7 +6,7 @@ import java.util.List;
 
 @Data
 public class CreateCardRequest {
-    private Long userId;
+    private String userId;
     private String cardholderName;
     private String brand; // visa or mc
     private String email;

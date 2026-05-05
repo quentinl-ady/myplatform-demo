@@ -6,7 +6,7 @@ export interface TransactionRuleRequest {
 }
 
 export interface CreateCardRequest {
-  userId: number;
+  userId: string;
   cardholderName: string;
   brand: string;
   email?: string;

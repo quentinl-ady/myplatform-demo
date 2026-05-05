@@ -39,7 +39,7 @@ export class DeviceComponent {
   }
 
   loadDevices() {
-    this.transferService.listDevices(Number(this.userId)).subscribe({
+    this.transferService.listDevices(this.userId).subscribe({
       next: (res) => {
         this.devices.set(res ?? []);
       },

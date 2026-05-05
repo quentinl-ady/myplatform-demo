@@ -111,7 +111,7 @@ export class CardCreateComponent implements OnInit {
   }
 
   loadUser() {
-    this.accountService.getUserById(Number(this.userId)).subscribe({
+    this.accountService.getUserById(this.userId).subscribe({
       next: (user) => {
         this.user = user;
         if (user.email) {
@@ -168,7 +168,7 @@ export class CardCreateComponent implements OnInit {
     const phone = phoneNumber ? `${this.form.value.phonePrefix} ${phoneNumber}` : undefined;
 
     const request: CreateCardRequest = {
-      userId: Number(this.userId),
+      userId: this.userId,
       cardholderName: this.form.value.cardholderName!,
       brand: this.form.value.brand!,
       email,

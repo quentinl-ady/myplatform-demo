@@ -49,7 +49,7 @@ export class CardTransactionsComponent implements OnInit {
 
   loadCards() {
     this.isLoadingCards = true;
-    this.issuingService.getCards(Number(this.userId)).subscribe({
+    this.issuingService.getCards(this.userId).subscribe({
       next: (cards) => {
         this.cards = cards;
         this.isLoadingCards = false;
@@ -79,7 +79,7 @@ export class CardTransactionsComponent implements OnInit {
 
     const piId = this.selectedPaymentInstrumentId;
 
-    this.issuingService.getCardTransfers(Number(this.userId), piId).subscribe({
+    this.issuingService.getCardTransfers(this.userId, piId).subscribe({
       next: (transfers) => {
         this.transfers = transfers;
         this.isLoading = false;

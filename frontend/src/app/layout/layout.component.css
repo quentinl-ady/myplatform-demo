@@ -23,29 +23,63 @@
 }
 
 .brand-header {
-  height: 64px;
+  height: 72px;
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  gap: 12px;
+  padding: 0 12px 0 24px;
+  gap: 8px;
   border-bottom: 1px solid var(--fintech-border);
 }
 .logo-mark {
-  height: 36px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.brand-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.brand-spacer {
+  flex: 1 1 auto;
+}
+.brand-edit-btn {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+  color: var(--fintech-text-secondary) !important;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+::ng-deep .brand-edit-btn .mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.logo-mark img {
-  height: 100%;
-  width: auto;
-  object-fit: contain;
-}
-.brand-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--fintech-text);
-  letter-spacing: -0.5px;
+.brand-header:hover .brand-edit-btn {
+  opacity: 1;
 }
 
 /* Navigation List */

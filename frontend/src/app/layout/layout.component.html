@@ -4,8 +4,13 @@
 
     <div class="brand-header">
       <div class="logo-mark">
-        <img src="assets/logo.svg" alt="My Platform" />
+        <img [src]="customLogoSrc || 'assets/logo.svg'" [attr.alt]="customPlatformName || 'My Platform'" />
       </div>
+      <span class="brand-name">{{ customPlatformName || 'My Platform' }}</span>
+      <div class="brand-spacer"></div>
+      <button mat-icon-button class="brand-edit-btn" (click)="openBrandingDialog()" matTooltip="Customize branding">
+        <mat-icon>edit</mat-icon>
+      </button>
     </div>
 
     <mat-nav-list class="fintech-nav-list">

@@ -9,7 +9,7 @@ import lombok.Setter;
 public class PayoutConfigurationRequest {
     public Boolean regular;
     public Boolean instant;
-    public Long userId;
+    public String userId;
     public String transferInstrumentId;
     public String balanceAccountId;
     public String currencyCode;

@@ -88,7 +88,7 @@ export class CardListComponent implements OnInit {
   }
 
   loadUser() {
-    this.accountService.getUserById(Number(this.userId)).subscribe({
+    this.accountService.getUserById(this.userId).subscribe({
       next: (user) => {
         this.user = user;
         this.cdr.detectChanges();
@@ -108,7 +108,7 @@ export class CardListComponent implements OnInit {
       }
     };
 
-    this.issuingService.getCards(Number(this.userId), 'active').subscribe({
+    this.issuingService.getCards(this.userId, 'active').subscribe({
       next: (cards) => {
         this.activeCards = cards;
         this.filteredActiveCards = cards;
@@ -121,7 +121,7 @@ export class CardListComponent implements OnInit {
       }
     });
 
-    this.issuingService.getCards(Number(this.userId), 'suspended').subscribe({
+    this.issuingService.getCards(this.userId, 'suspended').subscribe({
       next: (cards) => {
         this.suspendedCards = cards;
         this.filteredSuspendedCards = cards;
@@ -138,7 +138,7 @@ export class CardListComponent implements OnInit {
   loadClosedCards() {
     this.isLoadingClosed = true;
     this.cdr.detectChanges();
-    this.issuingService.getCards(Number(this.userId), 'closed').subscribe({
+    this.issuingService.getCards(this.userId, 'closed').subscribe({
       next: (cards) => {
         this.closedCards = cards;
         this.closedCardsLoaded = true;

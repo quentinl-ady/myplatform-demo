@@ -4,7 +4,7 @@ export interface PayoutAccount {
 }
 
 export interface PayoutConfigurationPayload {
-  userId: number;
+  userId: string;
   balanceAccountId: string;
   currencyCode: string;
   regular: boolean;

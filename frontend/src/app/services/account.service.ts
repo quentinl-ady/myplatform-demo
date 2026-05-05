@@ -10,10 +10,10 @@ export class AccountService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
 
-  private cachedUserId: number | null = null;
+  private cachedUserId: string | null = null;
   private cachedUser$: Observable<User> | null = null;
 
-  getUserById(userId: number): Observable<User> {
+  getUserById(userId: string): Observable<User> {
     if (this.cachedUserId !== userId || !this.cachedUser$) {
       this.cachedUserId = userId;
       this.cachedUser$ = this.http.get<User>(`${this.baseUrl}/api/users/${userId}`).pipe(
@@ -28,23 +28,23 @@ export class AccountService {
     this.cachedUser$ = null;
   }
 
-  getBalanceAccounts(userId: number): Observable<BalanceAccount[]> {
+  getBalanceAccounts(userId: string): Observable<BalanceAccount[]> {
     return this.http.get<BalanceAccount[]>(`${this.baseUrl}/api/accounts/${userId}/balance`);
   }
 
-  createBankAccount(userId: number): Observable<{ bankAccountId: string; bankAccountNumber: string }> {
+  createBankAccount(userId: string): Observable<{ bankAccountId: string; bankAccountNumber: string }> {
     return this.http.post<{ bankAccountId: string; bankAccountNumber: string }>(`${this.baseUrl}/api/accounts/${userId}/bank`, {});
   }
 
-  getBankAccountStatus(userId: number): Observable<BankAccountStatus> {
+  getBankAccountStatus(userId: string): Observable<BankAccountStatus> {
     return this.http.get<BankAccountStatus>(`${this.baseUrl}/api/accounts/${userId}/bank/status`);
   }
 
-  getBankAccountInformation(userId: number): Observable<BankAccountInformationResponse> {
+  getBankAccountInformation(userId: string): Observable<BankAccountInformationResponse> {
     return this.http.get<BankAccountInformationResponse>(`${this.baseUrl}/api/accounts/${userId}/bank`);
   }
 
-  getRibPdf(userId: number): Observable<Blob> {
+  getRibPdf(userId: string): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/api/bank-statement/rib/pdf`, {
       params: {userId},
       responseType: 'blob'

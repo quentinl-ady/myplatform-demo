@@ -11,7 +11,7 @@ public class TransferRequest {
     Long amount;
     String reference;
     String description;
-    Long userId;
+    String userId;
     String transferType;
     String counterpartyCountry;
     String accountNumber;

@@ -9,11 +9,11 @@ export class ActivityService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
 
-  getBusinessLines(userId: number): Observable<BusinessLine[]> {
+  getBusinessLines(userId: string): Observable<BusinessLine[]> {
     return this.http.get<BusinessLine[]>(`${this.baseUrl}/api/activities/${userId}`);
   }
 
-  addBusinessLine(userId: number, payload: { industryCode: string; salesChannels: string[] }): Observable<BusinessLine> {
+  addBusinessLine(userId: string, payload: { industryCode: string; salesChannels: string[] }): Observable<BusinessLine> {
     return this.http.post<BusinessLine>(`${this.baseUrl}/api/activities/${userId}`, payload, {
       headers: {'Content-Type': 'application/json'}
     });

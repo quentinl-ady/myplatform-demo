@@ -9,3 +9,4 @@ export {TransferService} from './transfer.service';
 export {IssuingService} from './issuing.service';
 export {ActivityService} from './activity.service';
 export {StandingOrderService} from './standing-order.service';
+export {BrandingService} from './branding.service';

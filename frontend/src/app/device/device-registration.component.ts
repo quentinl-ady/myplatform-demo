@@ -144,7 +144,7 @@ export class DeviceRegistrationComponent {
       const sdkOutput = await scaWebauthn.checkAvailability();
 
       const initiateResponse = await firstValueFrom(
-        this.transferService.initiateDeviceRegistration(String(sdkOutput), Number(this.userId), this.deviceName.trim())
+        this.transferService.initiateDeviceRegistration(String(sdkOutput), this.userId, this.deviceName.trim())
       );
 
       if (!initiateResponse?.success) {
@@ -160,7 +160,7 @@ export class DeviceRegistrationComponent {
         this.transferService.finalizeRegistration(
           initiateResponse.id,
           String(sdkOutputRegister),
-          Number(this.userId)
+          this.userId
         )
       );
 
