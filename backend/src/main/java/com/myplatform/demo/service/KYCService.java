@@ -190,7 +190,7 @@ public class KYCService {
         uploadDocument(legalEntityId, Document.TypeEnum.PASSPORT, "passport");
     }
 
-    public void signDocument(String legalEntityId, String userType, String activityReason, Boolean capital, Boolean bank, Boolean issuing) throws IOException, ApiException {
+    public void signDocument(String legalEntityId, String userType, String activityReason, Boolean capital, Boolean bank, Boolean issuing, String countryCode) throws IOException, ApiException {
 
         String acceptedById = "";
         if ("organization".equals(userType)) {
@@ -209,6 +209,10 @@ public class KYCService {
         if (Boolean.TRUE.equals(capital)) acceptTerms(legalEntityId, acceptedById, GetTermsOfServiceDocumentRequest.TypeEnum.ADYENCAPITAL);
         if (Boolean.TRUE.equals(bank)) acceptTerms(legalEntityId, acceptedById, GetTermsOfServiceDocumentRequest.TypeEnum.ADYENACCOUNT);
         if (Boolean.TRUE.equals(issuing)) acceptTerms(legalEntityId, acceptedById, GetTermsOfServiceDocumentRequest.TypeEnum.ADYENCARD);
+
+        if( (Boolean.TRUE.equals(issuing) || Boolean.TRUE.equals(bank)) && "GB".equals(countryCode)){
+            acceptTerms(legalEntityId, acceptedById, GetTermsOfServiceDocumentRequest.TypeEnum.ADYENPCCR);
+        }
     }
 
     private void acceptTerms(String legalEntityId, String acceptedBy, GetTermsOfServiceDocumentRequest.TypeEnum type) throws IOException, ApiException {

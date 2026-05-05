@@ -47,7 +47,7 @@
       </a>
 
       <p class="nav-section-title">Banking</p>
-      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'business-account'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
+      <a mat-list-item [routerLink]="bankAccountReady ? ['/', userId, 'business-account'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankAccountReady">
           <mat-icon matListItemIcon>sync_alt</mat-icon>
           <span matListItemTitle>Business Account</span>
       </a>
@@ -59,11 +59,11 @@
         <mat-icon matListItemIcon>attach_money</mat-icon>
         <span matListItemTitle>Loans</span>
       </a>
-      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'business-account-device'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
+      <a mat-list-item [routerLink]="bankAccountReady ? ['/', userId, 'business-account-device'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankAccountReady">
          <mat-icon matListItemIcon>devices</mat-icon>
          <span matListItemTitle>Trusted Devices</span>
       </a>
-      <a mat-list-item [routerLink]="bankEnabled ? ['/', userId, 'banktransfer'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankEnabled">
+      <a mat-list-item [routerLink]="bankAccountReady ? ['/', userId, 'banktransfer'] : null" routerLinkActive="active-link" [class.nav-disabled]="!bankAccountReady">
         <mat-icon matListItemIcon>send</mat-icon>
         <span matListItemTitle>Bank Transfers</span>
       </a>

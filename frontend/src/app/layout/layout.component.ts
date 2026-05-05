@@ -1,10 +1,11 @@
-import { Component, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MaterialModule } from '../material.module';
 import { AccountService, BrandingService } from '../services';
-import { User } from '../models';
+import { BankAccountStatus, User } from '../models';
+import { Subscription } from 'rxjs';
 import { BrandingDialogComponent } from './branding-dialog.component';
 
 @Component({
@@ -18,7 +19,8 @@ import { BrandingDialogComponent } from './branding-dialog.component';
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css'
 })
-export class LayoutComponent {
+export class LayoutComponent implements OnInit, OnDestroy {
+  private bankAccountSub?: Subscription;
   userId = '';
   userEmail = '';
   user: User | null = null;
@@ -33,6 +35,8 @@ export class LayoutComponent {
 
   get capitalEnabled(): boolean { return !!this.user?.capital; }
   get bankEnabled(): boolean { return !!this.user?.bank; }
+  bankAccountCreated = false;
+  get bankAccountReady(): boolean { return this.bankEnabled && this.bankAccountCreated; }
   get issuingEnabled(): boolean { return !!this.user?.issuing; }
   get isEmbeddedPayment(): boolean { return this.user?.activityReason === 'embeddedPayment'; }
 
@@ -44,6 +48,9 @@ export class LayoutComponent {
           next: (user) => {
             this.user = user;
             this.userEmail = user.email;
+            if (user.bank) {
+              this.loadBankAccountStatus();
+            }
             this.cdr.detectChanges();
           },
           error: () => {
@@ -53,6 +60,27 @@ export class LayoutComponent {
           }
         });
         this.loadBranding();
+      }
+    });
+
+    this.bankAccountSub = this.accountService.onBankAccountCreated$.subscribe(() => {
+      this.bankAccountCreated = true;
+      this.cdr.detectChanges();
+    });
+  }
+
+  ngOnDestroy() {
+    this.bankAccountSub?.unsubscribe();
+  }
+
+  private loadBankAccountStatus() {
+    this.accountService.getBankAccountStatus(this.userId).subscribe({
+      next: (status: BankAccountStatus) => {
+        this.bankAccountCreated = status.bankAccountCreated;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.bankAccountCreated = false;
       }
     });
   }

@@ -3,6 +3,7 @@ package com.myplatform.demo.service;
 import com.adyen.Client;
 import com.adyen.model.balanceplatform.*;
 import com.adyen.model.transfers.*;
+import com.adyen.model.transfers.Address;
 import com.adyen.model.transfers.IbanAccountIdentification;
 import com.adyen.model.transfers.UKLocalAccountIdentification;
 import com.adyen.model.transfers.USLocalAccountIdentification;
@@ -133,6 +134,7 @@ public class TransferService {
     private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId) {
         TransferInfo transferInfo = new TransferInfo();
         BankAccountV3AccountIdentification accountIdentification = new BankAccountV3AccountIdentification();
+        Address address = new Address();
 
         if (SEPA_COUNTRIES.contains(request.getCounterpartyCountry())) {
             transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("EUR").value(request.getAmount()));
@@ -140,25 +142,40 @@ public class TransferService {
             iban.setIban(request.getIban());
             iban.setType(IbanAccountIdentification.TypeEnum.IBAN);
             accountIdentification = new BankAccountV3AccountIdentification(iban);
+
+            address.setCountry(request.getCounterpartyCountry());
         } else if ("US".equals(request.getCounterpartyCountry())) {
             transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("USD").value(request.getAmount()));
             USLocalAccountIdentification usLocalAccountIdentification = new USLocalAccountIdentification();
-            usLocalAccountIdentification.accountNumber(request.getAccountNumber());
-            usLocalAccountIdentification.routingNumber(request.getRoutingNumber());
+            usLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
+            usLocalAccountIdentification.setRoutingNumber(request.getRoutingNumber());
+            usLocalAccountIdentification.setType(USLocalAccountIdentification.TypeEnum.USLOCAL);
             accountIdentification = new BankAccountV3AccountIdentification(usLocalAccountIdentification);
+
+            address.setCountry(request.getCounterpartyCountry());
+            address.setPostalCode("20001");
+            address.setCity("Washington");
+            address.setLine1("71 5th Avenue");
         } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())) {
             transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("GBP").value(request.getAmount()));
             UKLocalAccountIdentification ukLocalAccountIdentification = new UKLocalAccountIdentification();
-            ukLocalAccountIdentification.accountNumber(request.getAccountNumber());
+            ukLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
             ukLocalAccountIdentification.setSortCode(request.getSortCode());
+            ukLocalAccountIdentification.setType(UKLocalAccountIdentification.TypeEnum.UKLOCAL);
             accountIdentification = new BankAccountV3AccountIdentification(ukLocalAccountIdentification);
+
+            address.setCountry("GB");
+            address.setPostalCode("SW1A 1AA");
+            address.setCity("London");
+            address.setLine1("123 Main St");
         }
 
         transferInfo.setPaymentInstrumentId(paymentInstrumentId);
         transferInfo.setCategory(TransferInfo.CategoryEnum.BANK);
         CounterpartyInfoV3 counterpartyInfo = new CounterpartyInfoV3();
         BankAccountV3 bankAccount = new BankAccountV3();
-        bankAccount.setAccountHolder(new PartyIdentification().fullName(request.getCounterpartyName()));
+        bankAccount.setAccountHolder(new PartyIdentification().fullName(request.getCounterpartyName())
+                .address(address));
         bankAccount.setAccountIdentification(accountIdentification);
         counterpartyInfo.setBankAccount(bankAccount);
         transferInfo.setCounterparty(counterpartyInfo);

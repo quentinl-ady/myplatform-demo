@@ -1,6 +1,6 @@
 import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
-import {Observable} from 'rxjs';
+import {Observable, Subject} from 'rxjs';
 import {shareReplay} from 'rxjs/operators';
 import {environment} from '../../environments/environment';
 import {BalanceAccount, BankAccountInformationResponse, BankAccountStatus, User} from '../models';
@@ -9,6 +9,14 @@ import {BalanceAccount, BankAccountInformationResponse, BankAccountStatus, User}
 export class AccountService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
+
+  private readonly bankAccountCreated$ = new Subject<void>();
+
+  readonly onBankAccountCreated$ = this.bankAccountCreated$.asObservable();
+
+  notifyBankAccountCreated(): void {
+    this.bankAccountCreated$.next();
+  }
 
   private cachedUserId: string | null = null;
   private cachedUser$: Observable<User> | null = null;

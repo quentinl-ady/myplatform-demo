@@ -46,7 +46,7 @@ public class OnboardingController {
     public ResponseEntity<Map<String, String>> validateKyc(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
         kycService.validateKyc(user.getLegalEntityId(), user.getUserType(), user.getCountryCode());
-        kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing());
+        kycService.signDocument(user.getLegalEntityId(), user.getUserType(), user.getActivityReason(), user.getCapital(), user.getBank(), user.getIssuing(), user.getCountryCode());
         return ResponseEntity.ok(Map.of("status", "success", "message", "KYC processed successfully"));
     }
 

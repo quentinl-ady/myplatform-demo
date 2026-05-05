@@ -25,9 +25,8 @@ import '@adyen/kyc-components/transfer-instrument-configuration';
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  private bankStatusInterval: ReturnType<typeof setTimeout> | null = null;
-  private bankStatusDelay = 5000;
-  private static readonly BANK_STATUS_MAX_DELAY = 60000;
+  private bankStatusInterval: ReturnType<typeof setInterval> | null = null;
+  private static readonly BANK_STATUS_POLL_INTERVAL = 5000;
   userId = '';
   readonly status = signal<OnboardingResponse | null>(null);
   readonly loading = signal(false);
@@ -274,21 +273,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private startBankStatusPolling() {
     this.stopBankStatusPolling();
-    this.bankStatusDelay = 5000;
-    this.scheduleBankStatusPoll();
-  }
-
-  private scheduleBankStatusPoll() {
-    this.bankStatusInterval = setTimeout(() => {
+    this.bankStatusInterval = setInterval(() => {
       this.loadBankAccountStatus();
-      this.bankStatusDelay = Math.min(this.bankStatusDelay * 2, DashboardComponent.BANK_STATUS_MAX_DELAY);
-      this.scheduleBankStatusPoll();
-    }, this.bankStatusDelay);
+    }, DashboardComponent.BANK_STATUS_POLL_INTERVAL);
   }
 
   private stopBankStatusPolling() {
     if (this.bankStatusInterval) {
-      clearTimeout(this.bankStatusInterval);
+      clearInterval(this.bankStatusInterval);
       this.bankStatusInterval = null;
     }
   }
@@ -305,6 +297,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.creatingBankAccount.set(false);
         this.loadBankAccountStatus();
+        this.accountService.notifyBankAccountCreated();
         this.matSnackBar.open('✅ Bank account created: ' + res.bankAccountNumber, 'Close', { duration: 5000 });
       },
       error: (err) => {
