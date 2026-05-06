@@ -20,7 +20,7 @@ export const PAYMENT_METHODS = [
 
 const COUNTRY_LABELS: Record<string, string> = {
   FR: 'France',
-  UK: 'United Kingdom',
+  GB: 'United Kingdom',
   DE: 'Germany',
   US: 'United States',
   NL: 'Netherlands'
@@ -28,7 +28,7 @@ const COUNTRY_LABELS: Record<string, string> = {
 
 const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone: string, lineAdresse1: string }> = {
   FR: { city: 'Paris', postal: '75001', phone: '+33123456789', lineAdresse1: '6 Bd Haussmann' },
-  UK: { city: 'London', postal: 'EC1A1BB', phone: '+442012345678', lineAdresse1: '12-13 Wells Mews' },
+  GB: { city: 'London', postal: 'EC1A1BB', phone: '+442012345678', lineAdresse1: '12-13 Wells Mews' },
   DE: { city: 'Berlin', postal: '10115', phone: '+493012345678', lineAdresse1: 'Jägerstraße 27' },
   US: { city: 'Washington', postal: '20001', phone: '+12021234567', lineAdresse1: '71 5th Avenue' },
   NL: { city: 'Amsterdam', postal: '1011AB', phone: '+31201234567', lineAdresse1: 'Rokin 49' }
