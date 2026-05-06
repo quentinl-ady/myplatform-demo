@@ -35,8 +35,8 @@ public class AccountHolderService {
         Map<String, AccountHolderCapability> capabilities = new HashMap<>(Map.of(
                 "receiveFromBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),
                 "sendToBalanceAccount", new AccountHolderCapability().enabled(true).requested(true),
-                "sendToTransferInstrument", new AccountHolderCapability().enabled(true).requested(true),
-                "receiveFromPlatformPayments", new AccountHolderCapability().enabled(true).requested(true)
+                "sendToTransferInstrument", new AccountHolderCapability().enabled(true).requested(true)
+             //   "receiveFromPlatformPayments", new AccountHolderCapability().enabled(true).requested(true)
         ));
 
         if (activityReason.equals("marketplace")) {
