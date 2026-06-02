@@ -16,7 +16,7 @@
   },
   "private": true,
   "dependencies": {
-    "@adyen/adyen-platform-experience-web": "^1.10.0",
+    "@adyen/adyen-platform-experience-web": "^1.12.0",
     "@adyen/adyen-web": "^6.22.0",
     "@adyen/bpscaweb": "^0.1.5",
     "@adyen/kyc-components": "^4.4.1",

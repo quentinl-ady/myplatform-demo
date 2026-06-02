@@ -52,7 +52,7 @@ export class BusinessLoansComponent {
             }
         });
         const capitalOverview = new CapitalOverview({core});
-        capitalOverview.mount('#capital-overview-container');
+        (capitalOverview as any).mount('#capital-overview-container');
     }
 
 
