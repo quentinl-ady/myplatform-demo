@@ -51,9 +51,9 @@
           <mat-icon matListItemIcon>sync_alt</mat-icon>
           <span matListItemTitle>Business Account</span>
       </a>
-      <a mat-list-item [routerLink]="!bankEnabled ? ['/', userId, 'payout'] : null" routerLinkActive="active-link" [class.nav-disabled]="bankEnabled">
-        <mat-icon matListItemIcon>account_balance</mat-icon>
-        <span matListItemTitle>Payouts</span>
+      <a mat-list-item [routerLink]="['/', userId, 'cash-management']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
+        <span matListItemTitle>Cash Management</span>
       </a>
       <a mat-list-item [routerLink]="capitalEnabled ? ['/', userId, 'businessloans'] : null" routerLinkActive="active-link" [class.nav-disabled]="!capitalEnabled">
         <mat-icon matListItemIcon>attach_money</mat-icon>

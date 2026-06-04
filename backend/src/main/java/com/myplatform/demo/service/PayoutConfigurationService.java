@@ -7,6 +7,7 @@ import com.adyen.model.legalentitymanagement.TransferInstrument;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.TransferInstrumentsApi;
+import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.model.PayoutConfigurationResponse;
 import com.myplatform.demo.model.User;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,6 +32,11 @@ public class PayoutConfigurationService {
     public PayoutConfigurationResponse createPayoutConfiguration(String balanceAccountId, String currencyCode,
                                                                  Boolean regular, Boolean instant,
                                                                  String transferInstrumentId, String schedule) throws IOException, ApiException {
+
+        BalanceAccount ba = balanceAccountsApi.getBalanceAccount(balanceAccountId);
+        if ("Business Bank Account".equals(ba.getDescription())) {
+            throw new BadRequestException("Scheduled payouts are not allowed on Business Bank Accounts");
+        }
 
         String accountIdentifier = getAccountIdentifier(transferInstrumentId);
 
@@ -106,6 +112,14 @@ public class PayoutConfigurationService {
         String accountIdentifier = getAccountIdentifier(sweep.getCounterparty().getTransferInstrumentId());
         response.setAccountIdentifier(accountIdentifier);
         return response;
+    }
+
+    public SweepConfigurationV2 updateSweepStatus(String balanceAccountId, String sweepId, boolean active) throws IOException, ApiException {
+        UpdateSweepConfigurationV2 update = new UpdateSweepConfigurationV2();
+        update.setStatus(active
+                ? UpdateSweepConfigurationV2.StatusEnum.ACTIVE
+                : UpdateSweepConfigurationV2.StatusEnum.INACTIVE);
+        return balanceAccountsApi.updateSweep(balanceAccountId, sweepId, update);
     }
 
     private String getAccountIdentifier(String transferInstrumentId) throws ApiException, IOException {

@@ -36,9 +36,9 @@ const routeConfig: Routes = [
         title: 'Report'
       },
       {
-        path: 'payout',
-        loadComponent: () => import('./payout/payout.component').then(m => m.PayoutComponent),
-        title: 'Payout'
+        path: 'cash-management',
+        loadComponent: () => import('./cash-management/cash-management.component').then(m => m.CashManagementComponent),
+        title: 'Cash Management'
       },
       {
         path: 'dispute',

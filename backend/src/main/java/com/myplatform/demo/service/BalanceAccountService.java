@@ -43,22 +43,79 @@ public class BalanceAccountService {
 
         return balanceAccounts.stream()
                 .map(account -> {
-                    BalanceAccountInfoCustomer customer = new BalanceAccountInfoCustomer();
-                    customer.setCurrencyCode(account.getDefaultCurrencyCode());
-                    customer.setDescription(account.getDescription());
-                    customer.setBalanceAccountId(account.getId());
-                    return customer;
+                    try {
+                        return getDetailedBalanceAccount(account.getId());
+                    } catch (Exception e) {
+                        BalanceAccountInfoCustomer customer = new BalanceAccountInfoCustomer();
+                        customer.setCurrencyCode(account.getDefaultCurrencyCode());
+                        customer.setDescription(account.getDescription());
+                        customer.setBalanceAccountId(account.getId());
+                        return customer;
+                    }
                 })
                 .toList();
     }
 
     public BalanceAccountInfoCustomer getOneBalanceAccount(String balanceAccountId) throws IOException, ApiException {
-        BalanceAccount balanceAccount = balanceAccountsApi.getBalanceAccount(balanceAccountId);
-        BalanceAccountInfoCustomer balanceAccountInfoCustomer = new BalanceAccountInfoCustomer();
-        balanceAccountInfoCustomer.setCurrencyCode(balanceAccount.getDefaultCurrencyCode());
-        balanceAccountInfoCustomer.setDescription(balanceAccount.getDescription());
-        balanceAccountInfoCustomer.setBalanceAccountId(balanceAccount.getId());
-        return balanceAccountInfoCustomer;
+        return getDetailedBalanceAccount(balanceAccountId);
+    }
+
+    private BalanceAccountInfoCustomer getDetailedBalanceAccount(String balanceAccountId) throws IOException, ApiException {
+        BalanceAccount ba = balanceAccountsApi.getBalanceAccount(balanceAccountId);
+        BalanceAccountInfoCustomer customer = new BalanceAccountInfoCustomer();
+        customer.setCurrencyCode(ba.getDefaultCurrencyCode());
+        customer.setDescription(ba.getDescription());
+        customer.setBalanceAccountId(ba.getId());
+        customer.setStatus(ba.getStatus() != null ? ba.getStatus().getValue() : null);
+
+        if (ba.getBalances() != null) {
+            customer.setBalances(ba.getBalances().stream().map(b -> {
+                BalanceAccountInfoCustomer.BalanceInfo info = new BalanceAccountInfoCustomer.BalanceInfo();
+                info.setCurrency(b.getCurrency());
+                info.setAvailable(b.getAvailable() != null ? b.getAvailable() : 0);
+                info.setBalance(b.getBalance() != null ? b.getBalance() : 0);
+                info.setPending(b.getPending() != null ? b.getPending() : 0);
+                info.setReserved(b.getReserved() != null ? b.getReserved() : 0);
+                return info;
+            }).toList());
+        }
+
+        try {
+            BalanceSweepConfigurationsResponse sweepList = balanceAccountsApi.getAllSweepsForBalanceAccount(balanceAccountId);
+            if (sweepList.getSweeps() != null) {
+                customer.setSweeps(sweepList.getSweeps().stream().map(s -> {
+                    BalanceAccountInfoCustomer.SweepInfo sweep = new BalanceAccountInfoCustomer.SweepInfo();
+                    sweep.setId(s.getId());
+                    sweep.setCurrency(s.getCurrency());
+                    sweep.setDescription(s.getDescription());
+                    sweep.setCategory(s.getCategory() != null ? s.getCategory().getValue() : null);
+                    sweep.setType(s.getType() != null ? s.getType().getValue() : null);
+                    sweep.setStatus(s.getStatus() != null ? s.getStatus().getValue() : null);
+                    if (s.getSchedule() != null) {
+                        sweep.setScheduleType(s.getSchedule().getType().toString());
+                        sweep.setCronExpression(s.getSchedule().getCronExpression());
+                    }
+                    if (s.getCounterparty() != null) {
+                        sweep.setCounterpartyTransferInstrumentId(s.getCounterparty().getTransferInstrumentId());
+                        sweep.setCounterpartyBalanceAccountId(s.getCounterparty().getBalanceAccountId());
+                    }
+                    if (s.getPriorities() != null) {
+                        sweep.setPriorities(s.getPriorities().stream().map(p -> p.getValue()).toList());
+                    }
+                    return sweep;
+                }).toList());
+            }
+        } catch (Exception ignored) {}
+
+        return customer;
+    }
+
+    public BalanceAccount createNewBalanceAccount(String accountHolderId, String description) throws IOException, ApiException {
+        BalanceAccountInfo balanceAccountInfo = new BalanceAccountInfo()
+                .accountHolderId(accountHolderId)
+                .description(description != null && !description.isBlank() ? description : "Balance Account");
+
+        return balanceAccountsApi.createBalanceAccount(balanceAccountInfo);
     }
 
     public String findBusinessBankBalanceAccountId(String accountHolderId) throws IOException, ApiException {
