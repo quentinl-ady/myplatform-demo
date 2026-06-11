@@ -21,6 +21,13 @@
 }
 
 /* Header */
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.last-updated-label { font-size: 12px; color: var(--fintech-text-secondary); white-space: nowrap; }
 .header-section h2 {
   font-size: 28px;
   font-weight: 700;
@@ -103,6 +110,27 @@ mat-card {
   font-size: 11px;
   color: var(--fintech-text-secondary);
   margin-bottom: 14px;
+}
+
+/* Instant eligibility check */
+.instant-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--fintech-bg);
+  color: var(--fintech-text-secondary);
+}
+.instant-check mat-icon { font-size: 18px; width: 18px; height: 18px; }
+.instant-check.instant-yes {
+  background: #e6f9ee;
+  color: #059940;
+}
+.instant-check.instant-no {
+  background: #fef3e2;
+  color: #b45309;
 }
 
 .status-badge {

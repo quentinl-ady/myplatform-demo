@@ -175,7 +175,7 @@ public class LegalEntityService {
                 .legalEntityId(legalEntityId)
                 .industryCode(activity.getIndustryCode())
                 .salesChannels(activity.getSalesChannels())
-                .addWebDataItem(new WebData().webAddress(frontendUrl))
+                .addWebDataItem(new WebData().webAddress("https://www.adyen.com"))
                 .service(BusinessLineInfo.ServiceEnum.PAYMENTPROCESSING);
 
         BusinessLine businessLine = businessLinesApi.createBusinessLine(businessLineInfo);

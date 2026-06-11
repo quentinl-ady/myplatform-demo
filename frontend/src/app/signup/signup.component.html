@@ -170,14 +170,10 @@
     </mat-select>
   </mat-form-field>
 
-  <!-- CURRENCY -->
+  <!-- CURRENCY (auto-determined by country) -->
   <mat-form-field appearance="outline" class="full-width">
     <mat-label>Currency</mat-label>
-    <mat-select formControlName="currencyCode">
-      <mat-option value="EUR">EUR</mat-option>
-      <mat-option value="GBP">GBP</mat-option>
-      <mat-option value="USD">USD</mat-option>
-    </mat-select>
+    <input matInput formControlName="currencyCode" readonly />
   </mat-form-field>
 
   <!-- EMAIL -->

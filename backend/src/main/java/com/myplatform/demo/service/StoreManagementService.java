@@ -14,9 +14,15 @@ import com.adyen.service.management.TerminalsTerminalLevelApi;
 import com.myplatform.demo.model.PaymentMethodCustomer;
 import com.myplatform.demo.model.StoreCustomer;
 import com.myplatform.demo.model.TerminalResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.util.*;
@@ -26,31 +32,41 @@ import static com.myplatform.demo.service.GpayJwtService.MERCHANT_ID;
 @Service
 public class StoreManagementService {
 
+    private static final Logger log = LoggerFactory.getLogger(StoreManagementService.class);
+
+    private static final String MGMT_TEST_URL = "https://management-test.adyen.com/v3";
+
     private final AccountStoreLevelApi accountStoreLevelApi;
     private final PaymentMethodsMerchantLevelApi paymentMethodsMerchantLevelApi;
     private final SplitConfigurationMerchantLevelApi splitConfigurationMerchantLevelApi;
     private final BalanceAccountsApi balanceAccountsApi;
     private final LegalEntitiesApi lem;
     private final TerminalsTerminalLevelApi terminalsTerminalLevelApi;
+    private final RestTemplate restTemplate;
+    private final String pspApiKey;
     private final String merchantAccount;
 
     public StoreManagementService(@Qualifier("pspClient") Client pspClient,
                                   @Qualifier("balancePlatformClient") Client balancePlatformClient,
                                   @Qualifier("lemClient") Client lemClient,
                                   @Value("${adyen.lemVersion}") String lemVersion,
-                                  @Value("${adyen.merchantAccount}") String merchantAccount) {
+                                  @Value("${adyen.merchantAccount}") String merchantAccount,
+                                  RestTemplate restTemplate) {
         this.accountStoreLevelApi = new AccountStoreLevelApi(pspClient);
         this.paymentMethodsMerchantLevelApi = new PaymentMethodsMerchantLevelApi(pspClient);
         this.splitConfigurationMerchantLevelApi = new SplitConfigurationMerchantLevelApi(pspClient);
         this.balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
         this.lem = new LegalEntitiesApi(lemClient, "https://kyc-test.adyen.com/lem/" + lemVersion);
         this.terminalsTerminalLevelApi = new TerminalsTerminalLevelApi(pspClient);
+        this.restTemplate = restTemplate;
+        this.pspApiKey = pspClient.getConfig().getApiKey();
         this.merchantAccount = merchantAccount;
     }
 
     public StoreCustomer createStore(String legalEntityId, List<String> businessLineId, String city, String country,
                                      String postalCode, String lineAdresse1, String storeReference, String legalEntityName,
-                                     String phoneNumber, String balanceAccountId, List<String> paymentMethodRequest) throws IOException, ApiException {
+                                     String phoneNumber, String balanceAccountId, List<String> paymentMethodRequest,
+                                     String userEmail) throws IOException, ApiException {
         StoreCreationRequest storeCreationRequest = new StoreCreationRequest();
 
         storeCreationRequest.setBusinessLineIds(businessLineId);
@@ -80,7 +96,7 @@ public class StoreManagementService {
 
         Store store = accountStoreLevelApi.createStoreByMerchantId(merchantAccount, storeCreationRequest);
 
-        requestPaymentMethod(paymentMethodRequest, legalEntityId, store.getId());
+        doRequestPaymentMethods(paymentMethodRequest, businessLineId, store.getId(), country, userEmail);
         StoreCustomer storeCustomer = new StoreCustomer();
         storeCustomer.setStoreRef(storeReference);
         storeCustomer.setCity(city);
@@ -135,63 +151,191 @@ public class StoreManagementService {
         }
     }
 
-    public void requestPaymentMethod(List<String> paymentMethodRequest, String legalEntityId, String storeId)
+    public void requestPaymentMethod(List<String> paymentMethodRequest, String legalEntityId,
+                                      String storeId, String country, String userEmail)
             throws IOException, ApiException {
 
-        List<BusinessLine> businessLines =
+        List<String> businessLineIds =
                 lem.getAllBusinessLinesUnderLegalEntity(legalEntityId)
                         .getBusinessLines()
                         .stream()
                         .filter(bl -> "paymentProcessing".equals(bl.getService().getValue()))
+                        .map(BusinessLine::getId)
                         .toList();
 
-        List<String> specificPM = new ArrayList<>(List.of("cartebancaire", "amex", "googlepay"));
+        doRequestPaymentMethods(paymentMethodRequest, businessLineIds, storeId, country, userEmail);
+    }
 
-        for (BusinessLine businessLine : businessLines) {
+    public void requestPaymentMethodForExistingStore(List<String> paymentMethodRequest,
+                                                      String storeId, String country, String userEmail)
+            throws IOException, ApiException {
+
+        Store adyenStore = accountStoreLevelApi.getStore(merchantAccount, storeId);
+        List<String> businessLineIds = adyenStore.getBusinessLineIds();
+
+        doRequestPaymentMethods(paymentMethodRequest, businessLineIds, storeId, country, userEmail);
+    }
+
+    private void doRequestPaymentMethods(List<String> paymentMethodRequest, List<String> businessLineIds,
+                                          String storeId, String country, String userEmail)
+            throws IOException, ApiException {
+
+        Set<String> specificPM = Set.of(
+                "cartebancaire", "amex", "googlepay",
+                "klarna_b2b", "affirm", "accel", "nyce", "paybybank", "paybybank_plaid"
+        );
+
+        for (String blId : businessLineIds) {
             for (String paymentMethod : paymentMethodRequest) {
                 if (!specificPM.contains(paymentMethod)) {
-                    PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
-                    paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
-                    paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
-                    paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue(paymentMethod));
-                    paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+                    PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                    info.setBusinessLineId(blId);
+                    info.setStoreIds(Collections.singletonList(storeId));
+                    info.setType(PaymentMethodSetupInfo.TypeEnum.fromValue(paymentMethod));
+                    paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
                 }
             }
         }
 
         if (paymentMethodRequest.contains("cartebancaire")) {
-            for (BusinessLine businessLine : businessLines) {
-                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
-                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
-                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
-                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("cartebancaire"));
-                paymentMethodSetupInfo.cartesBancaires(new CartesBancairesInfo().siret("54205118000066"));
-                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.CARTEBANCAIRE);
+                info.cartesBancaires(new CartesBancairesInfo().siret("54205118000066"));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
             }
         }
 
         if (paymentMethodRequest.contains("amex")) {
-            for (BusinessLine businessLine : businessLines) {
-                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
-                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
-                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
-                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("amex"));
-                paymentMethodSetupInfo.setCurrencies(new ArrayList<>(List.of("EUR")));
-                paymentMethodSetupInfo.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
-                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            String amexCurrency = getAmexCurrency(country);
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.AMEX);
+                info.setCurrencies(new ArrayList<>(List.of(amexCurrency)));
+                info.amex(new AmexInfo().serviceLevel(AmexInfo.ServiceLevelEnum.NOCONTRACT));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
             }
         }
 
         if (paymentMethodRequest.contains("googlepay")) {
-            for (BusinessLine businessLine : businessLines) {
-                PaymentMethodSetupInfo paymentMethodSetupInfo = new PaymentMethodSetupInfo();
-                paymentMethodSetupInfo.setBusinessLineId(businessLine.getId());
-                paymentMethodSetupInfo.setStoreIds(Collections.singletonList(storeId));
-                paymentMethodSetupInfo.setType(PaymentMethodSetupInfo.TypeEnum.fromValue("googlepay"));
-                paymentMethodSetupInfo.googlePay(new GooglePayInfo().reuseMerchantId(Boolean.TRUE).merchantId(MERCHANT_ID));
-                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, paymentMethodSetupInfo);
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.GOOGLEPAY);
+                info.googlePay(new GooglePayInfo().reuseMerchantId(Boolean.TRUE).merchantId(MERCHANT_ID));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
             }
         }
+
+        if (paymentMethodRequest.contains("klarna_b2b")) {
+            requestKlarnaB2b(businessLineIds, storeId, country, userEmail);
+        }
+
+        if (paymentMethodRequest.contains("affirm")) {
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.AFFIRM);
+                info.affirm(new AffirmInfo().supportEmail(userEmail));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+
+        if (paymentMethodRequest.contains("accel")) {
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.ACCEL);
+                info.accel(new AccelInfo().processingType(AccelInfo.ProcessingTypeEnum.ECOM));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+
+        if (paymentMethodRequest.contains("nyce")) {
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.NYCE);
+                info.nyce(new NyceInfo().processingType(NyceInfo.ProcessingTypeEnum.ECOM));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+
+        if (paymentMethodRequest.contains("paybybank")) {
+            String pbCurrency = "GB".equals(country) ? "GBP" : "EUR";
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.PAYBYBANK);
+                info.setCurrencies(new ArrayList<>(List.of(pbCurrency)));
+                info.setCountries(new ArrayList<>(List.of(country)));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+
+        if (paymentMethodRequest.contains("paybybank_plaid")) {
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.PAYBYBANK_PLAID);
+                info.setCurrencies(new ArrayList<>(List.of("USD")));
+                info.setCountries(new ArrayList<>(List.of("US")));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+    }
+
+    private void requestKlarnaB2b(List<String> businessLineIds, String storeId,
+                                   String country, String userEmail) {
+        String regionCode = "GB".equals(country) || "FR".equals(country)
+                || "DE".equals(country) || "NL".equals(country) ? "EU" : "NA";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-API-Key", pspApiKey);
+
+        for (String blId : businessLineIds) {
+            String body = """
+                    {
+                      "type": "klarna_b2b",
+                      "businessLineId": "%s",
+                      "storeIds": ["%s"],
+                      "klarna": {
+                        "autoCapture": true,
+                        "disputeEmail": "%s",
+                        "supportEmail": "%s",
+                        "region": "%s"
+                      }
+                    }
+                    """.formatted(blId, storeId, userEmail, userEmail, regionCode);
+
+            HttpEntity<String> entity = new HttpEntity<>(body, headers);
+            try {
+                restTemplate.postForEntity(
+                        MGMT_TEST_URL + "/merchants/" + merchantAccount + "/paymentMethodSettings",
+                        entity, String.class);
+            } catch (Exception e) {
+                log.error("Failed to request klarna_b2b for store {}: {}", storeId, e.getMessage());
+            }
+        }
+    }
+
+    private String getAmexCurrency(String country) {
+        return switch (country) {
+            case "US" -> "USD";
+            case "GB" -> "GBP";
+            default -> "EUR";
+        };
     }
 
     public List<PaymentMethodCustomer> getAllPaymentMethod(String storeId) throws IOException, ApiException {
@@ -202,6 +346,8 @@ public class StoreManagementService {
                 .map(paymentMethod -> {
                     PaymentMethodCustomer paymentMethodCustomer = new PaymentMethodCustomer();
                     paymentMethodCustomer.setType(paymentMethod.getType());
+                    paymentMethodCustomer.setPaymentMethodId(paymentMethod.getId());
+                    paymentMethodCustomer.setEnabled(paymentMethod.getEnabled());
                     String verificationStatus = Optional.ofNullable(paymentMethod.getVerificationStatus())
                             .map(PaymentMethod.VerificationStatusEnum::getValue)
                             .orElse("valid");
@@ -209,6 +355,22 @@ public class StoreManagementService {
                     return paymentMethodCustomer;
                 })
                 .toList();
+    }
+
+    public PaymentMethodCustomer togglePaymentMethod(String paymentMethodId, boolean enabled) throws IOException, ApiException {
+        UpdatePaymentMethodInfo updateInfo = new UpdatePaymentMethodInfo();
+        updateInfo.setEnabled(enabled);
+        PaymentMethod updated = paymentMethodsMerchantLevelApi.updatePaymentMethod(merchantAccount, paymentMethodId, updateInfo);
+
+        PaymentMethodCustomer result = new PaymentMethodCustomer();
+        result.setType(updated.getType());
+        result.setPaymentMethodId(updated.getId());
+        result.setEnabled(updated.getEnabled());
+        String verificationStatus = Optional.ofNullable(updated.getVerificationStatus())
+                .map(PaymentMethod.VerificationStatusEnum::getValue)
+                .orElse("valid");
+        result.setVerificationStatus(verificationStatus);
+        return result;
     }
 
     public List<TerminalResponse> listTerminals(String storeId) throws IOException, ApiException {

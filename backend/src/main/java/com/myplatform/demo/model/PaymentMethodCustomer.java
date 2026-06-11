@@ -14,6 +14,8 @@ public class PaymentMethodCustomer {
 
     String type;
     String verificationStatus;
+    String paymentMethodId;
+    Boolean enabled;
 
     @ManyToOne
     @JoinColumn(name = "store_customer_id")

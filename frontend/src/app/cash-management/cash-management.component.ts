@@ -1,4 +1,4 @@
-import {Component, signal, inject} from '@angular/core';
+import {Component, signal, inject, ChangeDetectorRef} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import {CommonModule} from '@angular/common';
@@ -26,6 +26,7 @@ export class CashManagementComponent {
     // Balance accounts
     readonly balanceAccounts = signal<BalanceAccount[]>([]);
     loadingAccounts = false;
+    lastUpdated: number | null = null;
     showCreateForm = false;
     newAccountDescription = '';
     creatingAccount = false;
@@ -46,6 +47,10 @@ export class CashManagementComponent {
     submittingCashout = false;
     cashoutPendingBalance = 0;
     cashoutCurrency = '';
+    userCurrency = '';
+    userCountryCode = '';
+    instantAvailable: boolean | null = null;
+    checkingInstant = false;
 
     private fb = inject(FormBuilder);
     private route = inject(ActivatedRoute);
@@ -53,6 +58,7 @@ export class CashManagementComponent {
     private payoutService = inject(PayoutService);
     private cashManagementService = inject(CashManagementService);
     private snackBar = inject(MatSnackBar);
+    private cdr = inject(ChangeDetectorRef);
 
     constructor() {
         this.transferForm = this.fb.group({
@@ -75,7 +81,7 @@ export class CashManagementComponent {
             balanceAccountId: ['', Validators.required],
             currency: ['', Validators.required],
             amount: [null, [Validators.required, Validators.min(1)]],
-            transferInstrumentId: ['', Validators.required],
+            transferInstrumentId: [''],
             description: ['']
         });
     }
@@ -86,6 +92,7 @@ export class CashManagementComponent {
             if (this.userId) {
                 this.loadBalanceAccounts();
                 this.loadPayoutAccounts();
+                this.loadUserCurrency();
             }
         });
 
@@ -100,6 +107,10 @@ export class CashManagementComponent {
         this.cashoutForm.get('balanceAccountId')?.valueChanges.subscribe(baId => {
             this.onCashoutAccountChange(baId);
         });
+
+        this.cashoutForm.get('transferInstrumentId')?.valueChanges.subscribe(tiId => {
+            this.onCashoutTransferInstrumentChange(tiId);
+        });
     }
 
     // === Balance Accounts ===
@@ -109,6 +120,7 @@ export class CashManagementComponent {
         this.accountService.getBalanceAccounts(this.userId).subscribe({
             next: res => {
                 this.balanceAccounts.set(res);
+                this.lastUpdated = Date.now();
                 this.loadingAccounts = false;
             },
             error: () => {
@@ -116,6 +128,19 @@ export class CashManagementComponent {
                 this.toast('Error loading balance accounts');
             }
         });
+    }
+
+    refresh() {
+        this.loadBalanceAccounts();
+        this.loadPayoutAccounts();
+    }
+
+    getLastUpdatedLabel(): string {
+        if (!this.lastUpdated) return '';
+        const seconds = Math.floor((Date.now() - this.lastUpdated) / 1000);
+        if (seconds < 60) return 'Updated just now';
+        const minutes = Math.floor(seconds / 60);
+        return `Updated ${minutes} min ago`;
     }
 
     createBalanceAccount() {
@@ -315,20 +340,50 @@ export class CashManagementComponent {
         return this.cashoutForm.get('currency')?.value || '';
     }
 
+    loadUserCurrency() {
+        this.accountService.getUserById(this.userId).subscribe({
+            next: user => {
+                this.userCurrency = user.currencyCode;
+                this.userCountryCode = user.countryCode;
+                this.cashoutForm.patchValue({currency: this.userCurrency});
+            }
+        });
+    }
+
+    onCashoutTransferInstrumentChange(transferInstrumentId: string) {
+        if (!transferInstrumentId) {
+            this.instantAvailable = null;
+            return;
+        }
+        const baId = this.cashoutForm.get('balanceAccountId')?.value;
+        if (!baId || !this.userCurrency) return;
+
+        this.checkingInstant = true;
+        this.instantAvailable = null;
+        this.cashManagementService.checkInstantEligibility(
+            baId, transferInstrumentId, this.userCurrency
+        ).subscribe({
+            next: res => {
+                this.instantAvailable = res.instantAvailable;
+                this.checkingInstant = false;
+                this.cdr.detectChanges();
+            },
+            error: () => {
+                this.instantAvailable = false;
+                this.checkingInstant = false;
+                this.cdr.detectChanges();
+            }
+        });
+    }
+
     onCashoutAccountChange(baId: string) {
         const account = this.balanceAccounts().find(a => a.balanceAccountId === baId);
         if (account?.balances && account.balances.length > 0) {
-            const first = account.balances[0];
-            this.cashoutPendingBalance = first.pending;
-            this.cashoutCurrency = first.currency;
-            this.cashoutForm.patchValue({currency: first.currency});
+            const balance = account.balances.find(b => b.currency === this.userCurrency) || account.balances[0];
+            this.cashoutPendingBalance = balance.pending;
+            this.cashoutCurrency = this.userCurrency || balance.currency;
+            this.cashoutForm.patchValue({currency: this.cashoutCurrency});
         }
-    }
-
-    getCashoutCurrencies(): string[] {
-        const baId = this.cashoutForm.get('balanceAccountId')?.value;
-        const account = this.balanceAccounts().find(a => a.balanceAccountId === baId);
-        return account?.balances?.map(b => b.currency) || [];
     }
 
     submitCashout() {
@@ -340,8 +395,8 @@ export class CashManagementComponent {
             balanceAccountId: val.balanceAccountId,
             currency: val.currency,
             amount: Math.round(val.amount * 100),
-            transferInstrumentId: val.transferInstrumentId,
-            description: val.description || undefined
+            transferInstrumentId: val.transferInstrumentId || undefined,
+            description: val.transferInstrumentId ? (val.description || undefined) : undefined
         }).subscribe({
             next: () => {
                 this.toast('Cashout request submitted');

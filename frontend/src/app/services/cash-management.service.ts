@@ -21,6 +21,12 @@ export class CashManagementService {
     return this.http.post(`${this.baseUrl}/api/cash-management/cashout`, request);
   }
 
+  checkInstantEligibility(balanceAccountId: string, transferInstrumentId: string, currency: string): Observable<{ instantAvailable: boolean }> {
+    return this.http.get<{ instantAvailable: boolean }>(`${this.baseUrl}/api/cash-management/check-instant`, {
+      params: { balanceAccountId, transferInstrumentId, currency }
+    });
+  }
+
   updateSweepStatus(userId: string, balanceAccountId: string, sweepId: string, active: boolean): Observable<any> {
     return this.http.patch(`${this.baseUrl}/api/cash-management/${userId}/balance-accounts/${balanceAccountId}/sweeps/${sweepId}`, {active});
   }

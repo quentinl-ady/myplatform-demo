@@ -1,8 +1,17 @@
 <div class="fintech-wrapper">
 
   <div class="header-section">
-    <h2>Stores Management</h2>
-    <p>Manage your physical or digital storefronts and configure their payment methods.</p>
+    <div class="header-title">
+      <h2>Stores Management</h2>
+      <p>Manage your physical or digital storefronts and configure their payment methods.</p>
+    </div>
+    <div class="header-actions">
+      <span class="last-updated-label" *ngIf="lastUpdated && !isLoading">{{ getLastUpdatedLabel() }}</span>
+      <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
   </div>
 
   <div class="stores-list-container" *ngIf="stores().length; else noStores">
@@ -38,12 +47,52 @@
         </div>
 
         <div class="pm-section">
-          <span class="label">Payment Methods</span>
+          <div class="pm-section-header">
+            <span class="label">Payment Methods</span>
+            <button mat-stroked-button class="fintech-btn-sm" (click)="openAddPm(s)"
+                    *ngIf="getAvailablePMsForStore(s).length > 0 && addPmStoreId !== s.storeId">
+              <mat-icon class="btn-icon">add</mat-icon> Add
+            </button>
+          </div>
           <div class="pm-badges-container">
-            <span *ngFor="let pm of s.paymentMethods" class="pm-badge" [ngClass]="pm.verificationStatus">
-              {{ pm.type | titlecase }}
-              <span class="pm-status-icon">{{ getStatusIcon(pm.verificationStatus) }}</span>
-            </span>
+            <div *ngFor="let pm of s.paymentMethods" class="pm-badge-row">
+              <span class="pm-badge" [ngClass]="[pm.verificationStatus, pm.enabled ? '' : 'disabled']">
+                {{ getPmLabel(pm.type) }}
+                <span class="pm-status-icon">{{ getStatusIcon(pm.verificationStatus) }}</span>
+              </span>
+              <mat-slide-toggle
+                [checked]="pm.enabled"
+                (change)="togglePaymentMethod(s.storeId, pm)"
+                color="primary"
+                class="pm-toggle">
+              </mat-slide-toggle>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Payment Method Inline Panel -->
+        <div class="add-pm-panel" *ngIf="addPmStoreId === s.storeId">
+          <div class="add-pm-panel-header">
+            <strong>Add Payment Methods</strong>
+            <button mat-icon-button (click)="closeAddPm()"><mat-icon>close</mat-icon></button>
+          </div>
+          <form [formGroup]="addPmForm">
+            <div class="checkbox-grid">
+              <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
+                <mat-checkbox [formControlName]="p.key" color="primary">
+                  <div class="pm-label-content">
+                    <strong>{{ p.label }}</strong>
+                  </div>
+                </mat-checkbox>
+              </div>
+            </div>
+          </form>
+          <div class="add-pm-actions">
+            <button mat-stroked-button class="fintech-btn secondary" (click)="closeAddPm()">Cancel</button>
+            <button mat-flat-button class="fintech-btn primary" (click)="submitAddPm()" [disabled]="addPmLoading">
+              <span *ngIf="!addPmLoading">Confirm</span>
+              <mat-spinner *ngIf="addPmLoading" diameter="20" color="accent"></mat-spinner>
+            </button>
           </div>
         </div>
       </div>
@@ -142,15 +191,15 @@
         </form>
       </mat-step>
 
-      <mat-step [stepControl]="paymentsForm">
+      <mat-step [stepControl]="paymentsForm" *ngIf="paymentsForm">
         <form [formGroup]="paymentsForm">
           <ng-template matStepLabel>Payment Methods</ng-template>
 
           <div class="form-group">
             <label>Select accepted payment methods for this store</label>
             <div class="checkbox-grid">
-              <div class="pm-checkbox-card" *ngFor="let p of PAYMENT_METHODS">
-                <mat-checkbox formControlName="{{ p.key }}" color="primary">
+              <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
+                <mat-checkbox [formControlName]="p.key" color="primary">
                   <div class="pm-label-content">
                     <strong>{{ p.label }}</strong>
                     <span class="pm-fee">10% commission</span>

@@ -42,6 +42,14 @@ export class SignupComponent {
         { value: 'soleProprietorship', label: 'Sole Proprietorship', disabled: false },
     ];
 
+    readonly countryCurrencyMap: Record<string, string> = {
+        NL: 'EUR',
+        FR: 'EUR',
+        DE: 'EUR',
+        GB: 'GBP',
+        US: 'USD',
+    };
+
     individualDisabledMessage: string | null = null;
 
     // flags UI
@@ -69,7 +77,7 @@ export class SignupComponent {
             email: ['', [Validators.required, Validators.email]],
             password: ['', [Validators.required, Validators.minLength(4)]],
             countryCode: ['NL'],
-            currencyCode: ['EUR'],
+            currencyCode: [{ value: 'EUR', disabled: true }],
             userType: ['organization'],
             activityReason: ['marketplace', Validators.required],
             capital: [false],
@@ -80,6 +88,11 @@ export class SignupComponent {
         this.form.get('userType')!.valueChanges.subscribe((type) =>
             this.updateUserTypeControls(type)
         );
+
+        this.form.get('countryCode')!.valueChanges.subscribe((country) => {
+            const currency = this.countryCurrencyMap[country] || 'EUR';
+            this.form.get('currencyCode')!.setValue(currency);
+        });
 
         this.updateRestrictions();
         this.form.valueChanges.subscribe(() => this.updateRestrictions());
@@ -228,7 +241,7 @@ export class SignupComponent {
         this.error = null;
         this.loading = true;
 
-        let payload: any = { ...this.form.value };
+        let payload: any = { ...this.form.getRawValue() };
         if (payload.userType === 'individual') {
             delete payload.legalEntityName;
         } else if (payload.userType === 'organization') {

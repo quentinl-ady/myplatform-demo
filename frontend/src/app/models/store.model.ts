@@ -21,7 +21,7 @@ export interface Store {
   lineAdresse: string;
   phoneNumber: string;
   balanceAccountInfoCustomer: BalanceAccount;
-  paymentMethods: { type: string; verificationStatus: VerificationStatus }[];
+  paymentMethods: { type: string; verificationStatus: VerificationStatus; paymentMethodId: string; enabled: boolean }[];
 }
 
 export interface TerminalResponse {

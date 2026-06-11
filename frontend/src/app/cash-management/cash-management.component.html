@@ -2,8 +2,17 @@
 
   <!-- HEADER -->
   <div class="header-section">
-    <h2>Cash Management</h2>
-    <p>Manage your balance accounts, transfer funds and configure payouts.</p>
+    <div class="header-title">
+      <h2>Cash Management</h2>
+      <p>Manage your balance accounts, transfer funds and configure payouts.</p>
+    </div>
+    <div class="header-actions">
+      <span class="last-updated-label" *ngIf="lastUpdated && !loadingAccounts">{{ getLastUpdatedLabel() }}</span>
+      <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="loadingAccounts">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════ -->
@@ -259,7 +268,7 @@
 
         <div class="tab-content">
           <h3 class="tab-title">Cash Out</h3>
-          <p class="tab-subtitle">Instantly access your pending funds and pay them out to a bank account.</p>
+          <p class="tab-subtitle">Instantly access your pending funds — pay out to a bank account or keep on your balance account.</p>
 
           <form [formGroup]="cashoutForm" (ngSubmit)="submitCashout()" class="action-form">
             <div class="form-row">
@@ -274,16 +283,18 @@
               </div>
               <div class="form-group flex-1">
                 <label>Currency</label>
-                <select class="fintech-input" formControlName="currency">
-                  <option value="" disabled>Select currency...</option>
-                  <option *ngFor="let c of getCashoutCurrencies()" [value]="c">{{ c }}</option>
-                </select>
+                <input class="fintech-input" [value]="userCurrency" disabled />
+                <input type="hidden" formControlName="currency" />
               </div>
             </div>
 
             <div class="pending-info" *ngIf="cashoutPendingBalance > 0">
               <mat-icon>info_outline</mat-icon>
               Pending balance available: <strong>{{ formatAmount(cashoutPendingBalance, cashoutCurrency) }}</strong>
+            </div>
+            <div class="instant-check instant-no" *ngIf="cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0">
+              <mat-icon>money_off</mat-icon>
+              <span>No pending funds available on this balance account. Cash out is not possible.</span>
             </div>
 
             <div class="form-row">
@@ -292,14 +303,27 @@
                 <input class="fintech-input" type="number" formControlName="amount" placeholder="0.00" step="0.01" min="0.01" />
               </div>
               <div class="form-group flex-1">
-                <label>Destination Bank Account</label>
+                <label>Destination (optional)</label>
                 <select class="fintech-input" formControlName="transferInstrumentId">
-                  <option value="" disabled>Select bank account...</option>
+                  <option value="">Keep on Balance Account</option>
                   <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
                     {{ acc.accountIdentifier }}
                   </option>
                 </select>
               </div>
+            </div>
+
+            <div class="instant-check" *ngIf="checkingInstant">
+              <mat-spinner diameter="16"></mat-spinner>
+              <span>Checking instant payout eligibility…</span>
+            </div>
+            <div class="instant-check instant-yes" *ngIf="!checkingInstant && instantAvailable === true">
+              <mat-icon>bolt</mat-icon>
+              <span>Instant payout available for this bank account</span>
+            </div>
+            <div class="instant-check instant-no" *ngIf="!checkingInstant && instantAvailable === false">
+              <mat-icon>block</mat-icon>
+              <span>This bank account is not eligible for instant cashout. Please select another account or keep on balance account.</span>
             </div>
 
             <div class="form-group">
@@ -324,7 +348,7 @@
             </div>
 
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="cashoutForm.invalid || submittingCashout">
+                    [disabled]="cashoutForm.invalid || submittingCashout || checkingInstant || instantAvailable === false || (cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0)">
               <span *ngIf="!submittingCashout">Request Cash Out</span>
               <mat-spinner *ngIf="submittingCashout" diameter="20" color="accent"></mat-spinner>
             </button>

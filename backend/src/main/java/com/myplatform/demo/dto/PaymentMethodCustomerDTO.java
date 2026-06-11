@@ -8,4 +8,6 @@ import lombok.Setter;
 public class PaymentMethodCustomerDTO {
     private String type;
     private String verificationStatus;
+    private String paymentMethodId;
+    private Boolean enabled;
 }

@@ -31,6 +31,8 @@ public class DTOMapper {
                         PaymentMethodCustomerDTO pmDTO = new PaymentMethodCustomerDTO();
                         pmDTO.setType(pm.getType());
                         pmDTO.setVerificationStatus(pm.getVerificationStatus());
+                        pmDTO.setPaymentMethodId(pm.getPaymentMethodId());
+                        pmDTO.setEnabled(pm.getEnabled());
                         return pmDTO;
                     })
                     .toList();

@@ -86,6 +86,16 @@ public class CashManagementController {
         return ResponseEntity.ok(Map.of("status", active ? "active" : "inactive"));
     }
 
+    @GetMapping("/check-instant")
+    public ResponseEntity<Map<String, Object>> checkInstantEligibility(
+            @RequestParam String balanceAccountId,
+            @RequestParam String transferInstrumentId,
+            @RequestParam String currency) throws Exception {
+        Map<String, Object> result = cashManagementService.checkInstantEligibility(
+                balanceAccountId, transferInstrumentId, currency);
+        return ResponseEntity.ok(result);
+    }
+
     private User findUserWithAccountHolder(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));

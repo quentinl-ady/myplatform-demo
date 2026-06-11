@@ -2,8 +2,12 @@ package com.myplatform.demo.service;
 
 import com.adyen.Client;
 import com.adyen.model.balanceplatform.BalanceAccount;
+import com.adyen.model.balanceplatform.TransferRouteRequest;
+import com.adyen.model.balanceplatform.TransferRouteResponse;
+import com.adyen.model.balanceplatform.TransferRoute;
 import com.adyen.model.transfers.*;
 import com.adyen.service.balanceplatform.BalanceAccountsApi;
+import com.adyen.service.balanceplatform.TransferRoutesApi;
 import com.myplatform.demo.exception.BadRequestException;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.transfers.TransfersApi;
@@ -15,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -22,17 +27,22 @@ public class CashManagementService {
 
     private final TransfersApi transfersApi;
     private final BalanceAccountsApi balanceAccountsApi;
+    private final TransferRoutesApi transferRoutesApi;
     private final String balancePlatformApiKey;
+    private final String balancePlatform;
     private final RestTemplate restTemplate;
 
     private static final String CASHOUT_URL = "https://balanceplatform-api-test.adyen.com/btl/v4/cashouts";
 
     public CashManagementService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
                                   @Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
+                                  @Value("${adyen.balancePlatform}") String balancePlatform,
                                   RestTemplate restTemplate) {
         this.transfersApi = new TransfersApi(balancePlatformClient);
         this.balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
+        this.transferRoutesApi = new TransferRoutesApi(balancePlatformClient);
         this.balancePlatformApiKey = balancePlatformApiKey;
+        this.balancePlatform = balancePlatform;
         this.restTemplate = restTemplate;
     }
 
@@ -134,6 +144,36 @@ public class CashManagementService {
         }
         result.put("fee", fee);
         result.put("amount", amount);
+        return result;
+    }
+
+    public Map<String, Object> checkInstantEligibility(String balanceAccountId,
+                                                        String transferInstrumentId,
+                                                        String currency) throws IOException, ApiException {
+        TransferRouteRequest request = new TransferRouteRequest()
+                .balancePlatform(balancePlatform)
+                .balanceAccountId(balanceAccountId)
+                .category(TransferRouteRequest.CategoryEnum.BANK)
+                .counterparty(new com.adyen.model.balanceplatform.Counterparty().transferInstrumentId(transferInstrumentId))
+                .currency(currency)
+                .priorities(List.of(TransferRouteRequest.PrioritiesEnum.INSTANT));
+
+        TransferRouteResponse response;
+        try {
+            response = transferRoutesApi.calculateTransferRoutes(request);
+        } catch (ApiException e) {
+            System.err.println("TransferRoutes API error: " + e.getResponseBody());
+            throw e;
+        }
+
+        boolean instantAvailable = false;
+        if (response.getTransferRoutes() != null) {
+            instantAvailable = response.getTransferRoutes().stream()
+                    .anyMatch(route -> TransferRoute.PriorityEnum.INSTANT.equals(route.getPriority()));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("instantAvailable", instantAvailable);
         return result;
     }
 }
