@@ -112,9 +112,11 @@ public class TransferController {
             throw new BadRequestException("User has no account holder");
         }
         String sdkOutput = (String) payload.get("sdkOutput");
-        String paymentInstrumentId = resolvePhysicalPi(user);
+        String balanceAccountId = user.getBankAccountId() != null
+                ? balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId())
+                : null;
         return ResponseEntity.ok(bankTransferService.initiateBankTransfers(
-                user.getAccountHolderId(), paymentInstrumentId, sdkOutput));
+                user.getAccountHolderId(), balanceAccountId, sdkOutput));
     }
 
     @PostMapping("/{userId}/bank-transactions/finalize")
@@ -127,9 +129,11 @@ public class TransferController {
         String sdkOutput = (String) payload.get("sdkOutput");
         String createdSince = (String) payload.get("createdSince");
         String createdUntil = (String) payload.get("createdUntil");
-        String paymentInstrumentId = resolvePhysicalPi(user);
+        String balanceAccountId = user.getBankAccountId() != null
+                ? balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId())
+                : null;
         return ResponseEntity.ok(bankTransferService.finalizeBankTransfers(
-                user.getAccountHolderId(), paymentInstrumentId, sdkOutput, createdSince, createdUntil));
+                user.getAccountHolderId(), balanceAccountId, sdkOutput, createdSince, createdUntil));
     }
 
     @GetMapping("/{userId}/bank-transactions/detail/{transferId}")

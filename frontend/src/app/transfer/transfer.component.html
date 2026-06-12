@@ -90,7 +90,7 @@
           <span class="status-badge" [ngClass]="'st-' + t.status">{{ t.status }}</span>
         </span>
         <span class="col-amount" [class.incoming-amount]="isIncoming(t)">
-          {{ isIncoming(t) ? '+' : '' }}{{ formatAmount(t.amount) }} {{ t.currency }}
+          {{ isIncoming(t) ? '+' : '-' }}{{ formatAmount(t.amount) }} {{ t.currency }}
         </span>
       </div>
     </div>

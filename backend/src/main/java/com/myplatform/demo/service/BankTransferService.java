@@ -35,13 +35,13 @@ public class BankTransferService {
 
     // ---- SCA flow: initiate (step 1) ----
 
-    public Map<String, Object> initiateBankTransfers(String accountHolderId, String paymentInstrumentId, String sdkOutput) {
+    public Map<String, Object> initiateBankTransfers(String accountHolderId, String balanceAccountId, String sdkOutput) {
         OffsetDateTime now = OffsetDateTime.now();
         String createdSince = now.minusDays(90).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         String createdUntil = now.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 
         try {
-            List<TransactionDTO> transactions = fetchTransactions(accountHolderId, paymentInstrumentId, sdkOutput, createdSince, createdUntil);
+            List<TransactionDTO> transactions = fetchTransactions(accountHolderId, balanceAccountId, sdkOutput, createdSince, createdUntil);
             return Map.of(
                     "status", "completed",
                     "transactions", transactions
@@ -62,10 +62,10 @@ public class BankTransferService {
 
     // ---- SCA flow: finalize (step 2) ----
 
-    public Map<String, Object> finalizeBankTransfers(String accountHolderId, String paymentInstrumentId, String sdkOutput,
+    public Map<String, Object> finalizeBankTransfers(String accountHolderId, String balanceAccountId, String sdkOutput,
                                                       String createdSince, String createdUntil) {
         try {
-            List<TransactionDTO> transactions = fetchTransactions(accountHolderId, paymentInstrumentId, sdkOutput, createdSince, createdUntil);
+            List<TransactionDTO> transactions = fetchTransactions(accountHolderId, balanceAccountId, sdkOutput, createdSince, createdUntil);
             return Map.of(
                     "status", "completed",
                     "transactions", transactions
@@ -77,7 +77,7 @@ public class BankTransferService {
 
     // ---- Internal ----
 
-    private List<TransactionDTO> fetchTransactions(String accountHolderId, String paymentInstrumentId, String sdkOutput,
+    private List<TransactionDTO> fetchTransactions(String accountHolderId, String balanceAccountId, String sdkOutput,
                                                     String createdSince, String createdUntil) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(TRANSACTIONS_URL)
                 .queryParam("accountHolderId", accountHolderId)
@@ -86,8 +86,8 @@ public class BankTransferService {
                 .queryParam("limit", 50)
                 .queryParam("sortOrder", "desc");
 
-        if (paymentInstrumentId != null && !paymentInstrumentId.isBlank()) {
-            builder.queryParam("paymentInstrumentId", paymentInstrumentId);
+        if (balanceAccountId != null && !balanceAccountId.isBlank()) {
+            builder.queryParam("balanceAccountId", balanceAccountId);
         }
 
         HttpHeaders headers = buildHeaders(sdkOutput);
