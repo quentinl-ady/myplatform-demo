@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse} from '../models';
+import {PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class PaymentService {
@@ -32,6 +32,24 @@ export class PaymentService {
   makePosPayment(payload: PosPaymentRequest): Observable<PosPaymentResponse> {
     return this.http.post<PosPaymentResponse>(`${this.baseUrl}/api/pos/pay`, payload, {
       responseType: 'json'
+    });
+  }
+
+  createTokenizationSession(payload: SendPaymentPayload): Observable<SendPaymentResponse> {
+    return this.http.post<SendPaymentResponse>(`${this.baseUrl}/api/payments/tokenize-session`, payload, {
+      headers: {'Content-Type': 'application/json'}
+    });
+  }
+
+  getStoredPaymentMethods(userId: string, storeReference: string): Observable<StoredPaymentMethod[]> {
+    return this.http.get<StoredPaymentMethod[]>(`${this.baseUrl}/api/payments/stored-payment-methods`, {
+      params: { userId, storeReference }
+    });
+  }
+
+  makeTokenPayment(payload: TokenPaymentPayload): Observable<TokenPaymentResponse> {
+    return this.http.post<TokenPaymentResponse>(`${this.baseUrl}/api/payments/token-payment`, payload, {
+      headers: {'Content-Type': 'application/json'}
     });
   }
 }

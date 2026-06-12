@@ -29,3 +29,27 @@ export interface PosPaymentResponse {
   refusalReason: string;
   reference: string;
 }
+
+export interface StoredPaymentMethod {
+  recurringDetailReference: string;
+  cardBrand: string;
+  cardSummary: string;
+  expiryMonth: string;
+  expiryYear: string;
+  holderName: string;
+}
+
+export interface TokenPaymentPayload {
+  amount: number;
+  currencyCode: string;
+  storeReference: string;
+  userId: string;
+  reference: string;
+  storedPaymentMethodId: string;
+}
+
+export interface TokenPaymentResponse {
+  pspReference: string;
+  resultCode: string;
+  refusalReason: string;
+}

@@ -3,6 +3,9 @@ package com.myplatform.demo.controller;
 import com.adyen.model.checkout.PaymentCompletionDetails;
 import com.adyen.model.checkout.PaymentDetailsRequest;
 import com.adyen.model.checkout.PaymentDetailsResponse;
+import com.myplatform.demo.dto.StoredPaymentMethodDTO;
+import com.myplatform.demo.dto.TokenPaymentRequest;
+import com.myplatform.demo.dto.TokenPaymentResponse;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.PaymentSessionResponse;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -104,6 +108,58 @@ public class PaymentController {
         String authJwt = gpayJwtService.generateAuthJwt(hostname);
         Map<String, String> response = new HashMap<>();
         response.put("googlePayJwtToken", authJwt);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/tokenize-session")
+    public ResponseEntity<PaymentSessionResponse> createTokenizationSession(@RequestBody RequestPayment requestPayment) throws Exception {
+        User user = userRepository.findById(requestPayment.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getLegalEntityId() == null) {
+            throw new BadRequestException("User has no legalEntityId");
+        }
+
+        PaymentSessionResponse paymentSessionResponse = paymentCheckoutService.createTokenizationSession(
+                requestPayment.getCurrencyCode(),
+                requestPayment.getReference(),
+                user.getId(),
+                requestPayment.getStoreReference(),
+                user.getActivityReason());
+
+        return ResponseEntity.ok(paymentSessionResponse);
+    }
+
+    @GetMapping("/stored-payment-methods")
+    public ResponseEntity<List<StoredPaymentMethodDTO>> getStoredPaymentMethods(
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "") String storeReference) throws Exception {
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        List<StoredPaymentMethodDTO> storedMethods = paymentCheckoutService.listStoredPaymentMethods(storeReference);
+        return ResponseEntity.ok(storedMethods);
+    }
+
+    @PostMapping("/token-payment")
+    public ResponseEntity<TokenPaymentResponse> makeTokenPayment(@RequestBody TokenPaymentRequest tokenPaymentRequest) throws Exception {
+        User user = userRepository.findById(tokenPaymentRequest.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.getLegalEntityId() == null) {
+            throw new BadRequestException("User has no legalEntityId");
+        }
+
+        TokenPaymentResponse response = paymentCheckoutService.makeTokenPayment(
+                tokenPaymentRequest.getCurrencyCode(),
+                tokenPaymentRequest.getAmount(),
+                tokenPaymentRequest.getReference(),
+                tokenPaymentRequest.getStoreReference(),
+                user.getActivityReason(),
+                user.getBalanceAccountId(),
+                tokenPaymentRequest.getStoredPaymentMethodId());
+
         return ResponseEntity.ok(response);
     }
 }

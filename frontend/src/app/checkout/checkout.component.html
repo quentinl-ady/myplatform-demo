@@ -2,7 +2,7 @@
 
   <div class="header-section">
     <h2>Simulate Checkout</h2>
-    <p>Test the Adyen Dropin integration.</p>
+    <p>Test the Adyen Dropin integration with tokenization support.</p>
   </div>
 
   <div class="loading-state" *ngIf="loading()">
@@ -10,35 +10,111 @@
     <span>Loading checkout data...</span>
   </div>
 
-  <div class="checkout-layout" *ngIf="!loading()">
+  <div *ngIf="!loading()">
 
-    <mat-card class="config-card">
-      <h3 class="card-title">Payment Details</h3>
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn" [class.active]="activeTab === 'payment'" (click)="switchTab('payment')">
+        <mat-icon>shopping_cart</mat-icon> Payment
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'tokenize'" (click)="switchTab('tokenize')">
+        <mat-icon>credit_card</mat-icon> Tokenize Card (0-auth)
+      </button>
+      <button class="tab-btn" [class.active]="activeTab === 'token-payment'" (click)="switchTab('token-payment')">
+        <mat-icon>replay</mat-icon> Pay with Token
+      </button>
+    </div>
 
-      <form [formGroup]="checkoutForm" (ngSubmit)="onSubmit()" class="fintech-form">
+    <!-- ==================== TAB 1: PAYMENT ==================== -->
+    <div class="checkout-layout" *ngIf="activeTab === 'payment'">
 
-        <div class="form-group" *ngIf="user()?.activityReason === 'embeddedPayment'">
-          <label>Select Store</label>
-          <select class="fintech-input" formControlName="storeReference">
-            <option value="" disabled selected>Choose a store...</option>
-            <option *ngFor="let s of stores()" [value]="s.storeRef">
-              {{ s.storeRef }} ({{ s.city }}, {{ s.country }})
-            </option>
-          </select>
-          <span class="helper-text error" *ngIf="stores().length === 0">No stores found for this user. Please create one first.</span>
-        </div>
+      <mat-card class="config-card">
+        <h3 class="card-title">Payment Details</h3>
 
-        <div class="form-row">
-          <div class="form-group amount-group">
-            <label>Amount (minor units)</label>
-            <div class="input-with-icon">
-              <mat-icon class="input-icon">payments</mat-icon>
-              <input type="number" class="fintech-input pl-40" formControlName="amount" placeholder="e.g. 100 for 1.00" min="0" />
-            </div>
-            <span class="helper-text error" *ngIf="checkoutForm.get('amount')?.touched && checkoutForm.get('amount')?.hasError('required')">Amount is required</span>
+        <form [formGroup]="checkoutForm" (ngSubmit)="onSubmit()" class="fintech-form">
+
+          <div class="form-group" *ngIf="user()?.activityReason === 'embeddedPayment'">
+            <label>Select Store</label>
+            <select class="fintech-input" formControlName="storeReference">
+              <option value="" disabled selected>Choose a store...</option>
+              <option *ngFor="let s of stores()" [value]="s.storeRef">
+                {{ s.storeRef }} ({{ s.city }}, {{ s.country }})
+              </option>
+            </select>
+            <span class="helper-text error" *ngIf="stores().length === 0">No stores found for this user. Please create one first.</span>
           </div>
 
-          <div class="form-group currency-group">
+          <div class="form-row">
+            <div class="form-group amount-group">
+              <label>Amount (minor units)</label>
+              <div class="input-with-icon">
+                <mat-icon class="input-icon">payments</mat-icon>
+                <input type="number" class="fintech-input pl-40" formControlName="amount" placeholder="e.g. 100 for 1.00" min="0" />
+              </div>
+              <span class="helper-text error" *ngIf="checkoutForm.get('amount')?.touched && checkoutForm.get('amount')?.hasError('required')">Amount is required</span>
+            </div>
+
+            <div class="form-group currency-group">
+              <label>Currency</label>
+              <select class="fintech-input" formControlName="currencyCode">
+                <option value="EUR">EUR (€)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Order Reference</label>
+            <div class="input-with-icon">
+              <mat-icon class="input-icon">receipt</mat-icon>
+              <input type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. ORDER-1234" />
+            </div>
+            <span class="helper-text error" *ngIf="checkoutForm.get('reference')?.touched && checkoutForm.get('reference')?.hasError('required')">Reference is required</span>
+          </div>
+
+          <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit" [disabled]="checkoutForm.invalid || submitting()">
+            <span *ngIf="!submitting()">Generate Payment UI</span>
+            <mat-spinner *ngIf="submitting()" diameter="20" color="accent"></mat-spinner>
+          </button>
+        </form>
+      </mat-card>
+
+      <mat-card class="dropin-card" [class.active]="dropinActive">
+        <div class="empty-dropin" *ngIf="!dropinActive">
+          <mat-icon>shopping_cart_checkout</mat-icon>
+          <p>Fill out the payment details and click generate to load the checkout.</p>
+        </div>
+
+        <div class="dropin-wrapper" [class.visible]="dropinActive">
+          <h3 class="card-title dropin-title">Complete Payment</h3>
+          <div id="dropin-container"></div>
+        </div>
+      </mat-card>
+
+    </div>
+
+    <!-- ==================== TAB 2: TOKENIZE ==================== -->
+    <div class="checkout-layout" *ngIf="activeTab === 'tokenize'">
+
+      <mat-card class="config-card">
+        <h3 class="card-title">Tokenize Card (Zero-auth)</h3>
+        <p class="section-desc">Store a card for future use with a 0 EUR authorization. The card will be tokenized as <strong>UnscheduledCardOnFile</strong>.</p>
+
+        <form [formGroup]="tokenizeForm" (ngSubmit)="onTokenizeSubmit()" class="fintech-form">
+
+          <div class="form-group" *ngIf="user()?.activityReason === 'embeddedPayment'">
+            <label>Select Store</label>
+            <select class="fintech-input" formControlName="storeReference">
+              <option value="" disabled selected>Choose a store...</option>
+              <option *ngFor="let s of stores()" [value]="s.storeRef">
+                {{ s.storeRef }} ({{ s.city }}, {{ s.country }})
+              </option>
+            </select>
+            <span class="helper-text error" *ngIf="stores().length === 0">No stores found for this user. Please create one first.</span>
+          </div>
+
+          <div class="form-group">
             <label>Currency</label>
             <select class="fintech-input" formControlName="currencyCode">
               <option value="EUR">EUR (€)</option>
@@ -46,35 +122,156 @@
               <option value="GBP">GBP (£)</option>
             </select>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label>Order Reference</label>
-          <div class="input-with-icon">
-            <mat-icon class="input-icon">receipt</mat-icon>
-            <input type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. ORDER-1234" />
+          <div class="form-group">
+            <label>Reference</label>
+            <div class="input-with-icon">
+              <mat-icon class="input-icon">receipt</mat-icon>
+              <input type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. TOKEN-REF-001" />
+            </div>
+            <span class="helper-text error" *ngIf="tokenizeForm.get('reference')?.touched && tokenizeForm.get('reference')?.hasError('required')">Reference is required</span>
           </div>
-          <span class="helper-text error" *ngIf="checkoutForm.get('reference')?.touched && checkoutForm.get('reference')?.hasError('required')">Reference is required</span>
+
+          <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit" [disabled]="tokenizeForm.invalid || submitting()">
+            <span *ngIf="!submitting()">Start Tokenization</span>
+            <mat-spinner *ngIf="submitting()" diameter="20" color="accent"></mat-spinner>
+          </button>
+        </form>
+      </mat-card>
+
+      <mat-card class="dropin-card" [class.active]="tokenizeDropinActive">
+        <div class="empty-dropin" *ngIf="!tokenizeDropinActive">
+          <mat-icon>credit_card</mat-icon>
+          <p>Fill out the details and click start to load the tokenization form.</p>
         </div>
 
-        <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit" [disabled]="checkoutForm.invalid || submitting()">
-          <span *ngIf="!submitting()">Generate Payment UI</span>
-          <mat-spinner *ngIf="submitting()" diameter="20" color="accent"></mat-spinner>
-        </button>
-      </form>
-    </mat-card>
+        <div class="dropin-wrapper" [class.visible]="tokenizeDropinActive">
+          <h3 class="card-title dropin-title">Enter Card Details</h3>
+          <div id="tokenize-dropin-container"></div>
+        </div>
+      </mat-card>
 
-    <mat-card class="dropin-card" [class.active]="dropinActive">
-      <div class="empty-dropin" *ngIf="!dropinActive">
-        <mat-icon>shopping_cart_checkout</mat-icon>
-        <p>Fill out the payment details and click generate to load the checkout.</p>
-      </div>
+    </div>
 
-      <div class="dropin-wrapper" [class.visible]="dropinActive">
-        <h3 class="card-title dropin-title">Complete Payment</h3>
-        <div id="dropin-container"></div>
-      </div>
-    </mat-card>
+    <!-- ==================== TAB 3: PAY WITH TOKEN ==================== -->
+    <div class="checkout-layout" *ngIf="activeTab === 'token-payment'">
+
+      <mat-card class="config-card">
+        <h3 class="card-title">Pay with Stored Token</h3>
+        <p class="section-desc">Select a previously tokenized card and trigger a server-side payment (<strong>ContAuth / UnscheduledCardOnFile</strong>).</p>
+
+        <form [formGroup]="tokenPaymentForm">
+          <div class="form-group" *ngIf="user()?.activityReason === 'embeddedPayment'">
+            <label>Select Store</label>
+            <select class="fintech-input" formControlName="storeReference" (change)="loadStoredPaymentMethods()">
+              <option value="" disabled selected>Choose a store...</option>
+              <option *ngFor="let s of stores()" [value]="s.storeRef">
+                {{ s.storeRef }} ({{ s.city }}, {{ s.country }})
+              </option>
+            </select>
+          </div>
+        </form>
+
+        <div class="stored-methods-section">
+          <div class="stored-methods-header">
+            <h4>Stored Cards</h4>
+            <button mat-icon-button (click)="loadStoredPaymentMethods()" [disabled]="loadingStoredMethods()">
+              <mat-icon>refresh</mat-icon>
+            </button>
+          </div>
+
+          <div class="loading-state compact" *ngIf="loadingStoredMethods()">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Loading stored cards...</span>
+          </div>
+
+          <div *ngIf="!loadingStoredMethods() && storedMethods().length === 0" class="empty-stored">
+            <mat-icon>credit_card_off</mat-icon>
+            <p>No stored cards found. Tokenize a card first.</p>
+          </div>
+
+          <div class="stored-card-list" *ngIf="!loadingStoredMethods() && storedMethods().length > 0">
+            <div class="stored-card-item" *ngFor="let m of storedMethods()"
+                 [class.selected]="selectedStoredMethod?.recurringDetailReference === m.recurringDetailReference"
+                 (click)="selectStoredMethod(m)">
+              <div class="card-brand-icon">
+                <mat-icon>credit_card</mat-icon>
+              </div>
+              <div class="card-info">
+                <span class="card-brand">{{ m.cardBrand | uppercase }}</span>
+                <span class="card-number">**** {{ m.cardSummary }}</span>
+                <span class="card-expiry">{{ m.expiryMonth }}/{{ m.expiryYear }}</span>
+              </div>
+              <div class="card-holder">{{ m.holderName }}</div>
+              <mat-icon class="check-icon" *ngIf="selectedStoredMethod?.recurringDetailReference === m.recurringDetailReference">check_circle</mat-icon>
+            </div>
+          </div>
+        </div>
+      </mat-card>
+
+      <mat-card class="config-card">
+        <h3 class="card-title">Payment Details</h3>
+
+        <div *ngIf="!selectedStoredMethod" class="empty-stored">
+          <mat-icon>touch_app</mat-icon>
+          <p>Select a stored card from the list to proceed.</p>
+        </div>
+
+        <form *ngIf="selectedStoredMethod" [formGroup]="tokenPaymentForm" (ngSubmit)="onTokenPaymentSubmit()" class="fintech-form">
+
+          <div class="selected-card-badge">
+            <mat-icon>credit_card</mat-icon>
+            <span>{{ selectedStoredMethod.cardBrand | uppercase }} **** {{ selectedStoredMethod.cardSummary }}</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group amount-group">
+              <label>Amount (minor units)</label>
+              <div class="input-with-icon">
+                <mat-icon class="input-icon">payments</mat-icon>
+                <input type="number" class="fintech-input pl-40" formControlName="amount" placeholder="e.g. 100 for 1.00" min="1" />
+              </div>
+              <span class="helper-text error" *ngIf="tokenPaymentForm.get('amount')?.touched && tokenPaymentForm.get('amount')?.hasError('required')">Amount is required</span>
+            </div>
+
+            <div class="form-group currency-group">
+              <label>Currency</label>
+              <select class="fintech-input" formControlName="currencyCode">
+                <option value="EUR">EUR (€)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Payment Reference</label>
+            <div class="input-with-icon">
+              <mat-icon class="input-icon">receipt</mat-icon>
+              <input type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. TOKEN-PAY-001" />
+            </div>
+            <span class="helper-text error" *ngIf="tokenPaymentForm.get('reference')?.touched && tokenPaymentForm.get('reference')?.hasError('required')">Reference is required</span>
+          </div>
+
+          <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit"
+                  [disabled]="tokenPaymentForm.invalid || submittingTokenPayment()">
+            <span *ngIf="!submittingTokenPayment()">Charge Stored Card</span>
+            <mat-spinner *ngIf="submittingTokenPayment()" diameter="20" color="accent"></mat-spinner>
+          </button>
+        </form>
+
+        <!-- Result -->
+        <div *ngIf="tokenPaymentResult()" class="token-result" [class.success]="tokenPaymentResult()?.resultCode === 'Authorised'" [class.failure]="tokenPaymentResult()?.resultCode !== 'Authorised'">
+          <mat-icon>{{ tokenPaymentResult()?.resultCode === 'Authorised' ? 'check_circle' : 'cancel' }}</mat-icon>
+          <div class="result-details">
+            <span class="result-code">{{ tokenPaymentResult()?.resultCode }}</span>
+            <span class="result-psp" *ngIf="tokenPaymentResult()?.pspReference">PSP: {{ tokenPaymentResult()?.pspReference }}</span>
+            <span class="result-reason" *ngIf="tokenPaymentResult()?.refusalReason">{{ tokenPaymentResult()?.refusalReason }}</span>
+          </div>
+        </div>
+      </mat-card>
+
+    </div>
 
   </div>
 </div>
