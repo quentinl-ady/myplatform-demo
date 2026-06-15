@@ -1,4 +1,4 @@
-import {Component, signal, inject, ChangeDetectorRef} from '@angular/core';
+import {Component, signal, inject, ChangeDetectorRef, OnDestroy} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import {CommonModule} from '@angular/common';
@@ -19,7 +19,7 @@ import {AccountService, PayoutService, CashManagementService} from '../services'
     templateUrl: './cash-management.component.html',
     styleUrl: './cash-management.component.css'
 })
-export class CashManagementComponent {
+export class CashManagementComponent implements OnDestroy {
     userId = '';
     activeTab = 0;
 
@@ -51,6 +51,10 @@ export class CashManagementComponent {
     userCountryCode = '';
     instantAvailable: boolean | null = null;
     checkingInstant = false;
+
+    // Cashout cooldown
+    cashoutCooldownRemaining = 0;
+    private cashoutCooldownTimer: any = null;
 
     private fb = inject(FormBuilder);
     private route = inject(ActivatedRoute);
@@ -398,17 +402,48 @@ export class CashManagementComponent {
             transferInstrumentId: val.transferInstrumentId || undefined,
             description: val.transferInstrumentId ? (val.description || undefined) : undefined
         }).subscribe({
-            next: () => {
+            next: (res: any) => {
                 this.toast('Cashout request submitted');
                 this.cashoutForm.reset();
                 this.submittingCashout = false;
+                this.startCooldownTimer(res?.cooldownSeconds || 30);
                 this.loadBalanceAccounts();
             },
-            error: () => {
+            error: (err: any) => {
                 this.submittingCashout = false;
-                this.toast('Cashout request failed');
+                const msg = err?.error?.error || 'Cashout request failed';
+                this.toast(msg);
+                // If backend returns cooldown error, extract remaining seconds
+                const match = msg.match(/(\d+) seconds/);
+                if (match) {
+                    this.startCooldownTimer(parseInt(match[1], 10));
+                }
             }
         });
+    }
+
+    startCooldownTimer(seconds: number) {
+        this.clearCooldownTimer();
+        this.cashoutCooldownRemaining = seconds;
+        this.cashoutCooldownTimer = setInterval(() => {
+            this.cashoutCooldownRemaining--;
+            if (this.cashoutCooldownRemaining <= 0) {
+                this.clearCooldownTimer();
+            }
+            this.cdr.detectChanges();
+        }, 1000);
+    }
+
+    private clearCooldownTimer() {
+        if (this.cashoutCooldownTimer) {
+            clearInterval(this.cashoutCooldownTimer);
+            this.cashoutCooldownTimer = null;
+        }
+        this.cashoutCooldownRemaining = 0;
+    }
+
+    ngOnDestroy() {
+        this.clearCooldownTimer();
     }
 
     private toast(message: string) {

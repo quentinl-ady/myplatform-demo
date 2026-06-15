@@ -347,9 +347,20 @@
               </div>
             </div>
 
+            <!-- Cooldown banner -->
+            <div class="instant-check instant-no" *ngIf="cashoutCooldownRemaining > 0" style="margin-bottom: 12px;">
+              <mat-icon>hourglass_top</mat-icon>
+              <span>
+                Cooldown active — please wait <strong>{{ cashoutCooldownRemaining }}s</strong> before next request.
+                <br/>
+                <small style="opacity: 0.8;">In production, the cooldown period is 10 minutes.</small>
+              </span>
+            </div>
+
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="cashoutForm.invalid || submittingCashout || checkingInstant || instantAvailable === false || (cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0)">
-              <span *ngIf="!submittingCashout">Request Cash Out</span>
+                    [disabled]="cashoutForm.invalid || submittingCashout || checkingInstant || instantAvailable === false || (cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0) || cashoutCooldownRemaining > 0">
+              <span *ngIf="!submittingCashout && cashoutCooldownRemaining <= 0">Request Cash Out</span>
+              <span *ngIf="!submittingCashout && cashoutCooldownRemaining > 0">Wait {{ cashoutCooldownRemaining }}s</span>
               <mat-spinner *ngIf="submittingCashout" diameter="20" color="accent"></mat-spinner>
             </button>
           </form>

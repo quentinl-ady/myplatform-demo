@@ -18,9 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class CashManagementService {
@@ -33,6 +36,10 @@ public class CashManagementService {
     private final RestTemplate restTemplate;
 
     private static final String CASHOUT_URL = "https://balanceplatform-api-test.adyen.com/btl/v4/cashouts";
+
+    // Cooldown: 30 seconds for test environment (10 minutes in production)
+    private static final long CASHOUT_COOLDOWN_SECONDS = 30;
+    private final Map<String, Instant> lastCashoutByAccount = new ConcurrentHashMap<>();
 
     public CashManagementService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
                                   @Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
@@ -96,11 +103,25 @@ public class CashManagementService {
         return result;
     }
 
+    public long getCashoutCooldownRemaining(String balanceAccountId) {
+        Instant lastCashout = lastCashoutByAccount.get(balanceAccountId);
+        if (lastCashout == null) return 0;
+        long elapsed = Duration.between(lastCashout, Instant.now()).getSeconds();
+        return Math.max(0, CASHOUT_COOLDOWN_SECONDS - elapsed);
+    }
+
     public Map<String, Object> executeCashout(String balanceAccountId,
                                                String currency,
                                                long amount,
                                                String transferInstrumentId,
                                                String description) {
+        long remaining = getCashoutCooldownRemaining(balanceAccountId);
+        if (remaining > 0) {
+            throw new BadRequestException(
+                    "Cashout cooldown active. Please wait " + remaining + " seconds before next request. "
+                    + "(In production, the cooldown period is 10 minutes.)");
+        }
+
         long fee = Math.round(amount * 0.05);
 
         Map<String, Object> requestBody = new HashMap<>();
@@ -144,6 +165,10 @@ public class CashManagementService {
         }
         result.put("fee", fee);
         result.put("amount", amount);
+
+        lastCashoutByAccount.put(balanceAccountId, Instant.now());
+        result.put("cooldownSeconds", CASHOUT_COOLDOWN_SECONDS);
+
         return result;
     }
 
