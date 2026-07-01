@@ -56,7 +56,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     });
 
     this.webhookSub = this.webhookService.onWebhookReceived$.subscribe(() => {
-      this.loadEvents();
+      this.refreshEvents();
     });
   }
 
@@ -67,26 +67,65 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     }
   }
 
+  private initialLoadDone = false;
+
   private startPolling() {
-    this.pollInterval = setInterval(() => this.loadEvents(), 15000);
+    this.pollInterval = setInterval(() => this.refreshEvents(), 15000);
   }
 
   loadEvents() {
     this.loading.set(true);
+    this.initialLoadDone = false;
+    this.fetchEvents(true);
+  }
+
+  private refreshEvents() {
+    this.fetchEvents(false);
+  }
+
+  private fetchEvents(isFullLoad: boolean) {
     const obs = this.filter === 'unread'
       ? this.webhookService.getUnreadEvents(this.userId)
       : this.webhookService.getEvents(this.userId);
 
     obs.subscribe({
-      next: events => {
-        this.events = events;
+      next: incoming => {
+        if (!this.initialLoadDone || isFullLoad) {
+          this.events = incoming;
+          this.initialLoadDone = true;
+        } else {
+          this.mergeEvents(incoming);
+        }
         this.loading.set(false);
       },
       error: () => {
-        this.snackBar.open('Failed to load notifications', 'Close', { duration: 3000 });
+        if (isFullLoad) {
+          this.snackBar.open('Failed to load notifications', 'Close', { duration: 3000 });
+        }
         this.loading.set(false);
       }
     });
+  }
+
+  private mergeEvents(incoming: WebhookEvent[]) {
+    const existingIds = new Set(this.events.map(e => e.id));
+    const newEvents = incoming.filter(e => !existingIds.has(e.id));
+
+    if (newEvents.length > 0) {
+      this.events = [...newEvents, ...this.events];
+    }
+
+    const incomingMap = new Map(incoming.map(e => [e.id, e]));
+    for (const event of this.events) {
+      const updated = incomingMap.get(event.id);
+      if (updated) {
+        event.acknowledged = updated.acknowledged;
+      }
+    }
+
+    if (this.filter === 'unread') {
+      this.events = this.events.filter(e => !e.acknowledged);
+    }
   }
 
   pushEvent() {
@@ -186,7 +225,10 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   }
 
   getTimeAgo(dateStr: string): string {
-    const date = new Date(dateStr);
+    const normalized = dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.includes('-', 10)
+      ? dateStr
+      : dateStr + 'Z';
+    const date = new Date(normalized);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
