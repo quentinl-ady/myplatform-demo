@@ -11,3 +11,4 @@ export {ActivityService} from './activity.service';
 export {StandingOrderService} from './standing-order.service';
 export {BrandingService} from './branding.service';
 export {CashManagementService} from './cash-management.service';
+export {WebhookService} from './webhook.service';

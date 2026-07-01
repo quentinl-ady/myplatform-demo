@@ -3,7 +3,7 @@ import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MaterialModule } from '../material.module';
-import { AccountService, BrandingService } from '../services';
+import { AccountService, BrandingService, WebhookService } from '../services';
 import { BankAccountStatus, User } from '../models';
 import { Subscription } from 'rxjs';
 import { BrandingDialogComponent } from './branding-dialog.component';
@@ -30,8 +30,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private accountService = inject(AccountService);
   private brandingService = inject(BrandingService);
+  private webhookService = inject(WebhookService);
   private dialog = inject(MatDialog);
   private cdr = inject(ChangeDetectorRef);
+  webhookUnreadCount = 0;
+  private webhookSub?: Subscription;
+  private webhookPollInterval?: any;
 
   get capitalEnabled(): boolean { return !!this.user?.capital; }
   get bankEnabled(): boolean { return !!this.user?.bank; }
@@ -51,6 +55,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
             if (user.bank) {
               this.loadBankAccountStatus();
             }
+            this.startWebhookPolling();
             this.cdr.detectChanges();
           },
           error: () => {
@@ -67,10 +72,34 @@ export class LayoutComponent implements OnInit, OnDestroy {
       this.bankAccountCreated = true;
       this.cdr.detectChanges();
     });
+
+    this.webhookSub = this.webhookService.onWebhookReceived$.subscribe(() => {
+      this.loadWebhookCount();
+    });
   }
 
   ngOnDestroy() {
     this.bankAccountSub?.unsubscribe();
+    this.webhookSub?.unsubscribe();
+    if (this.webhookPollInterval) {
+      clearInterval(this.webhookPollInterval);
+    }
+  }
+
+  private loadWebhookCount() {
+    if (!this.userId) return;
+    this.webhookService.getUnreadCount(this.userId).subscribe({
+      next: (res) => {
+        this.webhookUnreadCount = res.unreadCount;
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
+  private startWebhookPolling() {
+    this.loadWebhookCount();
+    this.webhookPollInterval = setInterval(() => this.loadWebhookCount(), 30000);
   }
 
   private loadBankAccountStatus() {

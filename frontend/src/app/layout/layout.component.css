@@ -200,6 +200,16 @@
   align-items: center;
   justify-content: center;
 }
+.topbar-notif-btn {
+  color: var(--fintech-text-secondary) !important;
+  margin-right: 8px;
+  transition: color 0.2s ease;
+  text-decoration: none;
+}
+.topbar-notif-btn:hover {
+  color: var(--fintech-text) !important;
+}
+
 .sign-out-btn {
   margin-left: 8px;
   color: var(--fintech-text-secondary) !important;

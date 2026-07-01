@@ -1,0 +1,320 @@
+:host {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-radius: 16px;
+  --fintech-accent: #0abf53;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* ── Layout ── */
+.notif-wrapper {
+  max-width: 800px;
+  margin: 40px 0 40px 40px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Header ── */
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.notif-header h2 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.notif-subtitle {
+  color: var(--fintech-text-secondary);
+  font-size: 14px;
+  margin: 4px 0 0 0;
+}
+.notif-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mark-all-btn mat-icon { margin-right: 6px; }
+
+/* ── Card ── */
+mat-card {
+  background: var(--fintech-surface);
+  border-radius: var(--fintech-radius);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04) !important;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ── Loading / Empty ── */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 24px;
+  color: var(--fintech-text-secondary);
+}
+.empty-icon {
+  font-size: 56px;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  opacity: 0.25;
+}
+.empty-state p {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  color: var(--fintech-text);
+}
+.empty-hint {
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+}
+
+/* ── Notification List ── */
+.notif-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.notif-item {
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid #f0f0f0;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: #fafafa; }
+
+.notif-item.unread {
+  background: #f7fcf9;
+}
+.notif-item.unread:hover { background: #eef8f2; }
+
+.notif-item.expanded {
+  background: #fafafa;
+}
+
+/* ── Row ── */
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* ── Icon ── */
+.notif-icon-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  color: #666;
+  margin-top: 2px;
+}
+.notif-icon-wrapper[data-type="configuration"] { background: #e8eaf6; color: #3949ab; }
+.notif-icon-wrapper[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
+.notif-icon-wrapper[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
+.notif-icon-wrapper[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
+
+.notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: var(--fintech-accent);
+  border-radius: 50%;
+  border: 2px solid var(--fintech-surface);
+}
+
+/* ── Content ── */
+.notif-content {
+  flex: 1;
+  min-width: 0;
+}
+.notif-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fintech-text);
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+.notif-description {
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+.notif-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #999;
+}
+.notif-category {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: #eee;
+  color: #666;
+}
+.notif-category[data-type="configuration"] { background: #e8eaf6; color: #3949ab; }
+.notif-category[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
+.notif-category[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
+.notif-category[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
+.notif-time {
+  white-space: nowrap;
+}
+
+/* ── Actions ── */
+.notif-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+.notif-ack-btn {
+  color: #bbb;
+  transition: color 0.15s;
+}
+.notif-ack-btn:hover { color: var(--fintech-accent); }
+.notif-read-icon {
+  color: #ccc;
+  font-size: 20px;
+}
+
+/* ── Expanded Detail ── */
+.notif-detail {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+}
+.notif-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 24px;
+  margin-bottom: 14px;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detail-key {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #999;
+  font-weight: 500;
+}
+.detail-value {
+  font-size: 13px;
+  color: var(--fintech-text);
+}
+.detail-value.mono {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+.raw-json-toggle {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.raw-json-toggle mat-icon {
+  margin-right: 6px;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+.json-preview {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 16px;
+  border-radius: 10px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Dev Tools ── */
+.devtools-section {
+  margin-top: 8px;
+}
+.devtools-toggle {
+  color: var(--fintech-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+.devtools-toggle mat-icon {
+  margin-right: 6px;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+.devtools-card {
+  padding: 20px !important;
+  margin-top: 8px;
+}
+.devtools-hint {
+  font-size: 13px;
+  color: var(--fintech-text-secondary);
+  margin: 0 0 12px 0;
+}
+.json-editor {
+  width: 100%;
+  min-height: 180px;
+  padding: 14px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  color: var(--fintech-text);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.json-editor:focus { border-color: var(--fintech-accent); }
+.devtools-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.devtools-actions button mat-icon { margin-right: 6px; }
+
+/* ── Utilities ── */
+.spinning { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }

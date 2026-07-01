@@ -23,6 +23,10 @@
         <mat-icon matListItemIcon>bar_chart</mat-icon>
         <span matListItemTitle>Reports</span>
       </a>
+      <a mat-list-item [routerLink]="['/', userId, 'webhooks']" routerLinkActive="active-link">
+        <mat-icon matListItemIcon [matBadge]="webhookUnreadCount > 0 ? webhookUnreadCount : null" matBadgeColor="accent" matBadgeSize="small">notifications</mat-icon>
+        <span matListItemTitle>Notifications</span>
+      </a>
 
       <p class="nav-section-title">Payments & Commerce</p>
       <a mat-list-item [routerLink]="['/', userId, 'transactions']" routerLinkActive="active-link">
@@ -87,6 +91,7 @@
         <mat-icon matListItemIcon>gavel</mat-icon>
         <span matListItemTitle>Disputes</span>
       </a>
+
     </mat-nav-list>
   </mat-sidenav>
 
@@ -98,6 +103,10 @@
       </button>
 
       <div class="spacer"></div>
+
+      <a mat-icon-button [routerLink]="['/', userId, 'webhooks']" class="topbar-notif-btn" matTooltip="Notifications">
+        <mat-icon [matBadge]="webhookUnreadCount > 0 ? webhookUnreadCount : null" matBadgeColor="warn" matBadgeSize="small">notifications</mat-icon>
+      </a>
 
       <div class="user-profile">
         <div class="user-info">

@@ -99,6 +99,11 @@ const routeConfig: Routes = [
         path: 'card-transactions',
         loadComponent: () => import('./card-transactions/card-transactions.component').then(m => m.CardTransactionsComponent),
         title: 'Card Transactions'
+      },
+      {
+        path: 'webhooks',
+        loadComponent: () => import('./webhooks/webhooks.component').then(m => m.WebhooksComponent),
+        title: 'Notifications'
       }
     ]
   },

@@ -1,0 +1,130 @@
+<div class="notif-wrapper">
+
+  <!-- Header -->
+  <div class="notif-header">
+    <div class="notif-header-left">
+      <h2>Notifications</h2>
+      <p class="notif-subtitle">Stay up to date with your account activity.</p>
+    </div>
+    <div class="notif-header-right">
+      <mat-button-toggle-group [value]="filter" (change)="setFilter($event.value)" appearance="standard" class="notif-toggle">
+        <mat-button-toggle value="all">All</mat-button-toggle>
+        <mat-button-toggle value="unread">Unread</mat-button-toggle>
+      </mat-button-toggle-group>
+      <button mat-icon-button (click)="loadEvents()" [disabled]="loading()" matTooltip="Refresh">
+        <mat-icon [class.spinning]="loading()">refresh</mat-icon>
+      </button>
+      <button mat-stroked-button class="mark-all-btn" (click)="acknowledgeAll()" *ngIf="unreadCount > 0">
+        <mat-icon>done_all</mat-icon>
+        Mark all as read
+      </button>
+    </div>
+  </div>
+
+  <!-- Notification List -->
+  <mat-card class="notif-card">
+
+    <div *ngIf="loading()" class="loading-spinner">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+
+    <div *ngIf="!loading() && events.length === 0" class="empty-state">
+      <mat-icon class="empty-icon">notifications_none</mat-icon>
+      <p>No notifications yet.</p>
+      <span class="empty-hint">Notifications will appear here when events are received from Adyen.</span>
+    </div>
+
+    <div class="notif-list" *ngIf="!loading() && events.length > 0">
+      <div
+        *ngFor="let event of events"
+        class="notif-item"
+        [class.unread]="!event.acknowledged"
+        [class.expanded]="expandedEventId === event.id"
+        (click)="toggleExpand(event)"
+      >
+        <div class="notif-row">
+          <!-- Icon -->
+          <div class="notif-icon-wrapper" [attr.data-type]="event.webhookType">
+            <mat-icon>{{ getEventIcon(event.webhookType, event.eventType) }}</mat-icon>
+            <div class="notif-dot" *ngIf="!event.acknowledged"></div>
+          </div>
+
+          <!-- Content -->
+          <div class="notif-content">
+            <div class="notif-title">{{ event.title || 'Notification' }}</div>
+            <div class="notif-description">{{ event.description || event.eventType }}</div>
+            <div class="notif-meta">
+              <span class="notif-category" [attr.data-type]="event.webhookType">{{ getCategoryLabel(event.webhookType) }}</span>
+              <span class="notif-time">{{ getTimeAgo(event.receivedAt) }}</span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="notif-actions">
+            <button mat-icon-button
+                    *ngIf="!event.acknowledged"
+                    (click)="acknowledgeEvent(event, $event)"
+                    matTooltip="Mark as read"
+                    class="notif-ack-btn">
+              <mat-icon>done</mat-icon>
+            </button>
+            <mat-icon *ngIf="event.acknowledged" class="notif-read-icon" matTooltip="Read">done_all</mat-icon>
+          </div>
+        </div>
+
+        <!-- Expanded Details -->
+        <div class="notif-detail" *ngIf="expandedEventId === event.id">
+          <div class="notif-detail-grid">
+            <div class="detail-item">
+              <span class="detail-key">Event type</span>
+              <span class="detail-value mono">{{ event.eventType }}</span>
+            </div>
+            <div class="detail-item" *ngIf="event.resourceId">
+              <span class="detail-key">Resource ID</span>
+              <span class="detail-value mono">{{ event.resourceId }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-key">Source</span>
+              <span class="detail-value">{{ event.source === 'adyen' ? 'Adyen webhook' : 'Manual push' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-key">Received</span>
+              <span class="detail-value">{{ event.receivedAt | date:'medium' }}</span>
+            </div>
+          </div>
+          <button mat-stroked-button class="raw-json-toggle" (click)="toggleRawJson(event, $event)">
+            <mat-icon>{{ showRawJsonId === event.id ? 'visibility_off' : 'code' }}</mat-icon>
+            {{ showRawJsonId === event.id ? 'Hide raw JSON' : 'View raw JSON' }}
+          </button>
+          <pre class="json-preview" *ngIf="showRawJsonId === event.id">{{ formatJson(event.rawJson) }}</pre>
+        </div>
+      </div>
+    </div>
+  </mat-card>
+
+  <!-- Dev Tools (collapsible) -->
+  <div class="devtools-section">
+    <button mat-button class="devtools-toggle" (click)="devToolsOpen = !devToolsOpen">
+      <mat-icon>{{ devToolsOpen ? 'expand_less' : 'developer_mode' }}</mat-icon>
+      {{ devToolsOpen ? 'Hide' : 'Show' }} Webhook Simulator
+    </button>
+
+    <mat-card class="devtools-card" *ngIf="devToolsOpen">
+      <p class="devtools-hint">Paste an Adyen webhook JSON payload below to simulate an incoming event.</p>
+      <textarea
+        class="json-editor"
+        [(ngModel)]="jsonInput"
+        placeholder='{ "type": "balancePlatform.transfer.updated", "data": { ... } }'
+        rows="10"
+        spellcheck="false"
+      ></textarea>
+      <div class="devtools-actions">
+        <button mat-flat-button color="primary" (click)="pushEvent()" [disabled]="pushing() || !jsonInput.trim()">
+          <mat-icon>send</mat-icon>
+          {{ pushing() ? 'Sending...' : 'Push Event' }}
+        </button>
+      </div>
+    </mat-card>
+  </div>
+
+</div>
