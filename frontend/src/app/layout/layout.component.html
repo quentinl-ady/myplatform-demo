@@ -23,7 +23,7 @@
         <mat-icon matListItemIcon>bar_chart</mat-icon>
         <span matListItemTitle>Reports</span>
       </a>
-      <a mat-list-item [routerLink]="['/', userId, 'webhooks']" routerLinkActive="active-link">
+      <a mat-list-item [routerLink]="['/', userId, 'notifications']" routerLinkActive="active-link">
         <mat-icon matListItemIcon [matBadge]="webhookUnreadCount > 0 ? webhookUnreadCount : null" matBadgeColor="accent" matBadgeSize="small">notifications</mat-icon>
         <span matListItemTitle>Notifications</span>
       </a>
@@ -104,7 +104,7 @@
 
       <div class="spacer"></div>
 
-      <a mat-icon-button [routerLink]="['/', userId, 'webhooks']" class="topbar-notif-btn" matTooltip="Notifications">
+      <a mat-icon-button [routerLink]="['/', userId, 'notifications']" class="topbar-notif-btn" matTooltip="Notifications">
         <mat-icon [matBadge]="webhookUnreadCount > 0 ? webhookUnreadCount : null" matBadgeColor="warn" matBadgeSize="small">notifications</mat-icon>
       </a>
 

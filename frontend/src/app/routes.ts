@@ -101,7 +101,7 @@ const routeConfig: Routes = [
         title: 'Card Transactions'
       },
       {
-        path: 'webhooks',
+        path: 'notifications',
         loadComponent: () => import('./webhooks/webhooks.component').then(m => m.WebhooksComponent),
         title: 'Notifications'
       }

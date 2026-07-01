@@ -1,9 +1,10 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { WebhookService } from '../services';
 import { WebhookEvent } from '../models';
 
@@ -14,7 +15,7 @@ import { WebhookEvent } from '../models';
   templateUrl: './webhooks.component.html',
   styleUrl: './webhooks.component.css'
 })
-export class WebhooksComponent implements OnInit {
+export class WebhooksComponent implements OnInit, OnDestroy {
 
   userId = '';
   events: WebhookEvent[] = [];
@@ -24,6 +25,8 @@ export class WebhooksComponent implements OnInit {
   showRawJsonId: number | null = null;
   filter: 'all' | 'unread' = 'all';
   devToolsOpen = false;
+  private pollInterval?: any;
+  private webhookSub?: Subscription;
 
   jsonInput = `{
   "type": "balancePlatform.transfer.updated",
@@ -48,8 +51,24 @@ export class WebhooksComponent implements OnInit {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadEvents();
+        this.startPolling();
       }
     });
+
+    this.webhookSub = this.webhookService.onWebhookReceived$.subscribe(() => {
+      this.loadEvents();
+    });
+  }
+
+  ngOnDestroy() {
+    this.webhookSub?.unsubscribe();
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
+  }
+
+  private startPolling() {
+    this.pollInterval = setInterval(() => this.loadEvents(), 15000);
   }
 
   loadEvents() {
