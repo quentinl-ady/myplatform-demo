@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.CounterpartyVerificationResponse;
 import com.myplatform.demo.model.IsBankAccountValidRequest;
@@ -36,6 +37,7 @@ public class BankValidationController {
     public ResponseEntity<Map<String, String>> isCrossBorder(@RequestBody IsCrossBorderRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(request.getUserId());
         Boolean isCrossBorder = bankValidationService.isCrossBorder(request.getCountryCodeCounterparty(), user.getCountryCode());
         return ResponseEntity.ok(Map.of("isCrossBorder", String.valueOf(isCrossBorder)));
     }

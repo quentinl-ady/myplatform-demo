@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.Activity;
@@ -37,6 +38,7 @@ public class ActivityController {
     }
 
     private User findUserWithLegalEntity(String userId) {
+        ApiLogContext.setUserId(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

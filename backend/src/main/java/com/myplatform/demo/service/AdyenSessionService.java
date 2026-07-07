@@ -10,9 +10,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.myplatform.demo.model.ApiLog;
 
 @Service
 public class AdyenSessionService {
@@ -24,16 +27,19 @@ public class AdyenSessionService {
     private final String frontendUrl;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final ApiLogService apiLogService;
     private final ConcurrentHashMap<String, CachedSession> sessionCache = new ConcurrentHashMap<>();
 
     public AdyenSessionService(@Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
                                @Value("${adyen.lemApiKey}") String lemApiKey,
-                               @Value("${app.frontend.url}") String frontendUrl) {
+                               @Value("${app.frontend.url}") String frontendUrl,
+                               ApiLogService apiLogService) {
         this.balancePlatformApiKey = balancePlatformApiKey;
         this.lemApiKey = lemApiKey;
         this.frontendUrl = frontendUrl;
         this.httpClient = HttpClient.newHttpClient();
         this.objectMapper = new ObjectMapper();
+        this.apiLogService = apiLogService;
     }
 
     public String createSession(String accountHolderId, String[] roles) throws Exception {
@@ -64,7 +70,10 @@ public class AdyenSessionService {
                 .POST(BodyPublishers.ofString(json))
                 .build();
 
+        long start = System.currentTimeMillis();
         HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+        long duration = System.currentTimeMillis() - start;
+        logApiCall("POST", request.uri().toString(), json, response.body(), response.statusCode(), duration, "Authentication Sessions");
 
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             sessionCache.put(cacheKey, new CachedSession(response.body()));
@@ -102,13 +111,35 @@ public class AdyenSessionService {
                 .POST(BodyPublishers.ofString(json))
                 .build();
 
+        long start = System.currentTimeMillis();
         HttpResponse<String> response = httpClient.send(request, BodyHandlers.ofString());
+        long duration = System.currentTimeMillis() - start;
+        logApiCall("POST", request.uri().toString(), json, response.body(), response.statusCode(), duration, "Authentication Sessions");
 
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             sessionCache.put(cacheKey, new CachedSession(response.body()));
             return response.body();
         } else {
             throw new RuntimeException("Error create session with LEM key: " + response.body());
+        }
+    }
+
+    private void logApiCall(String method, String endpoint, String requestBody, String responseBody, int statusCode, long durationMs, String apiDomain) {
+        try {
+            ApiLog log = new ApiLog();
+            log.setUserId(com.myplatform.demo.configuration.ApiLogContext.getUserId());
+            log.setHttpMethod(method);
+            log.setEndpoint(endpoint);
+            log.setApiDomain(apiDomain);
+            log.setRequestBody(requestBody);
+            log.setResponseBody(responseBody);
+            log.setStatusCode(statusCode);
+            log.setDurationMs(durationMs);
+            log.setError(statusCode >= 400);
+            log.setTimestamp(LocalDateTime.now());
+            apiLogService.save(log);
+        } catch (Exception ex) {
+            // Never let logging break the actual API call
         }
     }
 

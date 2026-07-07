@@ -7,6 +7,7 @@ import { AccountService, BrandingService, WebhookService } from '../services';
 import { BankAccountStatus, User } from '../models';
 import { Subscription } from 'rxjs';
 import { BrandingDialogComponent } from './branding-dialog.component';
+import { ApiLogsComponent } from '../api-logs/api-logs.component';
 
 @Component({
   selector: 'app-layout',
@@ -14,7 +15,8 @@ import { BrandingDialogComponent } from './branding-dialog.component';
   imports: [
     CommonModule,
     RouterModule,
-    MaterialModule
+    MaterialModule,
+    ApiLogsComponent
   ],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css'
@@ -156,6 +158,12 @@ export class LayoutComponent implements OnInit, OnDestroy {
         });
       }
     });
+  }
+
+  apiPanelOpen = false;
+
+  toggleApiPanel() {
+    this.apiPanelOpen = !this.apiPanelOpen;
   }
 
   signOut() {

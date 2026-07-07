@@ -104,6 +104,10 @@
 
       <div class="spacer"></div>
 
+      <button mat-icon-button class="topbar-api-btn" [class.active]="apiPanelOpen" (click)="toggleApiPanel()" matTooltip="API Explorer">
+        <mat-icon>api</mat-icon>
+      </button>
+
       <a mat-icon-button [routerLink]="['/', userId, 'notifications']" class="topbar-notif-btn" matTooltip="Notifications">
         <mat-icon [matBadge]="webhookUnreadCount > 0 ? webhookUnreadCount : null" matBadgeColor="warn" matBadgeSize="small">notifications</mat-icon>
       </a>
@@ -129,3 +133,9 @@
 
   </mat-sidenav-content>
 </mat-sidenav-container>
+
+<!-- API Explorer Panel -->
+<div class="api-panel-overlay" *ngIf="apiPanelOpen" (click)="toggleApiPanel()"></div>
+<div class="api-panel" [class.open]="apiPanelOpen">
+  <app-api-logs [userId]="userId"></app-api-logs>
+</div>

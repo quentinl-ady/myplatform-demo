@@ -1,0 +1,507 @@
+:host {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-radius: 12px;
+  --fintech-accent: #0abf53;
+  --method-post: #e65100;
+  --method-post-bg: #fff3e0;
+  --method-patch: #f57f17;
+  --method-patch-bg: #fff8e1;
+  --method-get: #1565c0;
+  --method-get-bg: #e3f2fd;
+  --method-delete: #c62828;
+  --method-delete-bg: #ffebee;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Layout ── */
+.apilogs-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Panel Header ── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid #e5e5e5;
+  flex-shrink: 0;
+}
+.panel-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel-header-icon {
+  color: #e65100;
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+}
+.panel-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--fintech-text);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.auto-active {
+  color: #2e7d32 !important;
+}
+
+/* ── Compact Stats Row ── */
+.stats-row {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid #f0f0f0;
+}
+.stat-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f0f0f0;
+  color: var(--fintech-text-secondary);
+}
+.stat-chip.stat-post { background: var(--method-post-bg); color: var(--method-post); }
+.stat-chip.stat-patch { background: var(--method-patch-bg); color: var(--method-patch); }
+.stat-chip.stat-get { background: var(--method-get-bg); color: var(--method-get); }
+.stat-chip.stat-delete { background: var(--method-delete-bg); color: var(--method-delete); }
+
+/* ── Filter Bar ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  flex-shrink: 0;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid #e5e5e5;
+}
+.method-filters {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.method-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid #ddd;
+  background: var(--fintech-surface);
+  color: var(--fintech-text-secondary);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.method-pill:hover { background: #f5f5f5; }
+.method-pill.active {
+  background: var(--fintech-text);
+  color: #fff;
+  border-color: var(--fintech-text);
+}
+.pill-post.active { background: var(--method-post); border-color: var(--method-post); }
+.pill-patch.active { background: var(--method-patch); border-color: var(--method-patch); }
+.pill-get.active { background: var(--method-get); border-color: var(--method-get); }
+.pill-delete.active { background: var(--method-delete); border-color: var(--method-delete); }
+
+/* ── Domain Filter ── */
+.domain-filters {
+  display: flex;
+  gap: 4px;
+  padding: 6px 16px;
+  flex-shrink: 0;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid #e5e5e5;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.domain-filters::-webkit-scrollbar { display: none; }
+.domain-pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid #e0e0e0;
+  background: var(--fintech-surface);
+  color: var(--fintech-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.domain-pill:hover { background: #f5f5f5; }
+.domain-pill.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #a5d6a7;
+}
+.domain-count {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: #bbb;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+.search-box input {
+  width: 100%;
+  padding: 5px 10px 5px 30px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  background: var(--fintech-bg);
+  color: var(--fintech-text);
+}
+.search-box input:focus {
+  border-color: var(--fintech-accent);
+}
+
+/* ── Card ── */
+mat-card {
+  background: var(--fintech-surface);
+  border-radius: 0;
+  box-shadow: none !important;
+  padding: 0;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Loading / Empty ── */
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 20px;
+  color: var(--fintech-text-secondary);
+}
+.empty-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  opacity: 0.25;
+}
+.empty-state p {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  color: var(--fintech-text);
+}
+.empty-hint {
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
+  text-align: center;
+}
+
+/* ── Log List ── */
+.log-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.log-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid #f0f0f0;
+  border-left: 3px solid transparent;
+}
+.log-item:last-child { border-bottom: none; }
+.log-item:hover { background: #fafafa; }
+.log-item.expanded { background: #f7f7f7; }
+.log-item.impactful {
+  border-left-color: #ff9800;
+}
+.log-item.error-row {
+  background: #fff8f8;
+}
+.log-item.error-row:hover { background: #fff0f0; }
+
+/* ── Row ── */
+.log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Method Badge ── */
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+.method-badge[data-method="POST"]   { background: var(--method-post-bg); color: var(--method-post); }
+.method-badge[data-method="PATCH"]  { background: var(--method-patch-bg); color: var(--method-patch); }
+.method-badge[data-method="GET"]    { background: var(--method-get-bg); color: var(--method-get); }
+.method-badge[data-method="DELETE"] { background: var(--method-delete-bg); color: var(--method-delete); }
+
+/* ── Endpoint ── */
+.log-endpoint {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.endpoint-path {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fintech-text);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.endpoint-domain {
+  font-size: 10px;
+  color: var(--fintech-text-secondary);
+}
+
+/* ── Status ── */
+.log-status {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  flex-shrink: 0;
+}
+.status-ok { color: #2e7d32; }
+.status-err { color: #c62828; }
+
+/* ── Duration ── */
+.log-duration {
+  font-size: 10px;
+  color: var(--fintech-text-secondary);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  flex-shrink: 0;
+}
+
+/* ── Time ── */
+.log-time {
+  font-size: 10px;
+  color: #999;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Impactful Chip ── */
+.impactful-chip {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: #fff3e0;
+  color: #e65100;
+  flex-shrink: 0;
+}
+
+/* ── Expand Arrow ── */
+.expand-arrow {
+  color: #ccc;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.log-item:hover .expand-arrow { color: #888; }
+
+/* ── Expanded Detail ── */
+.log-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+.detail-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.detail-key {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #999;
+  font-weight: 500;
+}
+.detail-value {
+  font-size: 12px;
+  color: var(--fintech-text);
+}
+.detail-value.mono {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+.text-ok { color: #2e7d32; }
+.text-err { color: #c62828; }
+
+/* ── Doc Link ── */
+.doc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--method-get);
+  text-decoration: none;
+  font-weight: 500;
+  margin-bottom: 10px;
+  transition: opacity 0.15s;
+}
+.doc-link:hover { opacity: 0.7; }
+.doc-link mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Body Tabs ── */
+.body-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 2px solid #eee;
+}
+.body-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fintech-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.body-tab:hover { color: var(--fintech-text); }
+.body-tab.active {
+  color: var(--fintech-text);
+  border-bottom-color: var(--fintech-text);
+}
+.body-tab mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+/* ── JSON Container ── */
+.json-container {
+  position: relative;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #999;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+.copy-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.copy-btn mat-icon {
+  font-size: 15px;
+  width: 15px;
+  height: 15px;
+}
+
+/* ── JSON Preview ── */
+.json-preview {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 0 0 8px 8px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Utilities ── */
+.spinning { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }

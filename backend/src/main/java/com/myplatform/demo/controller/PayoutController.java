@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.PayoutAccount;
@@ -47,6 +48,7 @@ public class PayoutController {
     public ResponseEntity<PayoutConfigurationResponse> createPayoutConfiguration(@RequestBody PayoutConfigurationRequest request) throws Exception {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(request.getUserId());
         if (user.getLegalEntityId() == null) {
             throw new BadRequestException("User has no legalEntityId");
         }
@@ -61,6 +63,7 @@ public class PayoutController {
     }
 
     private User findUserWithLegalEntity(String userId) {
+        ApiLogContext.setUserId(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {

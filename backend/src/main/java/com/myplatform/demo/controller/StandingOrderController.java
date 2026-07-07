@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.myplatform.demo.configuration.ApiLogContext;
+
 import java.util.Map;
 
 @RestController
@@ -95,6 +97,7 @@ public class StandingOrderController {
     }
 
     private User findUser(String userId) {
+        ApiLogContext.setUserId(userId);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }

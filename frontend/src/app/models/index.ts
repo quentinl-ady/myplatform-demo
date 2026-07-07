@@ -10,3 +10,4 @@ export * from './issuing.model';
 export * from './standing-order.model';
 export * from './branding.model';
 export * from './webhook.model';
+export * from './api-log.model';

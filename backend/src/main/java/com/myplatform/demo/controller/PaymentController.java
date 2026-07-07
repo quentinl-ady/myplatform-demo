@@ -12,6 +12,7 @@ import com.myplatform.demo.model.PaymentSessionResponse;
 import com.myplatform.demo.model.RequestPayment;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.service.GpayJwtService;
 import com.myplatform.demo.service.PaymentCheckoutService;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,7 @@ public class PaymentController {
     public ResponseEntity<PaymentSessionResponse> sendPayment(@RequestBody RequestPayment requestPayment) throws Exception {
         User user = userRepository.findById(requestPayment.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(requestPayment.getUserId());
 
         if (user.getLegalEntityId() == null) {
             throw new BadRequestException("User has no legalEntityId");
@@ -115,6 +117,7 @@ public class PaymentController {
     public ResponseEntity<PaymentSessionResponse> createTokenizationSession(@RequestBody RequestPayment requestPayment) throws Exception {
         User user = userRepository.findById(requestPayment.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(requestPayment.getUserId());
 
         if (user.getLegalEntityId() == null) {
             throw new BadRequestException("User has no legalEntityId");
@@ -146,6 +149,7 @@ public class PaymentController {
     public ResponseEntity<TokenPaymentResponse> makeTokenPayment(@RequestBody TokenPaymentRequest tokenPaymentRequest) throws Exception {
         User user = userRepository.findById(tokenPaymentRequest.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(tokenPaymentRequest.getUserId());
 
         if (user.getLegalEntityId() == null) {
             throw new BadRequestException("User has no legalEntityId");

@@ -3,6 +3,7 @@ package com.myplatform.demo.controller;
 import com.adyen.model.balanceplatform.Device;
 import com.adyen.model.balanceplatform.RegisterSCAFinalResponse;
 import com.adyen.model.balanceplatform.RegisterSCAResponse;
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.*;
@@ -158,6 +159,7 @@ public class TransferController {
     }
 
     private User findUser(String userId) {
+        ApiLogContext.setUserId(userId);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }

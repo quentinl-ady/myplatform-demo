@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.User;
@@ -87,6 +88,7 @@ public class SessionController {
     }
 
     private User findUserWithAccountHolder(String userId) {
+        ApiLogContext.setUserId(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getAccountHolderId() == null) {

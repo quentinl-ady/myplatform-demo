@@ -233,6 +233,53 @@
   color: var(--fintech-text) !important;
 }
 
+/* --- API PANEL TOPBAR BUTTON --- */
+.topbar-api-btn {
+  color: var(--fintech-text-secondary) !important;
+  margin-right: 4px;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.topbar-api-btn:hover {
+  color: var(--fintech-text) !important;
+}
+.topbar-api-btn.active {
+  color: #e65100 !important;
+  background: #fff3e0;
+}
+
+/* --- API PANEL (right slide-out) --- */
+.api-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.api-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 600px;
+  max-width: 90vw;
+  background: var(--fintech-bg);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.api-panel.open {
+  transform: translateX(0);
+}
+
 @media (max-width: 992px) {
   .fintech-sidenav {
     width: 240px;
@@ -245,5 +292,9 @@
   }
   .main-content {
     padding: 16px;
+  }
+  .api-panel {
+    width: 100vw;
+    max-width: 100vw;
   }
 }

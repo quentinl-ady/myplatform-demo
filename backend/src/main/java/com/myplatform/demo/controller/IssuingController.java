@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.dto.*;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
@@ -39,6 +40,7 @@ public class IssuingController {
     public ResponseEntity<CardResponse> createCard(@RequestBody CreateCardRequest request) throws Exception {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(request.getUserId());
 
         if (request.getBalanceAccountId() == null || request.getBalanceAccountId().isBlank()) {
             throw new BadRequestException("Balance account is required");

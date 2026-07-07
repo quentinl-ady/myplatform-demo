@@ -1,0 +1,162 @@
+<div class="apilogs-wrapper">
+
+  <!-- Panel Header -->
+  <div class="panel-header">
+    <div class="panel-header-left">
+      <mat-icon class="panel-header-icon">api</mat-icon>
+      <h2>API Explorer</h2>
+    </div>
+    <div class="panel-header-right">
+      <button mat-icon-button (click)="loadLogs()" [disabled]="loading()" matTooltip="Refresh">
+        <mat-icon [class.spinning]="loading()">refresh</mat-icon>
+      </button>
+      <button mat-icon-button [class.auto-active]="autoRefresh" (click)="toggleAutoRefresh()" [matTooltip]="autoRefresh ? 'Stop live mode' : 'Live mode'">
+        <mat-icon>{{ autoRefresh ? 'sync' : 'sync_disabled' }}</mat-icon>
+      </button>
+      <button mat-icon-button (click)="clearLogs()" [disabled]="logs.length === 0" matTooltip="Clear logs">
+        <mat-icon>delete_outline</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Compact Stats -->
+  <div class="stats-row" *ngIf="logs.length > 0">
+    <span class="stat-chip">{{ logs.length }} calls</span>
+    <span class="stat-chip stat-post" *ngIf="getMethodCount('POST')">{{ getMethodCount('POST') }} POST</span>
+    <span class="stat-chip stat-patch" *ngIf="getMethodCount('PATCH')">{{ getMethodCount('PATCH') }} PATCH</span>
+    <span class="stat-chip stat-get" *ngIf="getMethodCount('GET')">{{ getMethodCount('GET') }} GET</span>
+    <span class="stat-chip stat-delete" *ngIf="getMethodCount('DELETE')">{{ getMethodCount('DELETE') }} DEL</span>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="method-filters">
+      <button class="method-pill" [class.active]="methodFilter === 'ALL'" (click)="setMethodFilter('ALL')">All</button>
+      <button class="method-pill pill-post" [class.active]="methodFilter === 'POST'" (click)="setMethodFilter('POST')">POST</button>
+      <button class="method-pill pill-patch" [class.active]="methodFilter === 'PATCH'" (click)="setMethodFilter('PATCH')">PATCH</button>
+      <button class="method-pill pill-get" [class.active]="methodFilter === 'GET'" (click)="setMethodFilter('GET')">GET</button>
+      <button class="method-pill pill-delete" [class.active]="methodFilter === 'DELETE'" (click)="setMethodFilter('DELETE')">DEL</button>
+    </div>
+    <div class="search-box">
+      <mat-icon class="search-icon">search</mat-icon>
+      <input type="text" placeholder="Filter..." [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" />
+    </div>
+  </div>
+
+  <!-- Domain Filter -->
+  <div class="domain-filters" *ngIf="getUniqueDomains().length > 1">
+    <button class="domain-pill" [class.active]="domainFilter === 'ALL'" (click)="setDomainFilter('ALL')">All</button>
+    <button class="domain-pill" *ngFor="let domain of getUniqueDomains()"
+            [class.active]="domainFilter === domain"
+            (click)="setDomainFilter(domain)">
+      {{ domain }} <span class="domain-count">{{ getDomainCount(domain) }}</span>
+    </button>
+  </div>
+
+  <!-- Log List -->
+  <mat-card class="logs-card">
+
+    <div *ngIf="loading()" class="loading-spinner">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+
+    <div *ngIf="!loading() && filteredLogs.length === 0" class="empty-state">
+      <mat-icon class="empty-icon">api</mat-icon>
+      <p>No API calls recorded yet.</p>
+      <span class="empty-hint">API calls to Adyen will appear here as you use the platform.</span>
+    </div>
+
+    <div class="log-list" *ngIf="!loading() && filteredLogs.length > 0">
+      <div
+        *ngFor="let log of filteredLogs"
+        class="log-item"
+        [class.impactful]="isImpactful(log)"
+        [class.error-row]="log.error"
+        [class.expanded]="expandedLogId === log.id"
+        (click)="toggleExpand(log)"
+      >
+        <div class="log-row">
+          <!-- Method Badge -->
+          <span class="method-badge" [attr.data-method]="log.httpMethod">{{ log.httpMethod }}</span>
+
+          <!-- Endpoint -->
+          <div class="log-endpoint">
+            <span class="endpoint-path">{{ getShortEndpoint(log.endpoint) }}</span>
+            <span class="endpoint-domain">{{ log.apiDomain }}</span>
+          </div>
+
+          <!-- Status -->
+          <span class="log-status" [class.status-ok]="!log.error" [class.status-err]="log.error">
+            {{ log.statusCode || '—' }}
+          </span>
+
+          <!-- Duration -->
+          <span class="log-duration">{{ log.durationMs }}ms</span>
+
+          <!-- Time -->
+          <span class="log-time">{{ getTimeAgo(log.timestamp) }}</span>
+
+          <!-- Impactful indicator -->
+          <span class="impactful-chip" *ngIf="isImpactful(log)">write</span>
+
+          <!-- Expand arrow -->
+          <mat-icon class="expand-arrow">{{ expandedLogId === log.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </div>
+
+        <!-- Expanded Detail -->
+        <div class="log-detail" *ngIf="expandedLogId === log.id" (click)="$event.stopPropagation()">
+          <div class="detail-meta">
+            <div class="detail-item">
+              <span class="detail-key">Full URL</span>
+              <span class="detail-value mono">{{ log.endpoint }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-key">API Domain</span>
+              <span class="detail-value">{{ log.apiDomain }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-key">Status</span>
+              <span class="detail-value" [class.text-ok]="!log.error" [class.text-err]="log.error">{{ log.statusCode || 'N/A' }} {{ log.error ? '(Error)' : '(OK)' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-key">Duration</span>
+              <span class="detail-value">{{ log.durationMs }}ms</span>
+            </div>
+          </div>
+
+          <!-- Doc link -->
+          <a *ngIf="getDocLink(log.endpoint)" [href]="getDocLink(log.endpoint)" target="_blank" class="doc-link">
+            <mat-icon>menu_book</mat-icon>
+            View API documentation
+          </a>
+
+          <!-- Tabs for request/response -->
+          <div class="body-tabs">
+            <button class="body-tab" [class.active]="activeTab === 'request'" (click)="setActiveTab('request')">
+              <mat-icon>upload</mat-icon>
+              Request Body
+            </button>
+            <button class="body-tab" [class.active]="activeTab === 'response'" (click)="setActiveTab('response')">
+              <mat-icon>download</mat-icon>
+              Response Body
+            </button>
+          </div>
+
+          <div class="json-container" *ngIf="activeTab === 'request'">
+            <button class="copy-btn" (click)="copyBody(log.requestBody, 'req-' + log.id)" matTooltip="Copy">
+              <mat-icon>{{ copiedId === 'req-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
+            </button>
+            <pre class="json-preview">{{ formatJson(log.requestBody) || '(empty)' }}</pre>
+          </div>
+          <div class="json-container" *ngIf="activeTab === 'response'">
+            <button class="copy-btn" (click)="copyBody(log.responseBody, 'res-' + log.id)" matTooltip="Copy">
+              <mat-icon>{{ copiedId === 'res-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
+            </button>
+            <pre class="json-preview">{{ formatJson(log.responseBody) || '(empty)' }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </mat-card>
+
+</div>

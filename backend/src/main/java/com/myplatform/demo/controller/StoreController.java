@@ -3,6 +3,7 @@ package com.myplatform.demo.controller;
 import com.myplatform.demo.dto.DTOMapper;
 import com.myplatform.demo.dto.PaymentMethodCustomerDTO;
 import com.myplatform.demo.dto.StoreCustomerDTO;
+import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.*;
@@ -162,6 +163,7 @@ public class StoreController {
     }
 
     private User findUserWithLegalEntity(String userId) {
+        ApiLogContext.setUserId(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (user.getLegalEntityId() == null) {
