@@ -76,7 +76,7 @@ public class LoggingClientWrapper implements ClientInterface {
             log.setUserId(ApiLogContext.getUserId());
             log.setHttpMethod(method);
             log.setEndpoint(endpoint);
-            log.setApiDomain(apiDomain);
+            log.setApiDomain(resolveApiDomain(endpoint));
             log.setRequestBody(requestBody);
             log.setResponseBody(responseBody);
             log.setStatusCode(statusCode);
@@ -87,6 +87,13 @@ public class LoggingClientWrapper implements ClientInterface {
         } catch (Exception ex) {
             // Never let logging break the actual API call
         }
+    }
+
+    private String resolveApiDomain(String endpoint) {
+        if (endpoint != null && endpoint.contains("management-test.adyen.com")) {
+            return "Management";
+        }
+        return apiDomain;
     }
 
     private String appendParams(String endpoint, Map<String, String> params) {

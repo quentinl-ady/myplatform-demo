@@ -47,6 +47,12 @@ export class PaymentService {
     });
   }
 
+  deleteStoredPaymentMethod(userId: string, storeReference: string, recurringDetailReference: string): Observable<{ status: string }> {
+    return this.http.delete<{ status: string }>(`${this.baseUrl}/api/payments/stored-payment-methods`, {
+      params: { userId, storeReference, recurringDetailReference }
+    });
+  }
+
   makeTokenPayment(payload: TokenPaymentPayload): Observable<TokenPaymentResponse> {
     return this.http.post<TokenPaymentResponse>(`${this.baseUrl}/api/payments/token-payment`, payload, {
       headers: {'Content-Type': 'application/json'}

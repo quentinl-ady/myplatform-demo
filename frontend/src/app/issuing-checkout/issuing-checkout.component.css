@@ -11,7 +11,7 @@
 }
 
 .fintech-wrapper {
-  max-width: 900px; /* Wider to accommodate side-by-side layout on desktop */
+  max-width: 900px;
   margin: 40px auto;
   padding: 0 16px;
   display: flex;
@@ -34,6 +34,24 @@
   color: var(--fintech-text-secondary);
   font-size: 15px;
   margin: 0;
+}
+
+.issuing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1565c0;
+}
+.issuing-badge mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .loading-state {

@@ -30,4 +30,11 @@ public class AdyenClientConfig {
         client.setHttpClient(new LoggingClientWrapper(client.getHttpClient(), apiLogService, "Payments"));
         return client;
     }
+
+    @Bean
+    public Client issuingPspClient(@Value("${adyen.issuing.pspApiKey}") String issuingPspApiKey, ApiLogService apiLogService) {
+        Client client = new Client(issuingPspApiKey, Environment.TEST);
+        client.setHttpClient(new LoggingClientWrapper(client.getHttpClient(), apiLogService, "Issuing Payments"));
+        return client;
+    }
 }

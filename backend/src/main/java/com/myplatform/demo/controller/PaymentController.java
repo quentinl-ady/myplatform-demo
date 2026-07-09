@@ -145,6 +145,20 @@ public class PaymentController {
         return ResponseEntity.ok(storedMethods);
     }
 
+    @DeleteMapping("/stored-payment-methods")
+    public ResponseEntity<Map<String, String>> deleteStoredPaymentMethod(
+            @RequestParam String userId,
+            @RequestParam String storeReference,
+            @RequestParam String recurringDetailReference) throws Exception {
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        ApiLogContext.setUserId(userId);
+
+        paymentCheckoutService.disableStoredPaymentMethod(storeReference, recurringDetailReference);
+        return ResponseEntity.ok(Map.of("status", "success"));
+    }
+
     @PostMapping("/token-payment")
     public ResponseEntity<TokenPaymentResponse> makeTokenPayment(@RequestBody TokenPaymentRequest tokenPaymentRequest) throws Exception {
         User user = userRepository.findById(tokenPaymentRequest.getUserId())

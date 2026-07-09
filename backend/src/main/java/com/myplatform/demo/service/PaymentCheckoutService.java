@@ -3,6 +3,8 @@ package com.myplatform.demo.service;
 import com.adyen.Client;
 import com.adyen.model.checkout.*;
 import com.adyen.model.checkout.Amount;
+import com.adyen.model.recurring.DisableRequest;
+import com.adyen.model.recurring.DisableResult;
 import com.adyen.model.recurring.Recurring;
 import com.adyen.model.recurring.RecurringDetail;
 import com.adyen.model.recurring.RecurringDetailsRequest;
@@ -285,5 +287,16 @@ public class PaymentCheckoutService {
         tokenPaymentResponse.setResultCode(response.getResultCode() != null ? response.getResultCode().getValue() : null);
         tokenPaymentResponse.setRefusalReason(response.getRefusalReason());
         return tokenPaymentResponse;
+    }
+
+    public void disableStoredPaymentMethod(String storeRef, String recurringDetailReference) throws IOException, ApiException {
+        String shopperReference = "john.doe@gmail.com_" + storeRef;
+
+        DisableRequest disableRequest = new DisableRequest();
+        disableRequest.setMerchantAccount(this.merchantAccount);
+        disableRequest.setShopperReference(shopperReference);
+        disableRequest.setRecurringDetailReference(recurringDetailReference);
+
+        recurringApi.disable(disableRequest);
     }
 }

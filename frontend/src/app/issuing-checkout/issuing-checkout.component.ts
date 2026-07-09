@@ -5,29 +5,28 @@ import { CommonModule } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { MaterialModule } from '../material.module';
-import { SendPaymentPayload, SendPaymentResponse, Store, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse, User } from '../models';
-import { AccountService, PaymentService, StoreService } from '../services';
+import { SendPaymentPayload, SendPaymentResponse, Store, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse } from '../models';
+import { IssuingPaymentService, IssuingUserInfo } from '../services/issuing-payment.service';
 import { AdyenCheckout, CoreConfiguration, Dropin } from '@adyen/adyen-web/auto';
 import '@adyen/adyen-web/styles/adyen.css';
-import { firstValueFrom } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 const log = (...args: any[]) => { if (!environment.production) console.log(...args); };
 
 @Component({
-  selector: 'app-checkout',
+  selector: 'app-issuing-checkout',
   standalone: true,
   imports: [
     CommonModule,
     MaterialModule,
     ReactiveFormsModule
   ],
-  templateUrl: './checkout.component.html',
-  styleUrl: './checkout.component.css'
+  templateUrl: './issuing-checkout.component.html',
+  styleUrl: './issuing-checkout.component.css'
 })
-export class CheckoutComponent implements OnInit {
+export class IssuingCheckoutComponent implements OnInit {
   userId = '';
-  readonly user = signal<User | null>(null);
+  readonly issuingUserInfo = signal<IssuingUserInfo | null>(null);
   readonly stores = signal<Store[]>([]);
   readonly loading = signal(false);
   readonly submitting = signal(false);
@@ -49,9 +48,7 @@ export class CheckoutComponent implements OnInit {
 
   private fb = inject(FormBuilder);
   private route = inject(ActivatedRoute);
-  private accountService = inject(AccountService);
-  private paymentService = inject(PaymentService);
-  private storeService = inject(StoreService);
+  private issuingPaymentService = inject(IssuingPaymentService);
   private matSnackBar = inject(MatSnackBar);
 
   private dropin: Dropin | null = null;
@@ -59,6 +56,7 @@ export class CheckoutComponent implements OnInit {
 
   countryCode = 'FR';
   clientKey = '';
+  issuingUserId = '';
 
   constructor() {
     this.checkoutForm = this.fb.group({
@@ -86,23 +84,24 @@ export class CheckoutComponent implements OnInit {
     this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       if (!this.userId) return;
-      this.loadUserAndMaybeStores();
+      this.loadIssuingUserInfo();
     });
 
-    this.paymentService.getClientKey().subscribe({
+    this.issuingPaymentService.getClientKey().subscribe({
       next: value => this.clientKey = value.key
     });
   }
 
-  private loadUserAndMaybeStores(): void {
+  private loadIssuingUserInfo(): void {
     this.loading.set(true);
-    this.accountService.getUserById(this.userId).subscribe({
-      next: (u) => {
-        this.user.set(u);
-        this.countryCode = u.countryCode;
-        log("countryCode : " + this.countryCode);
+    this.issuingPaymentService.getUserInfo().subscribe({
+      next: (info) => {
+        this.issuingUserInfo.set(info);
+        this.issuingUserId = info.userId;
+        this.countryCode = info.countryCode;
+        log("Issuing countryCode:", this.countryCode, "activityReason:", info.activityReason);
 
-        if (u.activityReason === 'embeddedPayment') {
+        if (info.activityReason === 'embeddedPayment') {
           this.loadStores();
         } else {
           this.checkoutForm.patchValue({ storeReference: '' });
@@ -110,7 +109,7 @@ export class CheckoutComponent implements OnInit {
         }
       },
       error: (err) => {
-        this.matSnackBar.open('Error while fetching user', 'Close', { duration: 3000 });
+        this.matSnackBar.open('Error while fetching issuing user info', 'Close', { duration: 3000 });
         this.loading.set(false);
       }
     });
@@ -118,7 +117,7 @@ export class CheckoutComponent implements OnInit {
 
   private loadStores(): void {
     this.loading.set(true);
-    this.storeService.getStores(this.userId).subscribe({
+    this.issuingPaymentService.getStores(this.issuingUserId).subscribe({
       next: (res) => {
         this.stores.set(res || []);
         if (this.stores().length) {
@@ -136,6 +135,10 @@ export class CheckoutComponent implements OnInit {
     });
   }
 
+  get isEmbeddedPayment(): boolean {
+    return this.issuingUserInfo()?.activityReason === 'embeddedPayment';
+  }
+
   switchTab(tab: 'payment' | 'tokenize' | 'token-payment'): void {
     this.activeTab = tab;
     if (tab === 'token-payment') {
@@ -150,7 +153,7 @@ export class CheckoutComponent implements OnInit {
       return;
     }
 
-    if (this.user()?.activityReason === 'embeddedPayment') {
+    if (this.isEmbeddedPayment) {
       const sr = this.checkoutForm.get('storeReference')?.value;
       if (!sr) {
         this.matSnackBar.open('Please select a store', 'Close', { duration: 2500 });
@@ -161,17 +164,17 @@ export class CheckoutComponent implements OnInit {
     const payload: SendPaymentPayload = {
       amount: Number(this.checkoutForm.get('amount')?.value),
       currencyCode: this.checkoutForm.get('currencyCode')?.value,
-      storeReference: (this.user()?.activityReason === 'embeddedPayment')
+      storeReference: this.isEmbeddedPayment
         ? this.checkoutForm.get('storeReference')?.value
         : '',
-      userId: this.userId,
+      userId: this.issuingUserId,
       reference: this.checkoutForm.get('reference')?.value
     };
 
     this.submitting.set(true);
-    this.paymentService.sendPayment(payload).subscribe({
+    this.issuingPaymentService.sendPayment(payload).subscribe({
       next: (res) => {
-        log('sendPayment response:', res);
+        log('issuing sendPayment response:', res);
         this.matSnackBar.open('Request sent successfully', 'Close', { duration: 3000 });
         this.submitting.set(false);
         this.initAdyenCheckout(res);
@@ -190,7 +193,7 @@ export class CheckoutComponent implements OnInit {
       return;
     }
 
-    if (this.user()?.activityReason === 'embeddedPayment') {
+    if (this.isEmbeddedPayment) {
       const sr = this.tokenizeForm.get('storeReference')?.value;
       if (!sr) {
         this.matSnackBar.open('Please select a store', 'Close', { duration: 2500 });
@@ -201,17 +204,17 @@ export class CheckoutComponent implements OnInit {
     const payload: SendPaymentPayload = {
       amount: 0,
       currencyCode: this.tokenizeForm.get('currencyCode')?.value,
-      storeReference: (this.user()?.activityReason === 'embeddedPayment')
+      storeReference: this.isEmbeddedPayment
         ? this.tokenizeForm.get('storeReference')?.value
         : '',
-      userId: this.userId,
+      userId: this.issuingUserId,
       reference: this.tokenizeForm.get('reference')?.value
     };
 
     this.submitting.set(true);
-    this.paymentService.createTokenizationSession(payload).subscribe({
+    this.issuingPaymentService.createTokenizationSession(payload).subscribe({
       next: (res) => {
-        log('tokenize session response:', res);
+        log('issuing tokenize session response:', res);
         this.matSnackBar.open('Tokenization session created', 'Close', { duration: 3000 });
         this.submitting.set(false);
         this.initTokenizeDropin(res);
@@ -224,7 +227,7 @@ export class CheckoutComponent implements OnInit {
   }
 
   loadStoredPaymentMethods(): void {
-    const storeRef = (this.user()?.activityReason === 'embeddedPayment')
+    const storeRef = this.isEmbeddedPayment
       ? (this.tokenPaymentForm.get('storeReference')?.value || '')
       : '';
 
@@ -232,7 +235,7 @@ export class CheckoutComponent implements OnInit {
     this.selectedStoredMethod = null;
     this.tokenPaymentResult.set(null);
 
-    this.paymentService.getStoredPaymentMethods(this.userId, storeRef).subscribe({
+    this.issuingPaymentService.getStoredPaymentMethods(storeRef).subscribe({
       next: (methods) => {
         this.storedMethods.set(methods);
         this.loadingStoredMethods.set(false);
@@ -251,11 +254,11 @@ export class CheckoutComponent implements OnInit {
 
   deleteStoredMethod(event: Event, method: StoredPaymentMethod): void {
     event.stopPropagation();
-    const storeRef = (this.user()?.activityReason === 'embeddedPayment')
+    const storeRef = this.isEmbeddedPayment
       ? (this.tokenPaymentForm.get('storeReference')?.value || '')
       : '';
 
-    this.paymentService.deleteStoredPaymentMethod(this.userId, storeRef, method.recurringDetailReference).subscribe({
+    this.issuingPaymentService.deleteStoredPaymentMethod(storeRef, method.recurringDetailReference).subscribe({
       next: () => {
         this.matSnackBar.open('Token deleted successfully', 'Close', { duration: 3000 });
         if (this.selectedStoredMethod?.recurringDetailReference === method.recurringDetailReference) {
@@ -284,18 +287,18 @@ export class CheckoutComponent implements OnInit {
     const payload: TokenPaymentPayload = {
       amount: Number(this.tokenPaymentForm.get('amount')?.value),
       currencyCode: this.tokenPaymentForm.get('currencyCode')?.value,
-      storeReference: (this.user()?.activityReason === 'embeddedPayment')
+      storeReference: this.isEmbeddedPayment
         ? this.tokenPaymentForm.get('storeReference')?.value
         : '',
-      userId: this.userId,
+      userId: this.issuingUserId,
       reference: this.tokenPaymentForm.get('reference')?.value,
       storedPaymentMethodId: this.selectedStoredMethod.recurringDetailReference
     };
 
     this.submittingTokenPayment.set(true);
-    this.paymentService.makeTokenPayment(payload).subscribe({
+    this.issuingPaymentService.makeTokenPayment(payload).subscribe({
       next: (res) => {
-        log('token payment response:', res);
+        log('issuing token payment response:', res);
         this.tokenPaymentResult.set(res);
         this.submittingTokenPayment.set(false);
         if (res.resultCode === 'Authorised') {
@@ -318,28 +321,8 @@ export class CheckoutComponent implements OnInit {
     }
 
     this.dropinActive = true;
-    const hostname = window.location.hostname;
 
     try {
-      let googlePayConfiguration = {};
-      try {
-        const jwtResponse = await firstValueFrom(
-          this.paymentService.getGooglePayJwt(hostname)
-        );
-        log('googlePayJwt : ' + jwtResponse.googlePayJwtToken);
-        googlePayConfiguration = {
-          configuration: {
-            merchantName: 'testQuentin',
-            merchantId: 'BCR2DN5TRCO6VRS6',
-            gatewayMerchantId: 'QuentinLecornuTEST',
-            authJwt: jwtResponse.googlePayJwtToken,
-            merchantOrigin: new URL(environment.frontendUrl).hostname
-          },
-        };
-      } catch (e) {
-        console.warn('Google Pay JWT fetch failed, Drop-in will load without Google Pay config', e);
-      }
-
       const globalConfiguration: CoreConfiguration = {
         session: {
           id: sendPaymentResponse.id,
@@ -352,8 +335,8 @@ export class CheckoutComponent implements OnInit {
           currency: sendPaymentResponse.currency
         },
         clientKey: this.clientKey,
-        onPaymentCompleted: (result, component) => log('Payment completed', result),
-        onPaymentFailed: (result, component) => log('Payment failed', result),
+        onPaymentCompleted: (result, component) => log('Issuing payment completed', result),
+        onPaymentFailed: (result, component) => log('Issuing payment failed', result),
         onError: (error, component) => { if (!environment.production) console.error(error.name, error.message, error.stack, component); }
       };
 
@@ -364,14 +347,17 @@ export class CheckoutComponent implements OnInit {
         holderNameRequired: true,
         billingAddressRequired: true,
         paymentMethodsConfiguration: {
-          card: { hasHolderName: true, holderNameRequired: true },
-          googlePayConfiguration
+          card: {
+            hasHolderName: true,
+            holderNameRequired: true,
+            brands: ['visa', 'mc']
+          }
         }
       };
 
-      this.dropin = new Dropin(checkout, dropinConfiguration).mount('#dropin-container');
+      this.dropin = new Dropin(checkout, dropinConfiguration).mount('#issuing-dropin-container');
     } catch (e) {
-      if (!environment.production) console.error("Failed to initialize Adyen Dropin", e);
+      if (!environment.production) console.error("Failed to initialize Issuing Adyen Dropin", e);
       this.matSnackBar.open('Failed to initialize payment gateway', 'Close', { duration: 3000 });
       this.dropinActive = false;
     }
@@ -399,10 +385,10 @@ export class CheckoutComponent implements OnInit {
         },
         clientKey: this.clientKey,
         onPaymentCompleted: (result, component) => {
-          log('Tokenization completed', result);
+          log('Issuing tokenization completed', result);
           this.matSnackBar.open('Card tokenized successfully!', 'Close', { duration: 5000 });
         },
-        onPaymentFailed: (result, component) => log('Tokenization failed', result),
+        onPaymentFailed: (result, component) => log('Issuing tokenization failed', result),
         onError: (error, component) => { if (!environment.production) console.error(error.name, error.message, error.stack, component); }
       };
 
@@ -413,13 +399,17 @@ export class CheckoutComponent implements OnInit {
         holderNameRequired: true,
         billingAddressRequired: true,
         paymentMethodsConfiguration: {
-          card: { hasHolderName: true, holderNameRequired: true }
+          card: {
+            hasHolderName: true,
+            holderNameRequired: true,
+            brands: ['visa', 'mc']
+          }
         }
       };
 
-      this.tokenizeDropin = new Dropin(checkout, dropinConfiguration).mount('#tokenize-dropin-container');
+      this.tokenizeDropin = new Dropin(checkout, dropinConfiguration).mount('#issuing-tokenize-dropin-container');
     } catch (e) {
-      if (!environment.production) console.error("Failed to initialize Tokenize Dropin", e);
+      if (!environment.production) console.error("Failed to initialize Issuing Tokenize Dropin", e);
       this.matSnackBar.open('Failed to initialize tokenization gateway', 'Close', { duration: 3000 });
       this.tokenizeDropinActive = false;
     }

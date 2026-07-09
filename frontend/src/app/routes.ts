@@ -101,6 +101,11 @@ const routeConfig: Routes = [
         title: 'Card Transactions'
       },
       {
+        path: 'issuing-checkout',
+        loadComponent: () => import('./issuing-checkout/issuing-checkout.component').then(m => m.IssuingCheckoutComponent),
+        title: 'Test Issued Cards'
+      },
+      {
         path: 'notifications',
         loadComponent: () => import('./webhooks/webhooks.component').then(m => m.WebhooksComponent),
         title: 'Notifications'

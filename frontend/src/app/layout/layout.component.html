@@ -85,6 +85,10 @@
         <mat-icon matListItemIcon>receipt_long</mat-icon>
         <span matListItemTitle>Card Transactions</span>
       </a>
+      <a mat-list-item [routerLink]="issuingEnabled ? ['/', userId, 'issuing-checkout'] : null" routerLinkActive="active-link" [class.nav-disabled]="!issuingEnabled">
+        <mat-icon matListItemIcon>contactless</mat-icon>
+        <span matListItemTitle>Test Issued Cards</span>
+      </a>
 
       <p class="nav-section-title">Risk</p>
       <a mat-list-item [routerLink]="['/', userId, 'dispute']" routerLinkActive="active-link">
