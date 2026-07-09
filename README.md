@@ -21,9 +21,9 @@ MyPlatform Demo simulates a **marketplace / SaaS platform** that onboards sub-me
 | Domain | Highlights |
 |--------|-----------|
 | **Onboarding & KYC** | Legal Entity creation (Individual / Organization / Sole Proprietorship) · Hosted Onboarding Page · Capability tracking · Automated KYC dev-tool (doc upload, ToS, PCI) · Business Lines |
-| **Payments** | Store creation with split config · Payment method setup (Visa, MC, CB, Amex) · Checkout sessions with redirect · Pay By Link · POS via Terminal API (Cloud) |
+| **Payments** | Store creation with split config · Payment method setup (Visa, MC, CB, Amex) · Checkout sessions with redirect · Tokenization (zero-auth) · Token payments (ContAuth) · Token deletion · Pay By Link · POS via Terminal API (Cloud) |
 | **Banking** | Bank account provisioning (IBAN / Account Number) · Balance display · Transfers (Regular & Instant) with country-aware format detection, async validation, Confirmation of Payee, SCA via WebAuthn · Auto-sweep (cron) · RIB PDF download (iText) |
-| **Issuing** | Virtual card creation (Visa / MC) · Lifecycle mgmt (active / suspended / closed) · Card data reveal (RSA/AES) · Transaction rules (max txns, max amount, total cap, MCC blocking) · Transaction history |
+| **Issuing** | Virtual card creation (Visa / MC) · Lifecycle mgmt (active / suspended / closed) · Card data reveal (RSA/AES) · Transaction rules (max txns, max amount, total cap, MCC blocking) · Transaction history · **Test Issued Cards** checkout (Visa/MC only, dedicated issuing credentials) |
 | **Capital** | Loan offers display & management via Adyen Capital component |
 | **Payouts** | Sweep/payout config to external bank accounts · Regular & instant |
 | **Platform Experience** | Transactions overview · Reports · Payouts · Disputes · Pay By Link · Capital |
@@ -64,7 +64,7 @@ MyPlatform Demo simulates a **marketplace / SaaS platform** that onboards sub-me
 
 ## Adyen API Keys & Required Roles
 
-The application uses **3 separate API keys**, each mapped to a dedicated `Client` bean in `AdyenClientConfig.java`.
+The application uses **4 separate API keys**, each mapped to a dedicated `Client` bean in `AdyenClientConfig.java`.
 
 ---
 
@@ -157,6 +157,7 @@ The application uses **3 separate API keys**, each mapped to a dedicated `Client
 | **Management - Split Config** | `/merchants/{id}/splitConfigurations` | POST | `StoreManagementService` | Management API - Split configurations |
 | **Management - Terminals** | `/terminals` | GET | `StoreManagementService` | Management API - Terminals |
 | **Terminal (Cloud)** | Cloud sync payment | POST | `PosService` | Terminal API |
+| **Recurring** | `/disable` | POST | `PaymentCheckoutService` | Recurring API |
 
 > **Roles to enable in Customer Area** (Settings > Users > API credentials > Roles):
 >
@@ -171,14 +172,35 @@ The application uses **3 separate API keys**, each mapped to a dedicated `Client
 
 ---
 
+### `adyen.issuing.pspApiKey` — Issuing Payments (Test Issued Cards)
+
+| API | Endpoint | Method | Service | Role required |
+|-----|----------|--------|---------|---------------|
+| **Checkout** | `/v71/sessions` | POST | `IssuingPaymentCheckoutService` | Checkout API |
+| **Recurring** | `/listRecurringDetails` | POST | `IssuingPaymentCheckoutService` | Recurring API |
+| **Recurring** | `/disable` | POST | `IssuingPaymentCheckoutService` | Recurring API |
+| **Payments** | `/v71/payments` | POST | `IssuingPaymentCheckoutService` | Checkout API |
+
+> This key is used exclusively for the **Test Issued Cards** page, which allows testing payments with Adyen-issued Visa & Mastercard cards.
+> The associated configuration also includes `adyen.issuing.merchantAccount`, `adyen.issuing.clientKey`, and `adyen.issuing.userId`.
+>
+> **Roles to enable in Customer Area** (Settings > Users > API credentials > Roles):
+>
+> | Customer Area role name | Used for |
+> |---|---|
+> | `Checkout webservice role` | Create payment sessions for issuing checkout |
+> | `Recurring role` | List & disable stored payment methods |
+
+---
+
 ## Project Structure
 
 ```
 myplatform-demo/
 ├── backend/
 │   └── src/main/java/com/myplatform/demo/
-│       ├── controller/          14 REST controllers
-│       ├── service/             16 services (Adyen API + business logic)
+│       ├── controller/          21 REST controllers
+│       ├── service/             22 services (Adyen API + business logic)
 │       ├── model/               JPA entities
 │       ├── dto/                 Data Transfer Objects
 │       ├── repository/          Spring Data repositories
@@ -196,6 +218,7 @@ myplatform-demo/
 │       ├── card-create          Virtual card issuance
 │       ├── card-list            Card management & data reveal
 │       ├── card-transactions    Card transaction history
+│       ├── issuing-checkout     Test Issued Cards (Visa/MC only)
 │       ├── store                Store & payment method setup
 │       ├── payout               Payout configuration
 │       ├── report               Reports (Platform Experience)
@@ -245,6 +268,10 @@ Edit `backend/src/main/resources/application.properties`:
 | `adyen.issuing.country` | Issuing country (e.g. `FR`) |
 | `adyen.issuing.visa.subvariant` | Visa brand variant |
 | `adyen.issuing.mastercard.subvariant` | Mastercard brand variant |
+| `adyen.issuing.pspApiKey` | PSP API key for issuing card payments |
+| `adyen.issuing.merchantAccount` | Merchant account for issuing payments |
+| `adyen.issuing.clientKey` | Client key for issuing checkout frontend |
+| `adyen.issuing.userId` | Platform userId used for issuing payment context |
 
 ### 3. Start the backend
 
