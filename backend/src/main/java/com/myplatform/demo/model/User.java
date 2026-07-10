@@ -47,6 +47,9 @@ public class User {
     private String bankAccountId;
     private String bankAccountNumber;
 
+    @Column(columnDefinition = "integer default 100")
+    private Integer approvalPercentage = 100;
+
     @Transient
     private List<Activity> businessActivities;
 

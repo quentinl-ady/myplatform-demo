@@ -181,6 +181,29 @@ public class IssuingController {
         return ResponseEntity.ok(cardTransferService.getCardTransfers(user.getAccountHolderId(), paymentInstrumentId));
     }
 
+    @GetMapping("/relayed-auth/{userId}")
+    public ResponseEntity<Map<String, Object>> getRelayedAuthConfig(@PathVariable String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        int pct = user.getApprovalPercentage() != null ? user.getApprovalPercentage() : 100;
+        return ResponseEntity.ok(Map.of("approvalPercentage", pct));
+    }
+
+    @PutMapping("/relayed-auth/{userId}")
+    public ResponseEntity<Map<String, Object>> updateRelayedAuthConfig(
+            @PathVariable String userId,
+            @RequestBody Map<String, Integer> request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Integer pct = request.get("approvalPercentage");
+        if (pct == null || pct < 0 || pct > 100) {
+            throw new BadRequestException("approvalPercentage must be between 0 and 100");
+        }
+        user.setApprovalPercentage(pct);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("approvalPercentage", pct));
+    }
+
     @GetMapping("/phone-prefixes")
     public ResponseEntity<List<PhonePrefix>> getPhonePrefixes() {
         List<PhonePrefix> prefixes = List.of(

@@ -106,6 +106,11 @@ const routeConfig: Routes = [
         title: 'Test Issued Cards'
       },
       {
+        path: 'relayed-auth',
+        loadComponent: () => import('./relayed-auth/relayed-auth.component').then(m => m.RelayedAuthComponent),
+        title: 'Relayed Authorisation'
+      },
+      {
         path: 'notifications',
         loadComponent: () => import('./webhooks/webhooks.component').then(m => m.WebhooksComponent),
         title: 'Notifications'

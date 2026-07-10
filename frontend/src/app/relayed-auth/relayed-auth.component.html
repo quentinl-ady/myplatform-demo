@@ -1,0 +1,88 @@
+<div class="fintech-wrapper">
+
+  <div class="page-header">
+    <div>
+      <h1>Relayed Authorisation</h1>
+      <p class="subtitle">Configure the approval probability for card transactions processed via relayed authorisation.</p>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="isLoading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading configuration…</p>
+  </div>
+
+  <!-- Config Card -->
+  <div class="config-card" *ngIf="!isLoading">
+
+    <!-- Visual Gauge -->
+    <div class="gauge-section">
+      <div class="gauge-ring" [style.--pct]="approvalPercentage">
+        <div class="gauge-inner">
+          <span class="gauge-value">{{ approvalPercentage }}%</span>
+          <span class="gauge-label" [style.color]="getStatusColor()">{{ getStatusLabel() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slider -->
+    <div class="slider-section">
+      <label class="slider-label">Approval probability</label>
+      <mat-slider min="0" max="100" step="5" showTickMarks discrete class="full-slider">
+        <input matSliderThumb [(ngModel)]="approvalPercentage" />
+      </mat-slider>
+      <div class="slider-hints">
+        <span>0% — Refuse all</span>
+        <span>100% — Approve all</span>
+      </div>
+    </div>
+
+    <!-- Quick Presets -->
+    <div class="presets-section">
+      <span class="presets-label">Quick presets</span>
+      <div class="presets-row">
+        <button mat-stroked-button class="preset-btn" [class.active]="approvalPercentage === 0" (click)="approvalPercentage = 0">0%</button>
+        <button mat-stroked-button class="preset-btn" [class.active]="approvalPercentage === 25" (click)="approvalPercentage = 25">25%</button>
+        <button mat-stroked-button class="preset-btn" [class.active]="approvalPercentage === 50" (click)="approvalPercentage = 50">50%</button>
+        <button mat-stroked-button class="preset-btn" [class.active]="approvalPercentage === 75" (click)="approvalPercentage = 75">75%</button>
+        <button mat-stroked-button class="preset-btn" [class.active]="approvalPercentage === 100" (click)="approvalPercentage = 100">100%</button>
+      </div>
+    </div>
+
+    <!-- Save Button -->
+    <div class="save-section">
+      <button mat-flat-button class="fintech-btn primary" (click)="save()" [disabled]="!hasChanges || isSaving">
+        <mat-spinner *ngIf="isSaving" diameter="18"></mat-spinner>
+        <mat-icon *ngIf="!isSaving">save</mat-icon>
+        {{ isSaving ? 'Saving…' : 'Save configuration' }}
+      </button>
+    </div>
+
+  </div>
+
+  <!-- Webhook Info -->
+  <div class="info-card" *ngIf="!isLoading">
+    <div class="info-header">
+      <mat-icon>webhook</mat-icon>
+      <h3>Webhook endpoint</h3>
+    </div>
+    <p class="info-text">Configure this URL in your Adyen Customer Area under <strong>Financial products → Relayed authorisation</strong>.</p>
+    <div class="url-row">
+      <code class="url-value">{{ webhookUrl }}</code>
+      <button mat-icon-button (click)="copyWebhookUrl()" matTooltip="Copy URL">
+        <mat-icon>content_copy</mat-icon>
+      </button>
+    </div>
+
+    <div class="info-steps">
+      <h4>How it works</h4>
+      <ol>
+        <li>Adyen sends a relayed authorisation webhook when a card payment is attempted.</li>
+        <li>This server randomly approves or refuses the transaction based on the configured percentage.</li>
+        <li>The response (<code>Authorised</code> or <code>Refused</code>) is sent back to Adyen within the 2-second deadline.</li>
+      </ol>
+    </div>
+  </div>
+
+</div>

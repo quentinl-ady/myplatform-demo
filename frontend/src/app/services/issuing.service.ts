@@ -64,6 +64,14 @@ export class IssuingService {
     return this.http.post<{ encryptedData: string }>(`${this.baseUrl}/api/issuing/reveal`, {paymentInstrumentId, encryptedKey});
   }
 
+  getRelayedAuthConfig(userId: string): Observable<{ approvalPercentage: number }> {
+    return this.http.get<{ approvalPercentage: number }>(`${this.baseUrl}/api/issuing/relayed-auth/${userId}`);
+  }
+
+  updateRelayedAuthConfig(userId: string, approvalPercentage: number): Observable<{ approvalPercentage: number }> {
+    return this.http.put<{ approvalPercentage: number }>(`${this.baseUrl}/api/issuing/relayed-auth/${userId}`, { approvalPercentage });
+  }
+
   getCardTransfers(userId: string, paymentInstrumentId?: string): Observable<CardTransfer[]> {
     let params = `?userId=${userId}`;
     if (paymentInstrumentId) {
