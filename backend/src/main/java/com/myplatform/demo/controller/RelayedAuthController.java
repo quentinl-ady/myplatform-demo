@@ -95,21 +95,25 @@ public class RelayedAuthController {
             long elapsed = System.currentTimeMillis() - startTime;
             log.info("[RelayedAuth] DECISION: status={}, approvalPercentage={}, roll={}, userId={}, elapsed={}ms",
                     status, approvalPercentage, roll, user != null ? user.getId() : "unknown", elapsed);
+
+            Map<String, Object> responseBody = new java.util.LinkedHashMap<>();
+            responseBody.put("authorisationDecision", Map.of("status", status));
+            responseBody.put("metadata", Map.of(
+                    "approvalPercentage", String.valueOf(approvalPercentage),
+                    "source", "myplatform-demo"
+            ));
+
+            String responseJson = objectMapper.writeValueAsString(responseBody);
+            log.info("[RelayedAuth] RESPONSE BODY: {}", responseJson);
             log.info("========== RELAYED AUTH RESPONSE: {} ==========", status);
 
-            return ResponseEntity.ok(Map.of(
-                    "status", status,
-                    "metadata", Map.of(
-                            "approvalPercentage", String.valueOf(approvalPercentage),
-                            "source", "myplatform-demo"
-                    )
-            ));
+            return ResponseEntity.ok(responseBody);
 
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startTime;
             log.error("[RelayedAuth] ERROR after {}ms: {} — falling back to Authorised", elapsed, e.getMessage(), e);
             log.error("[RelayedAuth] Raw payload that caused error: {}", rawJson);
-            return ResponseEntity.ok(Map.of("status", "Authorised"));
+            return ResponseEntity.ok(Map.of("authorisationDecision", Map.of("status", "Authorised")));
         }
     }
 
