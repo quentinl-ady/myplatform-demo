@@ -5,6 +5,7 @@ import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
 import com.myplatform.demo.model.KycStatus;
 import com.myplatform.demo.model.User;
+import com.myplatform.demo.repository.UserBrandingRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.KYCService;
 import com.myplatform.demo.service.LegalEntityService;
@@ -20,19 +21,23 @@ public class OnboardingController {
     private final UserRepository userRepository;
     private final LegalEntityService legalEntityService;
     private final KYCService kycService;
+    private final UserBrandingRepository brandingRepository;
 
     public OnboardingController(UserRepository userRepository,
                                 LegalEntityService legalEntityService,
-                                KYCService kycService) {
+                                KYCService kycService,
+                                UserBrandingRepository brandingRepository) {
         this.userRepository = userRepository;
         this.legalEntityService = legalEntityService;
         this.kycService = kycService;
+        this.brandingRepository = brandingRepository;
     }
 
     @GetMapping("/{userId}/link")
     public ResponseEntity<?> getOnboardingLink(@PathVariable String userId) throws Exception {
         User user = findUserWithLegalEntity(userId);
-        String url = legalEntityService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId, user.getActivityReason());
+        String themeId = brandingRepository.findById(userId).map(b -> b.getThemeId()).orElse(null);
+        String url = legalEntityService.createHOP(user.getLegalEntityId(), user.getCountryCode(), userId, user.getActivityReason(), themeId);
         return ResponseEntity.ok().body("{\"url\": \"" + url + "\"}");
     }
 

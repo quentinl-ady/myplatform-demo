@@ -23,4 +23,7 @@ public class UserBranding {
 
     @Column(length = 20)
     private String logoType;
+
+    @Column(length = 100)
+    private String themeId;
 }

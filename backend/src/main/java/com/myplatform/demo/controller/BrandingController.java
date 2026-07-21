@@ -51,6 +51,9 @@ public class BrandingController {
         if (body.containsKey("logoType")) {
             branding.setLogoType(body.get("logoType"));
         }
+        if (body.containsKey("themeId")) {
+            branding.setThemeId(body.get("themeId"));
+        }
 
         brandingRepository.save(branding);
         return ResponseEntity.ok(branding);

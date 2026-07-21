@@ -16,7 +16,7 @@ export class BrandingService {
     );
   }
 
-  updateBranding(userId: string, data: { platformName?: string; logoData?: string; logoType?: string }): Observable<UserBranding> {
+  updateBranding(userId: string, data: { platformName?: string; logoData?: string; logoType?: string; themeId?: string }): Observable<UserBranding> {
     return this.http.put<UserBranding>(`${this.baseUrl}/api/users/${userId}/branding`, data);
   }
 

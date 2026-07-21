@@ -101,7 +101,7 @@ public class LegalEntityService {
         }
     }
 
-    public String createHOP(String legalEntityId, String countryCode, String userId, String activityReason) throws IOException, ApiException {
+    public String createHOP(String legalEntityId, String countryCode, String userId, String activityReason, String themeId) throws IOException, ApiException {
         String languageCode = LANGUAGE_MAP.getOrDefault(countryCode.toUpperCase(), "en-US");
 
         OnboardingLinkSettings onboardingLinkSettings = new OnboardingLinkSettings();
@@ -115,6 +115,10 @@ public class LegalEntityService {
                 .locale(languageCode)
                 .settings(onboardingLinkSettings)
                 .redirectUrl(frontendUrl + "/" + userId + "/dashboard");
+
+        if (themeId != null && !themeId.isBlank()) {
+            onboardingLinkInfo.setThemeId(themeId);
+        }
 
         OnboardingLink link = hop.getLinkToAdyenhostedOnboardingPage(legalEntityId, onboardingLinkInfo);
         return link.getUrl();

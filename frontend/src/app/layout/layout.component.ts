@@ -28,6 +28,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   user: User | null = null;
   customLogoSrc: string | null = null;
   customPlatformName: string | null = null;
+  customThemeId: string | null = null;
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
@@ -121,9 +122,11 @@ export class LayoutComponent implements OnInit, OnDestroy {
       if (branding) {
         this.customPlatformName = branding.platformName || null;
         this.customLogoSrc = branding.logoData || null;
+        this.customThemeId = branding.themeId || null;
       } else {
         this.customPlatformName = null;
         this.customLogoSrc = null;
+        this.customThemeId = null;
       }
       this.cdr.detectChanges();
     });
@@ -133,7 +136,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
     const ref = this.dialog.open(BrandingDialogComponent, {
       data: {
         platformName: this.customPlatformName || 'My Platform',
-        logoPreview: this.customLogoSrc
+        logoPreview: this.customLogoSrc,
+        themeId: this.customThemeId
       }
     });
     ref.afterClosed().subscribe(result => {
@@ -142,6 +146,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
         this.brandingService.resetBranding(this.userId).subscribe(() => {
           this.customPlatformName = null;
           this.customLogoSrc = null;
+          this.customThemeId = null;
           this.cdr.detectChanges();
         });
       } else if (result.action === 'save') {
@@ -151,9 +156,11 @@ export class LayoutComponent implements OnInit, OnDestroy {
           payload.logoData = result.logoData;
           payload.logoType = result.logoType;
         }
+        payload.themeId = result.themeId || '';
         this.brandingService.updateBranding(this.userId, payload).subscribe(branding => {
           this.customPlatformName = branding.platformName || null;
           this.customLogoSrc = branding.logoData || null;
+          this.customThemeId = branding.themeId || null;
           this.cdr.detectChanges();
         });
       }

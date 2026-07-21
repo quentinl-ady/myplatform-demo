@@ -7,6 +7,7 @@ import { MaterialModule } from '../material.module';
 export interface BrandingDialogData {
   platformName: string;
   logoPreview: string | null;
+  themeId: string | null;
 }
 
 @Component({
@@ -51,6 +52,12 @@ export interface BrandingDialogData {
           </div>
         </div>
       </div>
+
+      <mat-form-field appearance="outline" class="full-width" style="margin-top: 16px;">
+        <mat-label>Hosted Onboarding Theme ID</mat-label>
+        <input matInput [(ngModel)]="themeId" placeholder="e.g. 37a3b051-..." />
+        <mat-hint>Optional. The unique identifier of your hosted onboarding theme.</mat-hint>
+      </mat-form-field>
 
     </mat-dialog-content>
 
@@ -126,12 +133,14 @@ export class BrandingDialogComponent {
   logoUrl: string = '';
   logoData: string | null = null;
   logoType: string | null = null;
+  themeId: string = '';
   errorMsg: string = '';
   loadingUrl: boolean = false;
 
   ngOnInit() {
     this.platformName = this.data.platformName || '';
     this.logoPreview = this.data.logoPreview || null;
+    this.themeId = this.data.themeId || '';
     if (this.logoPreview) {
       this.logoData = this.logoPreview;
     }
@@ -187,7 +196,8 @@ export class BrandingDialogComponent {
       action: 'save',
       platformName: this.platformName,
       logoData: this.logoData,
-      logoType: this.logoType
+      logoType: this.logoType,
+      themeId: this.themeId
     });
   }
 
