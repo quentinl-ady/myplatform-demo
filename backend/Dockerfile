@@ -10,4 +10,5 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/myplatform-backend-1.0.0.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENV TZ=UTC
+ENTRYPOINT ["java", "-Duser.timezone=UTC", "-jar", "app.jar"]

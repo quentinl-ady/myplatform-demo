@@ -12,8 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
@@ -23,13 +21,16 @@ public class PosService {
     private final CloudDeviceApi cloudDeviceApi;
     private final String saleId;
     private final String merchantAccount;
+    private final NetworkTimeService networkTimeService;
 
     public PosService(@Qualifier("pspClient") Client pspClient,
                       @Value("${adyen.saleId:POS_SYSTEM_MYPLATFORM}") String saleId,
-                      @Value("${adyen.merchantAccount}") String merchantAccount) {
+                      @Value("${adyen.merchantAccount}") String merchantAccount,
+                      NetworkTimeService networkTimeService) {
         this.saleId = saleId;
         this.merchantAccount = merchantAccount;
         this.cloudDeviceApi = new CloudDeviceApi(pspClient);
+        this.networkTimeService = networkTimeService;
     }
 
     public CloudDeviceApiResponse initiateSyncPayment(String reference, Long minorUnitAmount, String currency, String terminalId) throws Exception {
@@ -56,7 +57,7 @@ public class PosService {
         SaleData saleData = new SaleData();
         TransactionIDType saleTransactionID = new TransactionIDType()
                 .transactionID(reference)
-                .timeStamp(OffsetDateTime.now(ZoneOffset.UTC));
+                .timeStamp(networkTimeService.nowUtc());
         saleData.setSaleTransactionID(saleTransactionID);
 
         paymentRequest.setSaleData(saleData);
