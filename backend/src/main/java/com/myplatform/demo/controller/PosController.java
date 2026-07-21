@@ -1,7 +1,7 @@
 package com.myplatform.demo.controller;
 
 
-import com.adyen.model.terminal.TerminalAPIResponse;
+import com.adyen.model.clouddevice.CloudDeviceApiResponse;
 import com.myplatform.demo.model.PosPaymentRequest;
 import com.myplatform.demo.model.PosPaymentResponse;
 import com.myplatform.demo.service.PosService;
@@ -21,7 +21,7 @@ public class PosController {
 
     @PostMapping("/api/pos/pay")
     public ResponseEntity<PosPaymentResponse> makePayment(@RequestBody PosPaymentRequest posPaymentRequest) throws Exception {
-        TerminalAPIResponse adyenResponse = posService.initiateSyncPayment(posPaymentRequest.getReference(), posPaymentRequest.getAmount(), posPaymentRequest.getCurrency(), posPaymentRequest.getTerminalId());
+        CloudDeviceApiResponse adyenResponse = posService.initiateSyncPayment(posPaymentRequest.getReference(), posPaymentRequest.getAmount(), posPaymentRequest.getCurrency(), posPaymentRequest.getTerminalId());
         PosPaymentResponse uiResponse = posService.mapTerminalResponse(adyenResponse);
         return ResponseEntity.ok(uiResponse);
     }

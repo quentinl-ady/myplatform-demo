@@ -1,72 +1,70 @@
 package com.myplatform.demo.service;
 
 import com.adyen.Client;
-import com.adyen.model.nexo.*;
-import com.adyen.service.TerminalCloudAPI;
+import com.adyen.model.tapi.*;
+import com.adyen.service.clouddevice.CloudDeviceApi;
+import com.adyen.model.clouddevice.CloudDeviceApiRequest;
+import com.adyen.model.clouddevice.CloudDeviceApiResponse;
 import com.myplatform.demo.model.PosPaymentResponse;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import com.adyen.model.terminal.TerminalAPIRequest;
-import com.adyen.model.terminal.TerminalAPIResponse;
 
-import javax.xml.datatype.DatatypeFactory;
-import javax.xml.datatype.XMLGregorianCalendar;
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.util.GregorianCalendar;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Service
 @Getter
 public class PosService {
 
-    private final TerminalCloudAPI terminalCloudAPI;
+    private final CloudDeviceApi cloudDeviceApi;
     private final String saleId;
+    private final String merchantAccount;
 
     public PosService(@Qualifier("pspClient") Client pspClient,
-                      @Value("${adyen.saleId:POS_SYSTEM_MYPLATFORM}") String saleId) {
+                      @Value("${adyen.saleId:POS_SYSTEM_MYPLATFORM}") String saleId,
+                      @Value("${adyen.merchantAccount}") String merchantAccount) {
         this.saleId = saleId;
-        this.terminalCloudAPI = new TerminalCloudAPI(pspClient);
+        this.merchantAccount = merchantAccount;
+        this.cloudDeviceApi = new CloudDeviceApi(pspClient);
     }
 
-    public TerminalAPIResponse initiateSyncPayment(String reference, Long minorUnitAmount, String currency, String terminalId) throws Exception {
+    public CloudDeviceApiResponse initiateSyncPayment(String reference, Long minorUnitAmount, String currency, String terminalId) throws Exception {
 
         BigDecimal majorUnitAmount = BigDecimal.valueOf(minorUnitAmount).movePointLeft(2);
 
-        TerminalAPIRequest apiRequest = new TerminalAPIRequest();
+        CloudDeviceApiRequest apiRequest = new CloudDeviceApiRequest();
         SaleToPOIRequest saleToPOIRequest = new SaleToPOIRequest();
 
-        MessageHeader messageHeader = new MessageHeader();
-        messageHeader.setProtocolVersion("3.0");
-        messageHeader.setMessageType(MessageType.REQUEST);
-        messageHeader.setMessageClass(MessageClassType.SERVICE);
-        messageHeader.setMessageCategory(MessageCategoryType.PAYMENT);
-        messageHeader.setSaleID(this.saleId);
-        messageHeader.setPOIID(terminalId);
         String serviceId = UUID.randomUUID().toString().replace("-", "").substring(0, 9);
-        messageHeader.setServiceID(serviceId);
+
+        MessageHeader messageHeader = new MessageHeader()
+                .protocolVersion("3.0")
+                .messageType(MessageType.REQUEST)
+                .messageClass(MessageClass.SERVICE)
+                .messageCategory(MessageCategory.PAYMENT)
+                .saleID(this.saleId)
+                .serviceID(serviceId);
 
         saleToPOIRequest.setMessageHeader(messageHeader);
 
         PaymentRequest paymentRequest = new PaymentRequest();
 
         SaleData saleData = new SaleData();
-        TransactionIdentification saleTransactionID = new TransactionIdentification();
-        saleTransactionID.setTransactionID(reference);
-        GregorianCalendar gregorianCalendar = GregorianCalendar.from(ZonedDateTime.now());
-        XMLGregorianCalendar timeStamp = DatatypeFactory.newInstance().newXMLGregorianCalendar(gregorianCalendar);
-        saleTransactionID.setTimeStamp(timeStamp);
+        TransactionIDType saleTransactionID = new TransactionIDType()
+                .transactionID(reference)
+                .timeStamp(OffsetDateTime.now(ZoneOffset.UTC));
         saleData.setSaleTransactionID(saleTransactionID);
 
         paymentRequest.setSaleData(saleData);
 
         PaymentTransaction paymentTransaction = new PaymentTransaction();
-        AmountsReq amountsReq = new AmountsReq();
-        amountsReq.setCurrency(currency);
-        amountsReq.setRequestedAmount(majorUnitAmount);
+        AmountsReq amountsReq = new AmountsReq()
+                .currency(currency)
+                .requestedAmount(majorUnitAmount);
 
         paymentTransaction.setAmountsReq(amountsReq);
         paymentRequest.setPaymentTransaction(paymentTransaction);
@@ -74,28 +72,28 @@ public class PosService {
         saleToPOIRequest.setPaymentRequest(paymentRequest);
         apiRequest.setSaleToPOIRequest(saleToPOIRequest);
 
-        return this.terminalCloudAPI.sync(apiRequest);
+        return this.cloudDeviceApi.sync(this.merchantAccount, terminalId, apiRequest);
     }
 
-    public PosPaymentResponse mapTerminalResponse(TerminalAPIResponse terminalApiResponse) {
+    public PosPaymentResponse mapTerminalResponse(CloudDeviceApiResponse cloudDeviceApiResponse) {
         PosPaymentResponse response = new PosPaymentResponse();
 
-        if (terminalApiResponse == null || terminalApiResponse.getSaleToPOIResponse() == null) {
+        if (cloudDeviceApiResponse == null || cloudDeviceApiResponse.getSaleToPOIResponse() == null) {
             response.setStatus("ERROR");
             response.setRefusalReason("Empty or invalid response from terminal");
             return response;
         }
 
-        PaymentResponse paymentResponse = terminalApiResponse.getSaleToPOIResponse().getPaymentResponse();
+        PaymentResponse paymentResponse = cloudDeviceApiResponse.getSaleToPOIResponse().getPaymentResponse();
 
         if (paymentResponse != null && paymentResponse.getResponse() != null) {
-            ResultType result = paymentResponse.getResponse().getResult();
+            Result result = paymentResponse.getResponse().getResult();
 
-            if (result == ResultType.SUCCESS) {
+            if (result == Result.SUCCESS) {
                 response.setStatus("SUCCESS");
 
-                if (paymentResponse.getPOIData() != null && paymentResponse.getPOIData().getPOITransactionID() != null) {
-                    String fullTransactionId = paymentResponse.getPOIData().getPOITransactionID().getTransactionID();
+                if (paymentResponse.getPoiData() != null && paymentResponse.getPoiData().getPoITransactionID() != null) {
+                    String fullTransactionId = paymentResponse.getPoiData().getPoITransactionID().getTransactionID();
 
                     if (fullTransactionId != null && fullTransactionId.contains(".")) {
                         response.setPspReference(fullTransactionId.substring(fullTransactionId.indexOf('.') + 1));
@@ -110,13 +108,13 @@ public class PosService {
 
                 if (paymentResponse.getPaymentResult() != null && paymentResponse.getPaymentResult().getPaymentInstrumentData() != null) {
                     response.setCardBrand(paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData().getPaymentBrand());
-                    response.setMaskedPan(paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData().getMaskedPAN());
+                    response.setMaskedPan(paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData().getMaskedPan());
                 }
             } else {
                 response.setStatus("FAILURE");
 
                 if (paymentResponse.getResponse().getErrorCondition() != null) {
-                    response.setErrorCondition(paymentResponse.getResponse().getErrorCondition().value());
+                    response.setErrorCondition(paymentResponse.getResponse().getErrorCondition().getValue());
                 }
                 response.setRefusalReason(paymentResponse.getResponse().getAdditionalResponse());
             }
