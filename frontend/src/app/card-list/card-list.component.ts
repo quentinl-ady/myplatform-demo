@@ -285,8 +285,10 @@ export class CardListComponent implements OnInit {
 
   copyCardNumber(card: CardResponse) {
     if (this.revealedData?.pan) {
-      navigator.clipboard.writeText(this.revealedData.pan);
-      this.snack.open('Card number copied', 'Close', { duration: 2000 });
+      const expiry = `${this.revealedData.expiryMonth}/${this.revealedData.expiryYear?.toString().slice(-2)}`;
+      const text = `${this.revealedData.pan}\t${expiry}\t${this.revealedData.cvc}\t${card.cardholderName}`;
+      navigator.clipboard.writeText(text);
+      this.snack.open('Card details copied', 'Close', { duration: 2000 });
     }
   }
 
