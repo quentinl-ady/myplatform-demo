@@ -81,6 +81,10 @@ public class BankingProvisioningService {
             info.issuingCountryCode(countryCode);
             info.bankAccount(new BankAccountModel().formFactor(BankAccountModel.FormFactorEnum.PHYSICAL));
             return paymentInstrumentsApi.createPaymentInstrument(info).getId();
+        } else if (List.of("DE").contains(countryCode)) {
+            info.issuingCountryCode("NL");
+            info.bankAccount(new BankAccountModel().formFactor(BankAccountModel.FormFactorEnum.PHYSICAL));
+            return paymentInstrumentsApi.createPaymentInstrument(info).getId();
         }
 
         throw new IllegalArgumentException("Unsupported country code for bank account: " + countryCode);

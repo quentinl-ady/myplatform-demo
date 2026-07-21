@@ -124,7 +124,7 @@ public class AccountController {
 
         if ("US".equals(user.getCountryCode())) {
             user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getRoutingNumber());
-        } else if ("FR".equals(user.getCountryCode()) || "NL".equals(user.getCountryCode())) {
+        } else if (List.of("FR", "NL", "DE").contains(user.getCountryCode())) {
             user.setBankAccountNumber(paymentInstrument.getBankAccount().getIban());
         } else if ("UK".equals(user.getCountryCode()) || "GB".equals(user.getCountryCode())) {
             user.setBankAccountNumber(paymentInstrument.getBankAccount().getAccountNumber() + " " + paymentInstrument.getBankAccount().getSortCode());
