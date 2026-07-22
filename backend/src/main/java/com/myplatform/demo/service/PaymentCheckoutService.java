@@ -248,6 +248,7 @@ public class PaymentCheckoutService {
         if ("sepadirectdebit".equals(type)) {
             SepaDirectDebitDetails sepaDetails = new SepaDirectDebitDetails();
             sepaDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+            sepaDetails.setType(SepaDirectDebitDetails.TypeEnum.SEPADIRECTDEBIT);
             checkoutPaymentMethod = new CheckoutPaymentMethod(sepaDetails);
         } else {
             CardDetails cardDetails = new CardDetails();
