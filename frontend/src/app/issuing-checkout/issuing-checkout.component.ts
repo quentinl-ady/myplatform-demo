@@ -292,7 +292,8 @@ export class IssuingCheckoutComponent implements OnInit {
         : '',
       userId: this.issuingUserId,
       reference: this.tokenPaymentForm.get('reference')?.value,
-      storedPaymentMethodId: this.selectedStoredMethod.recurringDetailReference
+      storedPaymentMethodId: this.selectedStoredMethod.recurringDetailReference,
+      type: this.selectedStoredMethod.type
     };
 
     this.submittingTokenPayment.set(true);

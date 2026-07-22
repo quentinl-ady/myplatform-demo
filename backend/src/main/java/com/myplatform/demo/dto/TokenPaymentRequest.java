@@ -12,4 +12,5 @@ public class TokenPaymentRequest {
     private String userId;
     private String reference;
     private String storedPaymentMethodId;
+    private String type;
 }

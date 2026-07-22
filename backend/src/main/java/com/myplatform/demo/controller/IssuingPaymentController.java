@@ -153,7 +153,8 @@ public class IssuingPaymentController {
                 tokenPaymentRequest.getStoreReference(),
                 user.getActivityReason(),
                 user.getBalanceAccountId(),
-                tokenPaymentRequest.getStoredPaymentMethodId());
+                tokenPaymentRequest.getStoredPaymentMethodId(),
+                tokenPaymentRequest.getType());
 
         return ResponseEntity.ok(response);
     }

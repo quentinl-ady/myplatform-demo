@@ -222,6 +222,7 @@ public class IssuingPaymentCheckoutService {
             RecurringDetail detail = wrapper.getRecurringDetail();
             StoredPaymentMethodDTO dto = new StoredPaymentMethodDTO();
             dto.setRecurringDetailReference(detail.getRecurringDetailReference());
+            dto.setType(detail.getVariant());
             dto.setCardBrand(detail.getVariant());
 
             if (detail.getCard() != null) {
@@ -241,13 +242,22 @@ public class IssuingPaymentCheckoutService {
 
     public TokenPaymentResponse makeTokenPayment(String currencyCode, Long amount, String reference,
                                                   String storeRef, String activityReason,
-                                                  String balanceAccountId, String storedPaymentMethodId)
+                                                  String balanceAccountId, String storedPaymentMethodId,
+                                                  String type)
             throws IOException, ApiException {
 
         String shopperReference = "issuing_test@adyen.com_" + storeRef;
 
-        CardDetails cardDetails = new CardDetails();
-        cardDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+        CheckoutPaymentMethod checkoutPaymentMethod;
+        if ("sepadirectdebit".equals(type)) {
+            SepaDirectDebitDetails sepaDetails = new SepaDirectDebitDetails();
+            sepaDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+            checkoutPaymentMethod = new CheckoutPaymentMethod(sepaDetails);
+        } else {
+            CardDetails cardDetails = new CardDetails();
+            cardDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+            checkoutPaymentMethod = new CheckoutPaymentMethod(cardDetails);
+        }
 
         PaymentRequest paymentRequest = new PaymentRequest();
         paymentRequest.setAmount(new Amount().currency(currencyCode).value(amount));
@@ -256,7 +266,7 @@ public class IssuingPaymentCheckoutService {
         paymentRequest.setShopperReference(shopperReference);
         paymentRequest.setShopperInteraction(PaymentRequest.ShopperInteractionEnum.CONTAUTH);
         paymentRequest.setRecurringProcessingModel(PaymentRequest.RecurringProcessingModelEnum.UNSCHEDULEDCARDONFILE);
-        paymentRequest.setPaymentMethod(new CheckoutPaymentMethod(cardDetails));
+        paymentRequest.setPaymentMethod(checkoutPaymentMethod);
         paymentRequest.setShopperEmail("issuing_test@adyen.com");
 
         if ("embeddedPayment".equals(activityReason)) {

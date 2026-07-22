@@ -7,6 +7,7 @@ import lombok.Setter;
 @Setter
 public class StoredPaymentMethodDTO {
     private String recurringDetailReference;
+    private String type;
     private String cardBrand;
     private String cardSummary;
     private String expiryMonth;

@@ -218,6 +218,7 @@ public class PaymentCheckoutService {
             RecurringDetail detail = wrapper.getRecurringDetail();
             StoredPaymentMethodDTO dto = new StoredPaymentMethodDTO();
             dto.setRecurringDetailReference(detail.getRecurringDetailReference());
+            dto.setType(detail.getVariant());
             dto.setCardBrand(detail.getVariant());
 
             if (detail.getCard() != null) {
@@ -237,13 +238,22 @@ public class PaymentCheckoutService {
 
     public TokenPaymentResponse makeTokenPayment(String currencyCode, Long amount, String reference,
                                                   String storeRef, String activityReason,
-                                                  String balanceAccountId, String storedPaymentMethodId)
+                                                  String balanceAccountId, String storedPaymentMethodId,
+                                                  String type)
             throws IOException, ApiException {
 
         String shopperReference = "john.doe@gmail.com_" + storeRef;
 
-        CardDetails cardDetails = new CardDetails();
-        cardDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+        CheckoutPaymentMethod checkoutPaymentMethod;
+        if ("sepadirectdebit".equals(type)) {
+            SepaDirectDebitDetails sepaDetails = new SepaDirectDebitDetails();
+            sepaDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+            checkoutPaymentMethod = new CheckoutPaymentMethod(sepaDetails);
+        } else {
+            CardDetails cardDetails = new CardDetails();
+            cardDetails.setStoredPaymentMethodId(storedPaymentMethodId);
+            checkoutPaymentMethod = new CheckoutPaymentMethod(cardDetails);
+        }
 
         PaymentRequest paymentRequest = new PaymentRequest();
         paymentRequest.setAmount(new Amount().currency(currencyCode).value(amount));
@@ -252,7 +262,7 @@ public class PaymentCheckoutService {
         paymentRequest.setShopperReference(shopperReference);
         paymentRequest.setShopperInteraction(PaymentRequest.ShopperInteractionEnum.CONTAUTH);
         paymentRequest.setRecurringProcessingModel(PaymentRequest.RecurringProcessingModelEnum.UNSCHEDULEDCARDONFILE);
-        paymentRequest.setPaymentMethod(new CheckoutPaymentMethod(cardDetails));
+        paymentRequest.setPaymentMethod(checkoutPaymentMethod);
         paymentRequest.setShopperEmail("john.doe@gmail.com");
 
         if ("embeddedPayment".equals(activityReason)) {

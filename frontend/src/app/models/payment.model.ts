@@ -32,6 +32,7 @@ export interface PosPaymentResponse {
 
 export interface StoredPaymentMethod {
   recurringDetailReference: string;
+  type: string;
   cardBrand: string;
   cardSummary: string;
   expiryMonth: string;
@@ -46,6 +47,7 @@ export interface TokenPaymentPayload {
   userId: string;
   reference: string;
   storedPaymentMethodId: string;
+  type: string;
 }
 
 export interface TokenPaymentResponse {
