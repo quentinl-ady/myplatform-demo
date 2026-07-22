@@ -182,7 +182,8 @@ public class StoreManagementService {
 
         Set<String> specificPM = Set.of(
                 "cartebancaire", "amex", "googlepay",
-                "klarna_b2b", "affirm", "accel", "nyce", "paybybank", "paybybank_plaid"
+                "klarna_b2b", "affirm", "accel", "nyce", "paybybank", "paybybank_plaid",
+                "sepadirectdebit"
         );
 
         for (String blId : businessLineIds) {
@@ -290,6 +291,19 @@ public class StoreManagementService {
                 info.setType(PaymentMethodSetupInfo.TypeEnum.PAYBYBANK_PLAID);
                 info.setCurrencies(new ArrayList<>(List.of("USD")));
                 info.setCountries(new ArrayList<>(List.of("US")));
+                paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
+            }
+        }
+
+        if (paymentMethodRequest.contains("sepadirectdebit")) {
+            for (String blId : businessLineIds) {
+                PaymentMethodSetupInfo info = new PaymentMethodSetupInfo();
+                info.setBusinessLineId(blId);
+                info.setStoreIds(Collections.singletonList(storeId));
+                info.setType(PaymentMethodSetupInfo.TypeEnum.SEPADIRECTDEBIT);
+                info.setCurrencies(new ArrayList<>(List.of("EUR")));
+                info.setCountries(new ArrayList<>(List.of(country)));
+                info.setSepadirectdebit(new SepaDirectDebitInfo().creditorId("NL48ZZZ342764500000"));
                 paymentMethodsMerchantLevelApi.requestPaymentMethod(merchantAccount, info);
             }
         }

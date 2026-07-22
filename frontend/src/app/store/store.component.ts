@@ -26,7 +26,8 @@ const COUNTRY_PAYMENT_METHODS: Record<string, PaymentMethodDef[]> = {
   FR: [
     { key: 'cartebancaire', label: 'Cartes Bancaires' },
     { key: 'klarna_b2b', label: 'Billie' },
-    { key: 'paybybank', label: 'Pay by Bank EU' }
+    { key: 'paybybank', label: 'Pay by Bank EU' },
+    { key: 'sepadirectdebit', label: 'SEPA Direct Debit' }
   ],
   GB: [
     { key: 'paybybank', label: 'Pay by Bank EU' },
@@ -41,11 +42,13 @@ const COUNTRY_PAYMENT_METHODS: Record<string, PaymentMethodDef[]> = {
   DE: [
     { key: 'girocard', label: 'Girocard' },
     { key: 'paybybank', label: 'Pay by Bank EU' },
-    { key: 'klarna_b2b', label: 'Billie' }
+    { key: 'klarna_b2b', label: 'Billie' },
+    { key: 'sepadirectdebit', label: 'SEPA Direct Debit' }
   ],
   NL: [
     { key: 'ideal', label: 'iDEAL' },
-    { key: 'klarna_b2b', label: 'Billie' }
+    { key: 'klarna_b2b', label: 'Billie' },
+    { key: 'sepadirectdebit', label: 'SEPA Direct Debit' }
   ]
 };
 
