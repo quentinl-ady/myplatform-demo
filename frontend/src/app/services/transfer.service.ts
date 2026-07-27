@@ -57,8 +57,12 @@ export class TransferService {
     return this.http.get<Device[]>(`${this.baseUrl}/api/transfers/${userId}/devices`);
   }
 
-  initiateDeviceRegistration(sdkOutput: string, userId: string, deviceName: string): Observable<RegisterSCAResponse> {
-    return this.http.post<RegisterSCAResponse>(`${this.baseUrl}/api/transfers/devices/register`, {sdkOutput, userId, deviceName});
+  requestOtp(userId: string): Observable<{ otp: string; maskedEmail: string }> {
+    return this.http.post<{ otp: string; maskedEmail: string }>(`${this.baseUrl}/api/transfers/devices/otp`, { userId });
+  }
+
+  initiateDeviceRegistration(sdkOutput: string, userId: string, deviceName: string, otpCode: string): Observable<RegisterSCAResponse> {
+    return this.http.post<RegisterSCAResponse>(`${this.baseUrl}/api/transfers/devices/register`, {sdkOutput, userId, deviceName, otpCode});
   }
 
   finalizeRegistration(id: string, sdkOutput: string, userId: string): Observable<RegisterSCAFinalResponse> {

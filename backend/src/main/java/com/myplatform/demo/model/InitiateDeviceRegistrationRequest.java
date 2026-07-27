@@ -9,4 +9,5 @@ public class InitiateDeviceRegistrationRequest {
     private String sdkOutput;
     private String userId;
     private String deviceName;
+    private String otpCode;
 }

@@ -10,6 +10,7 @@ import com.myplatform.demo.model.*;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.BalanceAccountService;
 import com.myplatform.demo.service.BankTransferService;
+import com.myplatform.demo.service.OtpService;
 import com.myplatform.demo.service.TransferService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -29,15 +30,18 @@ public class TransferController {
     private final TransferService transferService;
     private final BankTransferService bankTransferService;
     private final BalanceAccountService balanceAccountService;
+    private final OtpService otpService;
 
     public TransferController(UserRepository userRepository,
                               TransferService transferService,
                               BankTransferService bankTransferService,
-                              BalanceAccountService balanceAccountService) {
+                              BalanceAccountService balanceAccountService,
+                              OtpService otpService) {
         this.userRepository = userRepository;
         this.transferService = transferService;
         this.bankTransferService = bankTransferService;
         this.balanceAccountService = balanceAccountService;
+        this.otpService = otpService;
     }
 
     @GetMapping("/{userId}/devices")
@@ -46,9 +50,24 @@ public class TransferController {
         return ResponseEntity.ok(transferService.getListDevices(resolvePhysicalPi(user)));
     }
 
+    @PostMapping("/devices/otp")
+    public ResponseEntity<Map<String, String>> requestOtp(@RequestBody Map<String, String> payload) {
+        String userId = payload.get("userId");
+        User user = findUser(userId);
+        String code = otpService.generateOtp(userId);
+        String email = user.getEmail();
+        String maskedEmail = maskEmail(email);
+        return ResponseEntity.ok(Map.of("otp", code, "maskedEmail", maskedEmail));
+    }
+
     @PostMapping("/devices/register")
-    public ResponseEntity<RegisterSCAResponse> initiateDeviceRegistration(@RequestBody InitiateDeviceRegistrationRequest request) throws Exception {
+    public ResponseEntity<?> initiateDeviceRegistration(@RequestBody InitiateDeviceRegistrationRequest request) throws Exception {
         User user = findUser(request.getUserId());
+
+        if (request.getOtpCode() == null || !otpService.verifyOtp(request.getUserId(), request.getOtpCode())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Invalid or expired OTP code"));
+        }
+
         return ResponseEntity.ok(transferService.registerDevice(request.getSdkOutput(), resolvePhysicalPi(user), request.getDeviceName()));
     }
 
@@ -162,5 +181,13 @@ public class TransferController {
         ApiLogContext.setUserId(userId);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return "***";
+        String[] parts = email.split("@");
+        String local = parts[0];
+        String masked = local.length() <= 2 ? local.charAt(0) + "***" : local.substring(0, 2) + "***";
+        return masked + "@" + parts[1];
     }
 }

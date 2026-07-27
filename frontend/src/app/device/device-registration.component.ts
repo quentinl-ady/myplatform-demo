@@ -40,14 +40,41 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
         <h3>Add this device</h3>
         <p>Register the device you are currently using to enable SCA.</p>
       </div>
-      <div class="action-form">
+
+      <!-- Step 1: Device name + Request OTP -->
+      <div class="action-form" *ngIf="step === 'name'">
         <div class="name-input-group">
           <label>Device name</label>
           <input type="text" class="device-name-input" [(ngModel)]="deviceName" placeholder="e.g. MacBook Pro, iPhone 15..." />
         </div>
-        <button mat-flat-button class="fintech-btn primary" (click)="registerDevice()" [disabled]="loading() || !deviceName.trim()">
-          <span *ngIf="!loading()">Register</span>
+        <button mat-flat-button class="fintech-btn primary" (click)="requestOtp()" [disabled]="loading() || !deviceName.trim()">
+          <span *ngIf="!loading()">Continue</span>
           <mat-spinner *ngIf="loading()" diameter="20" color="accent"></mat-spinner>
+        </button>
+      </div>
+
+      <!-- Step 2: OTP verification -->
+      <div class="otp-section" *ngIf="step === 'otp'">
+        <div class="otp-banner">
+          <mat-icon class="otp-icon">mail_outline</mat-icon>
+          <div class="otp-banner-text">
+            <span class="otp-label">Verification code sent to <strong>{{ maskedEmail }}</strong></span>
+            <span class="otp-code-display">Code: <strong>{{ otpCode }}</strong></span>
+          </div>
+        </div>
+        <div class="action-form">
+          <div class="name-input-group">
+            <label>Enter the 6-digit code</label>
+            <input type="text" class="device-name-input otp-input" [(ngModel)]="otpInput"
+                   placeholder="000000" maxlength="6" (keydown.enter)="verifyAndRegister()" />
+          </div>
+          <button mat-flat-button class="fintech-btn primary" (click)="verifyAndRegister()" [disabled]="loading() || otpInput.length !== 6">
+            <span *ngIf="!loading()">Register</span>
+            <mat-spinner *ngIf="loading()" diameter="20" color="accent"></mat-spinner>
+          </button>
+        </div>
+        <button mat-button class="back-link" (click)="step = 'name'" [disabled]="loading()">
+          <mat-icon>arrow_back</mat-icon> Back
         </button>
       </div>
     </mat-card>
@@ -99,6 +126,53 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     .device-name-input:focus {
       border-color: #000000;
     }
+    .otp-input {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 20px;
+      letter-spacing: 8px;
+      text-align: center;
+    }
+    .otp-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .otp-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+    }
+    .otp-icon {
+      color: #0284c7;
+      font-size: 28px;
+      width: 28px;
+      height: 28px;
+    }
+    .otp-banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .otp-label {
+      font-size: 13px;
+      color: #475569;
+    }
+    .otp-code-display {
+      font-size: 18px;
+      color: #0284c7;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      letter-spacing: 2px;
+    }
+    .back-link {
+      align-self: flex-start;
+      color: #737373 !important;
+      font-size: 13px;
+      padding: 4px 8px !important;
+    }
     .fintech-btn {
       border-radius: 24px !important;
       padding: 8px 24px !important;
@@ -130,9 +204,30 @@ export class DeviceRegistrationComponent {
 
   loading = signal(false);
   deviceName = '';
+  step: 'name' | 'otp' = 'name';
+  otpCode = '';
+  maskedEmail = '';
+  otpInput = '';
 
-  async registerDevice() {
+  async requestOtp() {
     if (this.loading()) return;
+    this.loading.set(true);
+
+    try {
+      const res = await firstValueFrom(this.transferService.requestOtp(this.userId));
+      this.otpCode = res.otp;
+      this.maskedEmail = res.maskedEmail;
+      this.otpInput = '';
+      this.step = 'otp';
+    } catch {
+      this.snack.open('Failed to send verification code', 'Close', { duration: 4000 });
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async verifyAndRegister() {
+    if (this.loading() || this.otpInput.length !== 6) return;
 
     this.loading.set(true);
 
@@ -144,7 +239,7 @@ export class DeviceRegistrationComponent {
       const sdkOutput = await scaWebauthn.checkAvailability();
 
       const initiateResponse = await firstValueFrom(
-        this.transferService.initiateDeviceRegistration(String(sdkOutput), this.userId, this.deviceName.trim())
+        this.transferService.initiateDeviceRegistration(String(sdkOutput), this.userId, this.deviceName.trim(), this.otpInput)
       );
 
       if (!initiateResponse?.success) {
@@ -173,12 +268,16 @@ export class DeviceRegistrationComponent {
     } catch (error: any) {
       let message = 'An error occurred';
 
-      if (error?.name === 'NotAllowedError') {
+      if (error?.status === 403) {
+        message = 'Invalid or expired verification code';
+        this.otpInput = '';
+      } else if (error?.name === 'NotAllowedError') {
         message = 'Authentication cancelled';
       } else if (error?.message === 'SCA_UNAVAILABLE') {
         message = 'SCA not available';
       } else if (error?.message === 'INITIATE_FAILED') {
-        message = 'Initiation failed';
+        message = 'Invalid or expired verification code';
+        this.otpInput = '';
       } else if (error?.message === 'FINALIZE_FAILED') {
         message = 'Finalization failed';
       } else if (error?.message === 'TIMEOUT') {
