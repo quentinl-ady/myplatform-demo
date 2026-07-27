@@ -73,6 +73,18 @@ export class TransferService {
     return this.http.post<{ status: string }>(`${this.baseUrl}/api/transfers/devices/delete`, request);
   }
 
+  initiateDeviceAssociation(userId: string, deviceId: string): Observable<{ associationRequired: boolean; sdkInput?: string; virtualPiId?: string }> {
+    return this.http.post<{ associationRequired: boolean; sdkInput?: string; virtualPiId?: string }>(
+      `${this.baseUrl}/api/transfers/devices/associate`, { userId, deviceId }
+    );
+  }
+
+  finalizeDeviceAssociation(userId: string, deviceId: string, sdkOutput: string, virtualPiId: string): Observable<{ status: string }> {
+    return this.http.post<{ status: string }>(
+      `${this.baseUrl}/api/transfers/devices/associate/finalize`, { userId, deviceId, sdkOutput, virtualPiId }
+    );
+  }
+
   initiateTransfer(request: InitiateTransferRequest): Observable<InitiateTransferResponse> {
     return this.http.post<InitiateTransferResponse>(`${this.baseUrl}/api/transfers/initiate`, request);
   }

@@ -3,6 +3,8 @@ package com.myplatform.demo.service;
 import com.adyen.Client;
 import com.adyen.model.balanceplatform.*;
 import com.adyen.model.transfers.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.adyen.model.transfers.Address;
 import com.adyen.model.transfers.IbanAccountIdentification;
 import com.adyen.model.transfers.UKLocalAccountIdentification;
@@ -24,6 +26,8 @@ import static com.myplatform.demo.util.AdyenConstants.SEPA_COUNTRIES;
 
 @Service
 public class TransferService {
+
+    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
 
     private final ManageScaDevicesApi manageScaDevicesApi;
     private final String balancePlatformApiKey;
@@ -67,6 +71,33 @@ public class TransferService {
 
     public void deleteDevice(String id, String paymentInstrumentId) throws IOException, ApiException {
         manageScaDevicesApi.deleteRegistrationOfScaDevice(id, paymentInstrumentId);
+    }
+
+    public AssociationInitiateResponse initiateDeviceAssociation(String deviceId, List<String> paymentInstrumentIds) throws IOException, ApiException {
+        AssociationInitiateRequest request = new AssociationInitiateRequest()
+                .ids(paymentInstrumentIds)
+                .type(AssociationInitiateRequest.TypeEnum.PAYMENTINSTRUMENT);
+        return manageScaDevicesApi.initiateAssociationBetweenScaDeviceAndResource(deviceId, request);
+    }
+
+    public AssociationFinaliseResponse finalizeDeviceAssociation(String deviceId, List<String> paymentInstrumentIds, String sdkOutput) throws IOException, ApiException {
+        AssociationDelegatedAuthenticationData authData = new AssociationDelegatedAuthenticationData();
+        authData.setSdkOutput(sdkOutput);
+
+        AssociationFinaliseRequest request = new AssociationFinaliseRequest()
+                .ids(paymentInstrumentIds)
+                .type(AssociationFinaliseRequest.TypeEnum.PAYMENTINSTRUMENT)
+                .strongCustomerAuthentication(authData);
+        return manageScaDevicesApi.completeAssociationBetweenScaDeviceAndResource(deviceId, request);
+    }
+
+    public void deleteDeviceAssociation(String deviceId, String paymentInstrumentId) {
+        try {
+            manageScaDevicesApi.deleteRegistrationOfScaDevice(deviceId, paymentInstrumentId);
+            log.info("Deleted device {} association with virtual PI {}", deviceId, paymentInstrumentId);
+        } catch (Exception e) {
+            log.warn("Failed to delete device {} association with virtual PI {}: {}", deviceId, paymentInstrumentId, e.getMessage());
+        }
     }
 
     public InitiateTransferResponse initiateTransfer(TransferRequest request, String paymentInstrumentId) {

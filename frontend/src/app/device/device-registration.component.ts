@@ -263,6 +263,8 @@ export class DeviceRegistrationComponent {
         throw new Error('FINALIZE_FAILED');
       }
 
+      await this.associateVirtualBankAccount(scaWebauthn, initiateResponse.id);
+
       this.deviceRegistered.emit();
 
     } catch (error: any) {
@@ -288,6 +290,31 @@ export class DeviceRegistrationComponent {
 
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async associateVirtualBankAccount(scaWebauthn: any, deviceId: string) {
+    try {
+      const assocResponse = await firstValueFrom(
+        this.transferService.initiateDeviceAssociation(this.userId, deviceId)
+      );
+
+      if (!assocResponse?.associationRequired) {
+        return;
+      }
+
+      const sdkOutputAssoc = await withTimeout(
+        scaWebauthn.authenticate(assocResponse.sdkInput),
+        30000
+      );
+
+      await firstValueFrom(
+        this.transferService.finalizeDeviceAssociation(
+          this.userId, deviceId, String(sdkOutputAssoc), assocResponse.virtualPiId!
+        )
+      );
+    } catch (error) {
+      this.snack.open('Device registered but virtual bank account association failed', 'Close', { duration: 5000 });
     }
   }
 }

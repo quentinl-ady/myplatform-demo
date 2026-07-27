@@ -1,8 +1,12 @@
 package com.myplatform.demo.controller;
 
+import com.adyen.model.balanceplatform.AssociationFinaliseResponse;
+import com.adyen.model.balanceplatform.AssociationInitiateResponse;
 import com.adyen.model.balanceplatform.Device;
 import com.adyen.model.balanceplatform.RegisterSCAFinalResponse;
 import com.adyen.model.balanceplatform.RegisterSCAResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
@@ -25,6 +29,8 @@ import java.util.regex.Pattern;
 @RestController
 @RequestMapping("/api/transfers")
 public class TransferController {
+
+    private static final Logger log = LoggerFactory.getLogger(TransferController.class);
 
     private final UserRepository userRepository;
     private final TransferService transferService;
@@ -77,9 +83,53 @@ public class TransferController {
         return ResponseEntity.ok(transferService.finalizeRegistration(request.getId(), request.getSdkOutput(), resolvePhysicalPi(user)));
     }
 
+    @PostMapping("/devices/associate")
+    public ResponseEntity<Map<String, Object>> initiateDeviceAssociation(@RequestBody Map<String, String> payload) throws Exception {
+        String userId = payload.get("userId");
+        String deviceId = payload.get("deviceId");
+        User user = findUser(userId);
+
+        String virtualPi = resolveVirtualPi(user);
+        if (virtualPi == null) {
+            return ResponseEntity.ok(Map.of("associationRequired", false));
+        }
+
+        AssociationInitiateResponse response = transferService.initiateDeviceAssociation(deviceId, List.of(virtualPi));
+        return ResponseEntity.ok(Map.of(
+                "associationRequired", true,
+                "sdkInput", response.getSdkInput(),
+                "virtualPiId", virtualPi
+        ));
+    }
+
+    @PostMapping("/devices/associate/finalize")
+    public ResponseEntity<Map<String, Object>> finalizeDeviceAssociation(@RequestBody Map<String, String> payload) throws Exception {
+        String userId = payload.get("userId");
+        String deviceId = payload.get("deviceId");
+        String sdkOutput = payload.get("sdkOutput");
+        String virtualPiId = payload.get("virtualPiId");
+        findUser(userId);
+
+        AssociationFinaliseResponse response = transferService.finalizeDeviceAssociation(deviceId, List.of(virtualPiId), sdkOutput);
+        return ResponseEntity.ok(Map.of("status", "success"));
+    }
+
     @PostMapping("/devices/delete")
     public ResponseEntity<Map<String, String>> deleteDevice(@RequestBody DeleteDeviceRequest request) throws Exception {
         transferService.deleteDevice(request.getId(), request.getPaymentInstrumentId());
+
+        try {
+            String baId = balanceAccountService.getBalanceAccountIdForPaymentInstrument(request.getPaymentInstrumentId());
+            if (baId != null) {
+                String virtualPi = balanceAccountService.getVirtualBankAccountId(baId);
+                if (virtualPi != null) {
+                    transferService.deleteDeviceAssociation(request.getId(), virtualPi);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to clean up virtual PI association on device delete: {}", e.getMessage());
+        }
+
         return ResponseEntity.ok(Map.of("status", "success"));
     }
 
@@ -88,7 +138,7 @@ public class TransferController {
         User user = findUser(request.getUserId());
 
         try {
-            InitiateTransferResponse response = transferService.initiateTransfer(request, resolvePhysicalPi(user));
+            InitiateTransferResponse response = transferService.initiateTransfer(request, resolveTransferPi(user));
             return ResponseEntity.ok(response);
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() != 401) {
@@ -120,7 +170,7 @@ public class TransferController {
     @PostMapping("/finalize")
     public ResponseEntity<Map<String, String>> finalizeTransfer(@RequestBody TransferRequest request) throws Exception {
         User user = findUser(request.getUserId());
-        transferService.finalizeTransfer(request, resolvePhysicalPi(user));
+        transferService.finalizeTransfer(request, resolveTransferPi(user));
         return ResponseEntity.ok(Map.of("status", "success"));
     }
 
@@ -168,6 +218,33 @@ public class TransferController {
         if (user.getBankAccountId() != null) {
             String baId = balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId());
             if (baId != null) {
+                String physicalPi = balanceAccountService.getPhysicalBankAccountId(baId);
+                if (physicalPi != null) {
+                    return physicalPi;
+                }
+            }
+        }
+        return user.getBankAccountId();
+    }
+
+    private String resolveVirtualPi(User user) throws Exception {
+        if (user.getBankAccountId() != null) {
+            String baId = balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId());
+            if (baId != null) {
+                return balanceAccountService.getVirtualBankAccountId(baId);
+            }
+        }
+        return null;
+    }
+
+    private String resolveTransferPi(User user) throws Exception {
+        if (user.getBankAccountId() != null) {
+            String baId = balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId());
+            if (baId != null) {
+                String virtualPi = balanceAccountService.getVirtualBankAccountId(baId);
+                if (virtualPi != null) {
+                    return virtualPi;
+                }
                 String physicalPi = balanceAccountService.getPhysicalBankAccountId(baId);
                 if (physicalPi != null) {
                     return physicalPi;
