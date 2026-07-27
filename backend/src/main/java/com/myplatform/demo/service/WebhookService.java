@@ -11,6 +11,7 @@ import com.myplatform.demo.repository.WebhookEventRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,8 @@ import java.util.Optional;
 public class WebhookService {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookService.class);
+    private static final int MAX_EVENTS_PER_USER = 50;
+    private static final int TRIM_THRESHOLD = MAX_EVENTS_PER_USER + 5;
 
     private final WebhookEventRepository webhookEventRepository;
     private final UserRepository userRepository;
@@ -36,6 +39,7 @@ public class WebhookService {
         this.objectMapper = objectMapper;
     }
 
+    @Transactional
     public WebhookEvent processWebhook(String rawJson, String source) {
         WebhookEvent event = new WebhookEvent();
         event.setRawJson(rawJson);
@@ -77,15 +81,23 @@ public class WebhookService {
         WebhookEvent saved = webhookEventRepository.save(event);
         log.info("Webhook event saved: id={}, type={}, webhookType={}, userId={}, source={}",
                 saved.getId(), saved.getEventType(), saved.getWebhookType(), saved.getUserId(), saved.getSource());
+
+        if (saved.getUserId() != null) {
+            long count = webhookEventRepository.countByUserId(saved.getUserId());
+            if (count > TRIM_THRESHOLD) {
+                webhookEventRepository.trimByUserId(saved.getUserId(), MAX_EVENTS_PER_USER);
+            }
+        }
+
         return saved;
     }
 
     public List<WebhookEvent> getEventsForUser(String userId) {
-        return webhookEventRepository.findByUserIdOrderByReceivedAtDesc(userId);
+        return webhookEventRepository.findTop50ByUserIdOrderByReceivedAtDesc(userId);
     }
 
     public List<WebhookEvent> getUnreadEventsForUser(String userId) {
-        return webhookEventRepository.findByUserIdAndAcknowledgedFalseOrderByReceivedAtDesc(userId);
+        return webhookEventRepository.findTop50ByUserIdAndAcknowledgedFalseOrderByReceivedAtDesc(userId);
     }
 
     public long countUnreadForUser(String userId) {

@@ -40,9 +40,8 @@
         class="notif-item"
         [class.unread]="!event.acknowledged"
         [class.expanded]="expandedEventId === event.id"
-        (click)="toggleExpand(event)"
       >
-        <div class="notif-row">
+        <div class="notif-row" (click)="onRowClick(event)">
           <!-- Icon -->
           <div class="notif-icon-wrapper" [attr.data-type]="event.webhookType">
             <mat-icon>{{ getEventIcon(event.webhookType, event.eventType) }}</mat-icon>
@@ -73,7 +72,7 @@
         </div>
 
         <!-- Expanded Details -->
-        <div class="notif-detail" *ngIf="expandedEventId === event.id">
+        <div class="notif-detail" *ngIf="expandedEventId === event.id" (click)="$event.stopPropagation()">
           <div class="notif-detail-grid">
             <div class="detail-item">
               <span class="detail-key">Event type</span>

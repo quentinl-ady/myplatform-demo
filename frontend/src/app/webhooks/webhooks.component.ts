@@ -176,6 +176,14 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     });
   }
 
+  onRowClick(event: WebhookEvent) {
+    const selection = window.getSelection();
+    if (selection && selection.toString().length > 0) {
+      return;
+    }
+    this.toggleExpand(event);
+  }
+
   toggleExpand(event: WebhookEvent) {
     this.expandedEventId = this.expandedEventId === event.id ? null : event.id;
     this.showRawJsonId = null;
