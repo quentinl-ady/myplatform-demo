@@ -14,7 +14,10 @@ import {
   RegisterSCAFinalResponse,
   RegisterSCAResponse,
   TransferDetail,
-  VerifyCounterpartyNameRequest
+  VerifyCounterpartyNameRequest,
+  BatchTransferRequest,
+  BatchTransferResponse,
+  BatchApproveResponse
 } from '../models';
 
 interface TransactionCache {
@@ -121,5 +124,21 @@ export class TransferService {
 
   getTransferDetail(userId: string, transferId: string): Observable<TransferDetail> {
     return this.http.get<TransferDetail>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/detail/${transferId}`);
+  }
+
+  getPendingBatchTransfers(userId: string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/api/transfers/batch/pending?userId=${userId}`);
+  }
+
+  initiateBatchTransfer(request: BatchTransferRequest): Observable<BatchTransferResponse> {
+    return this.http.post<BatchTransferResponse>(`${this.baseUrl}/api/transfers/batch/initiate`, request);
+  }
+
+  approveTransfers(userId: string, transferIds: string[], sdkOutput: string): Observable<BatchApproveResponse> {
+    return this.http.post<BatchApproveResponse>(`${this.baseUrl}/api/transfers/batch/approve`, { userId, transferIds, sdkOutput });
+  }
+
+  finalizeApproval(userId: string, transferIds: string[], sdkOutput: string): Observable<BatchApproveResponse> {
+    return this.http.post<BatchApproveResponse>(`${this.baseUrl}/api/transfers/batch/approve/finalize`, { userId, transferIds, sdkOutput });
   }
 }

@@ -1,0 +1,298 @@
+<div class="fintech-wrapper">
+
+  <!-- ==================== NO DEVICE WARNING ==================== -->
+  <mat-card class="no-device-warning" *ngIf="hasDevices() === false">
+    <div class="warning-banner">
+      <div class="warning-icon-wrapper">
+        <mat-icon>warning_amber</mat-icon>
+      </div>
+      <div class="warning-text">
+        <h3>No trusted device registered</h3>
+        <p>You need to register a device before you can make batch transfers. This device will be used for Strong Customer Authentication (SCA) to secure your transactions.</p>
+      </div>
+    </div>
+    <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
+  </mat-card>
+
+  <!-- ==================== BALANCE CARD ==================== -->
+  <mat-card class="account-card" *ngIf="accountInfo && hasDevices()">
+    <div class="account-header">
+      <p class="account-label">Available Balance</p>
+      <h1 class="account-balance">
+        {{ (accountInfo.amount / 100) | number:'1.2-2' }} <span class="currency">{{ accountInfo.currency }}</span>
+      </h1>
+      <p class="account-details">{{ accountInfo.description }} &bull; {{ accountInfo.bankAccountNumber }}</p>
+    </div>
+  </mat-card>
+
+  <ng-container *ngIf="hasDevices()">
+
+    <!-- ==================== SUCCESS STATE ==================== -->
+    <mat-card class="transfer-card success-state" *ngIf="isApprovalSuccess">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <h2>Batch Approved</h2>
+      <p>All {{ approvedCount }} transfers have been approved and are being processed.</p>
+      <button mat-flat-button class="fintech-btn primary" (click)="resetAll()">Start new batch</button>
+    </mat-card>
+
+    <!-- ==================== ADD TRANSFER FORM ==================== -->
+    <mat-card class="transfer-card" *ngIf="!isApprovalSuccess">
+      <h2>Add Transfer to Batch</h2>
+
+      <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()">
+
+        <div class="amount-wrapper">
+          <span class="currency-symbol">{{ userCurrency }}</span>
+          <input type="number" class="amount-input" formControlName="amount" placeholder="0.00" step="0.01" />
+        </div>
+
+        <div class="form-grid">
+
+          <div class="form-group">
+            <label>Beneficiary Name</label>
+            <input type="text" class="fintech-input" formControlName="counterpartyName" placeholder="e.g. John Doe / Acme Corp" />
+          </div>
+
+          <div class="form-group">
+            <label>Recipient Country</label>
+            <select class="fintech-input" formControlName="counterpartyCountry" (change)="onCountryChange()">
+              <option value="" disabled selected>Select a country</option>
+              <option value="FR">France</option>
+              <option value="GB">United Kingdom</option>
+              <option value="US">United States</option>
+              <option value="DE">Germany</option>
+              <option value="NL">Netherlands</option>
+            </select>
+          </div>
+
+          <div class="loading-format" *ngIf="isLoadingFormat">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>Detecting bank account format...</span>
+          </div>
+
+          <ng-container *ngIf="bankAccountFormat && !isLoadingFormat">
+
+            <div class="form-group" *ngIf="bankAccountFormat === 'iban'">
+              <label>Recipient IBAN</label>
+              <input type="text" class="fintech-input" formControlName="iban" placeholder="FR76 1234..." />
+            </div>
+
+            <ng-container *ngIf="bankAccountFormat === 'accountNumberRoutingNumber'">
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 123456789" />
+              </div>
+              <div class="form-group">
+                <label>Routing Number</label>
+                <input type="text" class="fintech-input" formControlName="routingNumber" placeholder="e.g. 122105278" />
+              </div>
+            </ng-container>
+
+            <ng-container *ngIf="bankAccountFormat === 'accountNumberSortCode'">
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 12345678" />
+              </div>
+              <div class="form-group">
+                <label>Sort Code</label>
+                <input type="text" class="fintech-input" formControlName="sortCode" placeholder="e.g. 20-00-00" />
+              </div>
+            </ng-container>
+
+            <div class="validation-status" *ngIf="isCheckingAccountFormat || isAccountFormatValid || accountFormatError">
+              <mat-spinner *ngIf="isCheckingAccountFormat" diameter="16"></mat-spinner>
+              <mat-icon *ngIf="isAccountFormatValid && !isCheckingAccountFormat" class="success-icon-small">check_circle</mat-icon>
+              <mat-icon *ngIf="accountFormatError && !isCheckingAccountFormat" class="error-icon-small">error</mat-icon>
+              <span [ngClass]="{'success-text': isAccountFormatValid, 'error-text': accountFormatError, 'pending-text': isCheckingAccountFormat}">
+                {{ isCheckingAccountFormat ? 'Verifying account format...' : (isAccountFormatValid ? 'Valid account format' : accountFormatError) }}
+              </span>
+            </div>
+
+          </ng-container>
+
+          <div class="form-group">
+            <label>Transfer Type</label>
+            <select class="fintech-input" formControlName="transferType">
+              <option value="regular">Regular Transfer (1-2 days)</option>
+              <option value="instant">Instant Transfer (Immediate)</option>
+            </select>
+          </div>
+
+          <div class="fee-warning" *ngIf="transferForm.get('transferType')?.value === 'instant'">
+            <mat-icon class="fee-icon">info</mat-icon>
+            <span>A 1% additional commission will be applied and deducted from your account at the end of the month.</span>
+          </div>
+
+          <div class="form-group">
+            <label>Reference (internal)</label>
+            <input type="text" class="fintech-input" formControlName="reference" placeholder="Internal reference" />
+            <span class="hint-text">Note: You can use "noNameMatch" or "partialNameMatch" here to test different verification use-cases.</span>
+          </div>
+
+          <div class="form-group">
+            <label>Description (external)</label>
+            <input type="text" class="fintech-input" formControlName="description" placeholder="Visible to beneficiary" />
+          </div>
+
+        </div>
+
+        <button mat-flat-button type="submit" class="fintech-btn primary full-width"
+                [disabled]="transferForm.invalid || isAdding || isLoadingFormat || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
+          <mat-spinner diameter="20" *ngIf="isAdding"></mat-spinner>
+          <mat-icon *ngIf="!isAdding">add</mat-icon>
+          {{ isAdding ? 'Adding...' : 'Add to batch' }}
+        </button>
+      </form>
+    </mat-card>
+
+    <!-- ==================== LOADING PENDING ==================== -->
+    <mat-card class="pending-card" *ngIf="isLoadingPending && pendingTransfers.length === 0 && !isApprovalSuccess">
+      <div class="loading-format" style="justify-content: center; padding: 24px;">
+        <mat-spinner diameter="24"></mat-spinner>
+        <span>Loading pending transfers...</span>
+      </div>
+    </mat-card>
+
+    <!-- ==================== PENDING TRANSFERS ==================== -->
+    <mat-card class="pending-card" *ngIf="(pendingTransfers.length > 0 || pendingNotFoundCount > 0) && !isApprovalSuccess">
+      <h2>Pending Transfers</h2>
+      <p class="pending-subtitle">{{ pendingTransfers.length }} transfer(s) ready for approval</p>
+
+      <div class="pending-warning" *ngIf="pendingNotFoundCount > 0">
+        <mat-icon>warning</mat-icon>
+        <span>{{ pendingNotFoundCount }} transfer(s) not yet propagated. Please wait ~1 minute and
+          <a href="javascript:void(0)" (click)="loadPendingTransfers()">retry</a>.
+        </span>
+      </div>
+
+      <div class="pending-list">
+        <div class="pending-item" *ngFor="let t of pendingTransfers; let i = index">
+          <div class="pending-item-left">
+            <div class="pending-icon-wrapper">
+              <mat-icon>send</mat-icon>
+            </div>
+            <div class="pending-item-info">
+              <span class="pending-counterparty">{{ t.counterpartyName }}</span>
+              <span class="pending-desc" *ngIf="t.description">{{ t.description }}</span>
+              <span class="pending-ref" *ngIf="t.reference">Ref: {{ t.reference }}</span>
+            </div>
+          </div>
+          <div class="pending-item-right">
+            <span class="pending-amount">{{ formatAmount(t.amount) }} {{ t.currency }}</span>
+            <span class="pending-status">Pending</span>
+            <button mat-icon-button class="remove-btn" (click)="removeFromBatch(i)" [disabled]="isApproving">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="batch-total">
+        <span class="batch-total-label">Total ({{ pendingTransfers.length }} transfers)</span>
+        <span class="batch-total-amount">{{ getBatchTotal() }}</span>
+      </div>
+
+      <div class="batch-actions">
+        <button mat-flat-button class="fintech-btn secondary" (click)="clearBatch()" [disabled]="isApproving">
+          Clear all
+        </button>
+        <button mat-flat-button class="fintech-btn primary" (click)="approveAll()" [disabled]="isApproving">
+          <mat-spinner diameter="20" *ngIf="isApproving"></mat-spinner>
+          <mat-icon *ngIf="!isApproving">verified_user</mat-icon>
+          {{ isApproving ? 'Approving...' : 'Approve all' }}
+        </button>
+      </div>
+    </mat-card>
+
+  </ng-container>
+
+  <!-- ==================== SCA MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showScaModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Approve Batch Transfer</h3>
+      </div>
+      <div class="modal-body">
+        <p>You are about to approve <strong>{{ pendingTransfers.length }}</strong> transfer(s) for a total of <strong>{{ getBatchTotal() }}</strong>.</p>
+        <p>Complete the SCA authentication to authorize all transfers at once.</p>
+        <div class="sca-banner" *ngIf="scaStatus">
+          <mat-spinner diameter="16"></mat-spinner>
+          {{ scaStatus }}
+        </div>
+      </div>
+      <div class="actions">
+        <button mat-flat-button class="fintech-btn secondary" (click)="declineApproval()" [disabled]="isApproving">Cancel</button>
+        <button mat-flat-button class="fintech-btn primary" (click)="confirmApproval()" [disabled]="isApproving">
+          <mat-spinner diameter="20" *ngIf="isApproving"></mat-spinner>
+          {{ isApproving ? 'Authenticating...' : 'Authenticate' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VoP MODALS ==================== -->
+  <div class="modal-overlay" *ngIf="showExactMatchModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="color: #4caf50;">Name Verified Successfully</h3>
+      </div>
+      <div class="modal-body" style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+          <mat-icon style="color: #4caf50;">check_circle</mat-icon>
+          <span>The beneficiary name perfectly matches the account details.</span>
+        </div>
+        <p>Name confirmed: <strong>{{ transferForm.value.counterpartyName }}</strong></p>
+      </div>
+      <div class="actions">
+        <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
+        <button mat-flat-button class="fintech-btn primary" (click)="proceedAfterExactMatch()">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showPartialMatchModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="color: var(--fintech-warning);">Name Mismatch Warning</h3>
+      </div>
+      <div class="modal-body" style="margin-bottom: 24px;">
+        <p>The account name is slightly different from what you entered.</p>
+        <p>You entered: <br><strong>{{ transferForm.value.counterpartyName }}</strong></p>
+        <p>Bank verification found: <br><strong style="color: var(--fintech-primary);">{{ suggestedName }}</strong></p>
+        <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Would you like to use the name provided by the bank, modify your transfer, or cancel?</p>
+      </div>
+      <div class="actions" style="flex-direction: column; gap: 8px;">
+        <button mat-flat-button class="fintech-btn primary" (click)="acceptSuggestedName()">Use Found Name & Continue</button>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
+          <button mat-stroked-button class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showNoMatchModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="color: #f44336;">Warning: Invalid Name</h3>
+      </div>
+      <div class="modal-body" style="margin-bottom: 24px;">
+        <p>The name on the destination account <strong>does not match</strong> the beneficiary name you provided.</p>
+        <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Sending money to an incorrect beneficiary can result in loss of funds. Do you still want to proceed at your own risk?</p>
+      </div>
+      <div class="actions" style="flex-direction: column; gap: 8px;">
+        <button mat-flat-button style="background-color: #f44336; color: white;" class="fintech-btn" (click)="proceedWithRisk()">Continue at my own risk</button>
+        <div style="display: flex; gap: 8px; width: 100%;">
+          <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
+          <button mat-stroked-button class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

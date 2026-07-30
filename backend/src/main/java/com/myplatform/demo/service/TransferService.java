@@ -12,7 +12,9 @@ import com.adyen.model.transfers.USLocalAccountIdentification;
 import com.adyen.service.balanceplatform.ManageScaDevicesApi;
 import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.model.InitiateTransferResponse;
+import com.myplatform.demo.model.PendingTransfer;
 import com.myplatform.demo.model.TransferRequest;
+import com.myplatform.demo.repository.PendingTransferRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -20,7 +22,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.myplatform.demo.util.AdyenConstants.SEPA_COUNTRIES;
 
@@ -32,13 +36,16 @@ public class TransferService {
     private final ManageScaDevicesApi manageScaDevicesApi;
     private final String balancePlatformApiKey;
     private final RestTemplate restTemplate;
+    private final PendingTransferRepository pendingTransferRepository;
 
     public TransferService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
                            @Value("${adyen.balancePlatformApiKey}") String balancePlatformApiKey,
-                           RestTemplate restTemplate) {
+                           RestTemplate restTemplate,
+                           PendingTransferRepository pendingTransferRepository) {
         this.manageScaDevicesApi = new ManageScaDevicesApi(balancePlatformClient);
         this.balancePlatformApiKey = balancePlatformApiKey;
         this.restTemplate = restTemplate;
+        this.pendingTransferRepository = pendingTransferRepository;
     }
 
     public List<Device> getListDevices(String paymentInstrumentId) throws IOException, ApiException {
@@ -159,6 +166,150 @@ public class TransferService {
         } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())) {
             response.setAccountNumber(request.getAccountNumber());
             response.setSortCode(request.getSortCode());
+        }
+    }
+
+    public Map<String, Object> initiateBatchTransfer(TransferRequest request, String paymentInstrumentId, String accountHolderId) {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+
+        TransferRequestReview review = new TransferRequestReview()
+                .numberOfApprovalsRequired(1)
+                .scaOnApproval(true);
+        transferInfo.setReview(review);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("X-API-Key", balancePlatformApiKey);
+
+        HttpEntity<TransferInfo> entity = new HttpEntity<>(transferInfo, headers);
+
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers";
+
+        ResponseEntity<Transfer> response =
+                restTemplate.exchange(url, HttpMethod.POST, entity, Transfer.class);
+
+        Transfer transfer = response.getBody();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", transfer.getId());
+        result.put("amount", transfer.getAmount().getValue());
+        result.put("currency", transfer.getAmount().getCurrency());
+        result.put("counterpartyName", request.getCounterpartyName());
+        result.put("status", transfer.getStatus() != null ? transfer.getStatus().getValue() : "unknown");
+        result.put("reason", transfer.getReason() != null ? transfer.getReason().getValue() : null);
+        result.put("description", request.getDescription());
+        result.put("reference", request.getReference());
+
+        // Save pending transfer for persistence across page reloads
+        PendingTransfer pt = new PendingTransfer();
+        pt.setTransferId(transfer.getId());
+        pt.setAccountHolderId(accountHolderId);
+        pendingTransferRepository.save(pt);
+
+        return result;
+    }
+
+    public Map<String, Object> approveTransfers(List<String> transferIds, String sdkOutput) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("X-API-Key", balancePlatformApiKey);
+
+        String authenticate = "SCA realm=\"ApproveTransfers\" " + "auth-param1=\"" + sdkOutput + "\"";
+        headers.add("WWW-Authenticate", authenticate);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("transferIds", transferIds);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers/approve";
+
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+                // Remove approved transfers from pending store
+                pendingTransferRepository.deleteAllById(transferIds);
+                Map<String, Object> result = new HashMap<>();
+                result.put("status", "success");
+                return result;
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                String responseBody = e.getResponseBodyAsString();
+                if (attempt < maxRetries && responseBody != null && responseBody.contains("Transfer not found")) {
+                    log.info("Transfer not found on attempt {}/{}, retrying in 2s...", attempt, maxRetries);
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        return result;
+    }
+
+    public Map<String, Object> getPendingTransfers(String accountHolderId) {
+        List<PendingTransfer> stored = pendingTransferRepository.findByAccountHolderId(accountHolderId);
+        List<Map<String, Object>> results = new java.util.ArrayList<>();
+        int notFoundCount = 0;
+
+        for (PendingTransfer pt : stored) {
+            try {
+                Map<String, Object> detail = fetchTransferDetail(pt.getTransferId());
+                if (detail != null) {
+                    results.add(detail);
+                }
+            } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+                notFoundCount++;
+                log.warn("Transfer {} not yet propagated (404)", pt.getTransferId());
+            } catch (Exception e) {
+                log.warn("Failed to fetch transfer detail for {}: {}", pt.getTransferId(), e.getMessage());
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("transfers", results);
+        response.put("notFoundCount", notFoundCount);
+        response.put("totalCount", stored.size());
+        return response;
+    }
+
+    private Map<String, Object> fetchTransferDetail(String transferId) {
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers/" + transferId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        headers.set("x-api-key", balancePlatformApiKey);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode t = mapper.readTree(response.getBody());
+
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", t.get("id").asText());
+            if (t.has("amount")) {
+                item.put("amount", t.get("amount").get("value").asLong());
+                item.put("currency", t.get("amount").get("currency").asText());
+            }
+            String counterpartyName = "";
+            if (t.has("counterparty") && t.get("counterparty").has("bankAccount")
+                    && t.get("counterparty").get("bankAccount").has("accountHolder")) {
+                com.fasterxml.jackson.databind.JsonNode ah = t.get("counterparty").get("bankAccount").get("accountHolder");
+                if (ah.has("fullName")) counterpartyName = ah.get("fullName").asText();
+            }
+            item.put("counterpartyName", counterpartyName);
+            item.put("status", t.has("status") ? t.get("status").asText() : "");
+            item.put("reason", t.has("reason") ? t.get("reason").asText() : "");
+            item.put("description", t.has("description") ? t.get("description").asText() : "");
+            item.put("reference", t.has("reference") ? t.get("reference").asText() : "");
+            return item;
+        } catch (Exception e) {
+            log.error("Failed to parse transfer detail for {}: {}", transferId, e.getMessage());
+            return null;
         }
     }
 

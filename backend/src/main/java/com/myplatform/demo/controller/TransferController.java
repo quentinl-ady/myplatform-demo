@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -172,6 +173,75 @@ public class TransferController {
         User user = findUser(request.getUserId());
         transferService.finalizeTransfer(request, resolveTransferPi(user));
         return ResponseEntity.ok(Map.of("status", "success"));
+    }
+
+    @PostMapping("/batch/initiate")
+    public ResponseEntity<Map<String, Object>> initiateBatchTransfer(@RequestBody TransferRequest request) throws Exception {
+        User user = findUser(request.getUserId());
+        Map<String, Object> result = transferService.initiateBatchTransfer(request, resolveTransferPi(user), user.getAccountHolderId());
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/batch/approve")
+    public ResponseEntity<Map<String, Object>> approveTransfers(@RequestBody Map<String, Object> payload) throws Exception {
+        String userId = (String) payload.get("userId");
+        @SuppressWarnings("unchecked")
+        List<String> transferIds = (List<String>) payload.get("transferIds");
+        String sdkOutput = (String) payload.get("sdkOutput");
+        findUser(userId);
+
+        try {
+            Map<String, Object> result = transferService.approveTransfers(transferIds, sdkOutput);
+            return ResponseEntity.ok(result);
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 422 && e.getResponseBodyAsString().contains("Transfer not found")) {
+                Map<String, Object> res = new HashMap<>();
+                res.put("status", "transfers_not_ready");
+                res.put("message", "Some transfers are not yet propagated. Please wait 1 minute and try again.");
+                return ResponseEntity.ok(res);
+            }
+            if (e.getStatusCode().value() != 401) {
+                throw e;
+            }
+
+            HttpHeaders errorHeaders = e.getResponseHeaders();
+            Map<String, Object> res = new HashMap<>();
+
+            if (errorHeaders != null) {
+                String wwwAuth = errorHeaders.getFirst("WWW-Authenticate");
+                if (wwwAuth != null) {
+                    Pattern pattern = Pattern.compile("auth-param1=\"([^\"]+)\"");
+                    Matcher matcher = pattern.matcher(wwwAuth);
+                    if (matcher.find()) {
+                        res.put("authParam1", matcher.group(1));
+                    }
+                }
+            }
+
+            res.put("status", "sca_required");
+            return ResponseEntity.ok(res);
+        }
+    }
+
+    @PostMapping("/batch/approve/finalize")
+    public ResponseEntity<Map<String, Object>> finalizeApproval(@RequestBody Map<String, Object> payload) throws Exception {
+        String userId = (String) payload.get("userId");
+        @SuppressWarnings("unchecked")
+        List<String> transferIds = (List<String>) payload.get("transferIds");
+        String sdkOutput = (String) payload.get("sdkOutput");
+        findUser(userId);
+
+        Map<String, Object> result = transferService.approveTransfers(transferIds, sdkOutput);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/batch/pending")
+    public ResponseEntity<Map<String, Object>> getPendingTransfers(@RequestParam String userId) throws Exception {
+        User user = findUser(userId);
+        if (user.getAccountHolderId() == null) {
+            throw new BadRequestException("User has no account holder");
+        }
+        return ResponseEntity.ok(transferService.getPendingTransfers(user.getAccountHolderId()));
     }
 
     @PostMapping("/{userId}/bank-transactions/initiate")

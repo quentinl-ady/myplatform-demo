@@ -81,6 +81,11 @@ const routeConfig: Routes = [
         title: 'Bank Transfers'
       },
       {
+        path: 'batch-transfer',
+        loadComponent: () => import('./batch-transfer/batch-transfer.component').then(m => m.BatchTransferComponent),
+        title: 'Batch Transfers'
+      },
+      {
         path: 'pos',
         loadComponent: () => import('./pos/pos.component').then(m => m.PosComponent),
         title: 'Point of Sale'

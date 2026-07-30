@@ -46,6 +46,36 @@ export interface InitiateTransferResponse {
   routingNumber: string;
 }
 
+export interface BatchTransferRequest {
+  userId: string;
+  amount: number;
+  reference: string;
+  description: string;
+  transferType: string;
+  counterpartyCountry: string;
+  counterpartyName: string;
+  iban: string;
+  accountNumber: string;
+  routingNumber: string;
+  sortCode: string;
+}
+
+export interface BatchTransferResponse {
+  id: string;
+  amount: number;
+  currency: string;
+  counterpartyName: string;
+  status: string;
+  reason: string;
+  description: string;
+  reference: string;
+}
+
+export interface BatchApproveResponse {
+  status: string;
+  authParam1?: string;
+}
+
 export interface IsCrossBorderRequest {
   userId: string;
   countryCodeCounterparty: string;
