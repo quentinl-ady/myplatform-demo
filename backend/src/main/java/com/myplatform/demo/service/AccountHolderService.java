@@ -6,6 +6,7 @@ import com.adyen.model.legalentitymanagement.BusinessLineInfo;
 import com.adyen.service.balanceplatform.AccountHoldersApi;
 import com.adyen.service.exception.ApiException;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -17,11 +18,15 @@ public class AccountHolderService {
 
     private final AccountHoldersApi accountHoldersApi;
     private final BankingProvisioningService bankingProvisioningService;
+    private final String balancePlatform;
+
 
     public AccountHolderService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
-                                BankingProvisioningService bankingProvisioningService) {
+                                BankingProvisioningService bankingProvisioningService,
+                                @Value("${adyen.balancePlatform}") String balancePlatform) {
         this.accountHoldersApi = new AccountHoldersApi(balancePlatformClient);
         this.bankingProvisioningService = bankingProvisioningService;
+        this.balancePlatform = balancePlatform;
     }
 
     public String createAccountHolder(String legalEntityId, String activityReason, Boolean capital, Boolean bank, Boolean issuing,
@@ -30,6 +35,7 @@ public class AccountHolderService {
 
         AccountHolderInfo accountHolderInfo = new AccountHolderInfo()
                 .legalEntityId(legalEntityId)
+                .balancePlatform(balancePlatform)
                 .reference(reference);
 
         Map<String, AccountHolderCapability> capabilities = new HashMap<>(Map.of(
