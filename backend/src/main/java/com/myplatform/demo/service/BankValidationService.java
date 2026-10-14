@@ -34,20 +34,6 @@ public class BankValidationService {
         this.restTemplate = restTemplate;
     }
 
-    public String getBankAccountFormat(String countryCode) {
-        if (countryCode == null || countryCode.isBlank()) {
-            return "unknown";
-        }
-
-        String normalizedCode = countryCode.trim().toUpperCase();
-
-        return switch (normalizedCode) {
-            case "US" -> "accountNumberRoutingNumber";
-            case "GB", "UK" -> "accountNumberSortCode";
-            default -> SEPA_COUNTRIES.contains(normalizedCode) ? "iban" : "unknown";
-        };
-    }
-
     public Boolean isCrossBorder(String countryCodeCounterparty, String countryCodeBankAccount) {
         if (countryCodeCounterparty == null || countryCodeCounterparty.isBlank() ||
                 countryCodeBankAccount == null || countryCodeBankAccount.isBlank()) {

@@ -15,7 +15,9 @@ import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.BalanceAccountService;
 import com.myplatform.demo.service.BankTransferService;
 import com.myplatform.demo.service.OtpService;
+import com.myplatform.demo.service.TransferRouteService;
 import com.myplatform.demo.service.TransferService;
+import com.myplatform.demo.util.RecipientCountries;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -35,17 +37,20 @@ public class TransferController {
 
     private final UserRepository userRepository;
     private final TransferService transferService;
+    private final TransferRouteService transferRouteService;
     private final BankTransferService bankTransferService;
     private final BalanceAccountService balanceAccountService;
     private final OtpService otpService;
 
     public TransferController(UserRepository userRepository,
                               TransferService transferService,
+                              TransferRouteService transferRouteService,
                               BankTransferService bankTransferService,
                               BalanceAccountService balanceAccountService,
                               OtpService otpService) {
         this.userRepository = userRepository;
         this.transferService = transferService;
+        this.transferRouteService = transferRouteService;
         this.bankTransferService = bankTransferService;
         this.balanceAccountService = balanceAccountService;
         this.otpService = otpService;
@@ -55,6 +60,20 @@ public class TransferController {
     public ResponseEntity<List<Device>> listDevices(@PathVariable String userId) throws Exception {
         User user = findUser(userId);
         return ResponseEntity.ok(transferService.getListDevices(resolvePhysicalPi(user)));
+    }
+
+    @GetMapping("/{userId}/recipient-countries")
+    public ResponseEntity<List<RecipientCountry>> getRecipientCountries(@PathVariable String userId) {
+        User user = findUser(userId);
+        return ResponseEntity.ok(RecipientCountries.forAccountCurrency(user.getCurrencyCode()));
+    }
+
+    @PostMapping("/{userId}/transfer-routes")
+    public ResponseEntity<List<TransferRouteOption>> calculateTransferRoutes(@PathVariable String userId,
+                                                                             @RequestBody TransferRequest beneficiary) throws Exception {
+        User user = findUser(userId);
+        RecipientCountry recipientCountry = resolveRecipientCountry(user, beneficiary.getCounterpartyCountry());
+        return ResponseEntity.ok(transferRouteService.calculateRoutes(resolveBalanceAccountId(user), recipientCountry, beneficiary));
     }
 
     @PostMapping("/devices/otp")
@@ -137,9 +156,11 @@ public class TransferController {
     @PostMapping("/initiate")
     public ResponseEntity<InitiateTransferResponse> initiateTransfer(@RequestBody TransferRequest request) throws Exception {
         User user = findUser(request.getUserId());
+        RecipientCountry recipientCountry = resolveRecipientCountry(user, request.getCounterpartyCountry());
+        transferRouteService.requireEligible(resolveBalanceAccountId(user), recipientCountry, request);
 
         try {
-            InitiateTransferResponse response = transferService.initiateTransfer(request, resolveTransferPi(user));
+            InitiateTransferResponse response = transferService.initiateTransfer(request, resolveTransferPi(user), recipientCountry);
             return ResponseEntity.ok(response);
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() != 401) {
@@ -161,7 +182,7 @@ public class TransferController {
                 }
             }
 
-            transferService.populateCounterpartyDetails(res, request);
+            transferService.populateCounterpartyDetails(res, request, recipientCountry);
             res.setAmount(request.getAmount());
             res.setCounterpartyCountry(request.getCounterpartyCountry());
             return ResponseEntity.ok(res);
@@ -171,14 +192,17 @@ public class TransferController {
     @PostMapping("/finalize")
     public ResponseEntity<Map<String, String>> finalizeTransfer(@RequestBody TransferRequest request) throws Exception {
         User user = findUser(request.getUserId());
-        transferService.finalizeTransfer(request, resolveTransferPi(user));
+        RecipientCountry recipientCountry = resolveRecipientCountry(user, request.getCounterpartyCountry());
+        transferService.finalizeTransfer(request, resolveTransferPi(user), recipientCountry);
         return ResponseEntity.ok(Map.of("status", "success"));
     }
 
     @PostMapping("/batch/initiate")
     public ResponseEntity<Map<String, Object>> initiateBatchTransfer(@RequestBody TransferRequest request) throws Exception {
         User user = findUser(request.getUserId());
-        Map<String, Object> result = transferService.initiateBatchTransfer(request, resolveTransferPi(user), user.getAccountHolderId());
+        RecipientCountry recipientCountry = resolveRecipientCountry(user, request.getCounterpartyCountry());
+        transferRouteService.requireEligible(resolveBalanceAccountId(user), recipientCountry, request);
+        Map<String, Object> result = transferService.initiateBatchTransfer(request, resolveTransferPi(user), user.getAccountHolderId(), recipientCountry);
         return ResponseEntity.ok(result);
     }
 
@@ -322,6 +346,19 @@ public class TransferController {
             }
         }
         return user.getBankAccountId();
+    }
+
+    private String resolveBalanceAccountId(User user) throws Exception {
+        if (user.getBankAccountId() == null) {
+            throw new BadRequestException("User has no bank account");
+        }
+        return balanceAccountService.getBalanceAccountIdForPaymentInstrument(user.getBankAccountId());
+    }
+
+    private RecipientCountry resolveRecipientCountry(User user, String countryCode) {
+        return RecipientCountries.find(user.getCurrencyCode(), countryCode)
+                .orElseThrow(() -> new BadRequestException(
+                        "Transfers to " + countryCode + " are not available from a " + user.getCurrencyCode() + " account"));
     }
 
     private User findUser(String userId) {

@@ -7,20 +7,26 @@ import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 
 import { Subscription, combineLatest, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter, map } from 'rxjs/operators';
 
 import ScaWebauthn from '@adyen/bpscaweb';
 import {
+  BankAccountFormat,
   InitiateTransferRequest,
   InitiateTransferResponse,
   BankAccountInformationResponse,
+  RecipientCountry,
   VerifyCounterpartyNameRequest,
   StandingOrder,
   StandingOrderCreateRequest,
   StandingOrderInitiateResponse,
+  TestAccount,
+  TransferRouteRequest,
   User
 } from '../models';
 import { AccountService, TransferService, StandingOrderService } from '../services';
+import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
+import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
 
 @Component({
   selector: 'app-banktransfer',
@@ -29,7 +35,9 @@ import { AccountService, TransferService, StandingOrderService } from '../servic
     CommonModule,
     ReactiveFormsModule,
     MaterialModule,
-    DeviceRegistrationComponent
+    DeviceRegistrationComponent,
+    RecipientCountryPickerComponent,
+    TransferSpeedPickerComponent
   ],
   templateUrl: './banktransfer.component.html',
   styleUrl: './banktransfer.component.css'
@@ -53,13 +61,18 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   // ─── Tab management ───
   activeTab: 'oneshot' | 'standing' = 'oneshot';
 
+  // ─── Recipient countries reachable from the account currency ───
+  recipientCountries: RecipientCountry[] = [];
+
   // ─── Shared bank format validation state ───
-  isLoadingFormat = false;
-  bankAccountFormat: 'iban' | 'accountNumberRoutingNumber' | 'accountNumberSortCode' | null = null;
+  bankAccountFormat: BankAccountFormat | null = null;
   isCheckingAccountFormat = false;
   isAccountFormatValid = false;
   accountFormatError = '';
   private validationSub?: Subscription;
+
+  // Bank details the transfer routes are calculated for, set once they pass the format check.
+  routeBeneficiary: TransferRouteRequest | null = null;
 
   // ─── Shared VoP modals ───
   showExactMatchModal = false;
@@ -72,7 +85,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   oneshotForm = this.fb.group({
     amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
     accountHolderName: ['', [Validators.required]],
-    transferType: ['regular', [Validators.required]],
+    transferType: [null as string | null, [Validators.required]],
     counterpartyCountry: ['', [Validators.required]],
     reference: [''],
     description: [''],
@@ -102,7 +115,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     routingNumber: [''],
     sortCode: [''],
     schedule: ['daily', [Validators.required]],
-    priority: ['regular', [Validators.required]],
+    priority: [null as string | null, [Validators.required]],
     reference: [''],
     description: [''],
     referenceForBeneficiary: ['']
@@ -112,6 +125,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   scaStatus = '';
 
   editingOrder: StandingOrder | null = null;
+  editRouteBeneficiary: TransferRouteRequest | null = null;
   editForm = this.fb.group({
     reference: [''],
     description: [''],
@@ -131,6 +145,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadUser();
+        this.loadRecipientCountries();
         this.fetchAccountInformation();
         this.checkDevices();
         this.loadStandingOrders();
@@ -162,6 +177,18 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       error: () => {
         this.user = null;
         this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadRecipientCountries() {
+    this.transferService.getRecipientCountries(this.userId).subscribe({
+      next: (countries) => {
+        this.recipientCountries = countries;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.snack.open('Failed to load recipient countries', 'Close', { duration: 3000 });
       }
     });
   }
@@ -215,32 +242,31 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.isAccountFormatValid = false;
     this.accountFormatError = '';
     this.isCheckingAccountFormat = false;
-    this.isLoadingFormat = false;
+    this.routeBeneficiary = null;
   }
 
-  onCountryChange(event: Event) {
-    const selectElement = event.target as HTMLSelectElement;
-    const countryCode = selectElement.value;
-    if (!countryCode) return;
-
-    this.isLoadingFormat = true;
-    this.bankAccountFormat = null;
+  onCountryChange(countryCode: string) {
     this.clearDynamicValidators();
+    this.bankAccountFormat = this.findRecipientCountry(countryCode)?.bankAccountFormat ?? null;
+    if (!this.bankAccountFormat) return;
 
-    this.transferService.getBankAccountFormat(countryCode).subscribe({
-      next: (res) => {
-        this.bankAccountFormat = res.bankAccountFormat as any;
-        this.applyDynamicValidators();
-        this.setupAsyncValidation();
-        this.isLoadingFormat = false;
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.isLoadingFormat = false;
-        this.snack.open('Error loading bank format for selected country', 'Close', { duration: 3000 });
-        this.cdr.detectChanges();
-      }
-    });
+    this.applyDynamicValidators();
+    this.setupAsyncValidation();
+  }
+
+  get testAccount(): TestAccount | null {
+    return this.findRecipientCountry(this.activeForm.value.counterpartyCountry)?.testAccount ?? null;
+  }
+
+  fillTestAccount() {
+    const testAccount = this.testAccount;
+    if (testAccount) {
+      this.activeForm.patchValue(testAccount);
+    }
+  }
+
+  private findRecipientCountry(countryCode: string | null | undefined): RecipientCountry | undefined {
+    return this.recipientCountries.find(country => country.countryCode === countryCode);
   }
 
   clearDynamicValidators() {
@@ -250,6 +276,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.isAccountFormatValid = false;
     this.accountFormatError = '';
     this.isCheckingAccountFormat = false;
+    this.routeBeneficiary = null;
 
     const form = this.activeForm;
     ['iban', 'accountNumber', 'routingNumber', 'sortCode'].forEach(field => {
@@ -296,6 +323,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       debounceTime(1000),
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       tap(() => {
+        this.routeBeneficiary = null;
         const allFilled = controlsToWatch.every(c => c?.value && c.valid);
         if (!allFilled) {
           this.isAccountFormatValid = false;
@@ -319,14 +347,22 @@ export class BankTransferComponent implements OnInit, OnDestroy {
           sortCode: form.value.sortCode || ''
         };
         return this.transferService.isBankAccountValid(req).pipe(
-          catchError(() => of({ isBankAccountValid: 'false' }))
+          catchError(() => of({ isBankAccountValid: 'false' })),
+          map(res => ({ res, req }))
         );
       })
-    ).subscribe((res) => {
+    ).subscribe(({ res, req }) => {
       this.isCheckingAccountFormat = false;
       if (res.isBankAccountValid === 'true' || res.isBankAccountValid === true as any) {
         this.isAccountFormatValid = true;
         this.accountFormatError = '';
+        this.routeBeneficiary = {
+          counterpartyCountry: req.counterpartyCountry,
+          iban: req.iban,
+          accountNumber: req.accountNumber,
+          routingNumber: req.routingNumber,
+          sortCode: req.sortCode
+        };
       } else {
         this.isAccountFormatValid = false;
         this.accountFormatError = 'Invalid account format or checksum.';
@@ -418,7 +454,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     const country = this.oneshotForm.value.counterpartyCountry;
     this.vopContext = 'oneshot';
 
-    if (country === 'US') {
+    if (!this.findRecipientCountry(country)?.payeeVerification) {
       this.initiateTransferFlow();
       return;
     }
@@ -488,10 +524,11 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: () => {
+        error: (err) => {
           this.ngZone.run(() => {
             this.isOneshotProcessing = false;
-            this.snack.open('Transfer initiation failed', 'Close', { duration: 3000 });
+            const message = err.status === 400 && err.error?.error ? err.error.error : 'Transfer initiation failed';
+            this.snack.open(message, 'Close', { duration: 5000 });
             this.cdr.detectChanges();
           });
         }
@@ -546,7 +583,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.bankAccountFormat = null;
     this.clearDynamicValidators();
     this.oneshotForm.reset({
-      transferType: 'regular',
+      transferType: null,
       counterpartyCountry: '',
       accountHolderName: ''
     });
@@ -582,13 +619,14 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.createForm.reset({
       counterpartyCountry: '',
       schedule: 'daily',
-      priority: 'regular'
+      priority: null
     });
   }
 
   showSoList() {
     this.soView = 'list';
     this.editingOrder = null;
+    this.editRouteBeneficiary = null;
     this.scaStatus = '';
     this.resetBankFormatState();
     this.loadStandingOrders();
@@ -596,6 +634,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   showSoEdit(order: StandingOrder) {
     this.editingOrder = order;
+    this.editRouteBeneficiary = this.routeBeneficiaryOf(order);
     this.soView = 'edit';
     this.editForm.patchValue({
       reference: order.reference || '',
@@ -603,6 +642,25 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       referenceForBeneficiary: order.referenceForBeneficiary || '',
       priority: order.priorities?.[0] || 'regular'
     });
+  }
+
+  private routeBeneficiaryOf(order: StandingOrder): TransferRouteRequest | null {
+    const account = order.counterparty?.bankAccount?.accountIdentification;
+    const countryByType: Record<string, string> = {
+      iban: (account?.iban || '').slice(0, 2).toUpperCase(),
+      ukLocal: 'GB',
+      usLocal: 'US'
+    };
+    const counterpartyCountry = account ? countryByType[account.type] : '';
+    if (!counterpartyCountry) return null;
+
+    return {
+      counterpartyCountry,
+      iban: account?.iban || '',
+      accountNumber: account?.accountNumber || '',
+      routingNumber: account?.routingNumber || '',
+      sortCode: account?.sortCode || ''
+    };
   }
 
   onDeleteSo(order: StandingOrder) {
@@ -683,7 +741,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     const country = this.createForm.value.counterpartyCountry;
     this.vopContext = 'standing';
 
-    if (country === 'US') {
+    if (!this.findRecipientCountry(country)?.payeeVerification) {
       this.initiateStandingOrderFlow();
       return;
     }

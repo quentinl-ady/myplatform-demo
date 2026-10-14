@@ -1,0 +1,25 @@
+<div class="country-search">
+  <mat-icon class="search-icon">search</mat-icon>
+  <input type="text"
+         class="fintech-input"
+         placeholder="Search by country name or code"
+         aria-label="Recipient country"
+         [formControl]="search"
+         [matAutocomplete]="countryAuto"
+         (blur)="onTouched()" />
+  <mat-autocomplete #countryAuto="matAutocomplete"
+                    autoActiveFirstOption
+                    [displayWith]="displayCountry"
+                    (optionSelected)="onOptionSelected($event)"
+                    (closed)="onPanelClosed()">
+    <mat-optgroup *ngFor="let group of filteredGroups" [label]="group.label">
+      <mat-option *ngFor="let country of group.countries" [value]="country">
+        <span class="country-option">
+          <span class="country-code">{{ country.countryCode }}</span>
+          <span>{{ country.name }}</span>
+        </span>
+      </mat-option>
+    </mat-optgroup>
+    <mat-option *ngIf="filteredGroups.length === 0" disabled>No matching country</mat-option>
+  </mat-autocomplete>
+</div>

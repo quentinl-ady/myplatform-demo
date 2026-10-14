@@ -60,22 +60,16 @@
 
           <div class="form-group">
             <label>Recipient Country</label>
-            <select class="fintech-input" formControlName="counterpartyCountry" (change)="onCountryChange()">
-              <option value="" disabled selected>Select a country</option>
-              <option value="FR">France</option>
-              <option value="GB">United Kingdom</option>
-              <option value="US">United States</option>
-              <option value="DE">Germany</option>
-              <option value="NL">Netherlands</option>
-            </select>
+            <app-recipient-country-picker formControlName="counterpartyCountry" [countries]="recipientCountries"
+                                          (countryChange)="onCountryChange($event)"></app-recipient-country-picker>
           </div>
 
-          <div class="loading-format" *ngIf="isLoadingFormat">
-            <mat-spinner diameter="20"></mat-spinner>
-            <span>Detecting bank account format...</span>
-          </div>
+          <ng-container *ngIf="bankAccountFormat">
 
-          <ng-container *ngIf="bankAccountFormat && !isLoadingFormat">
+            <button type="button" mat-stroked-button class="fintech-btn secondary test-account-btn" *ngIf="testAccount" (click)="fillTestAccount()">
+              <mat-icon>science</mat-icon>
+              Use test account
+            </button>
 
             <div class="form-group" *ngIf="bankAccountFormat === 'iban'">
               <label>Recipient IBAN</label>
@@ -116,16 +110,10 @@
           </ng-container>
 
           <div class="form-group">
-            <label>Transfer Type</label>
-            <select class="fintech-input" formControlName="transferType">
-              <option value="regular">Regular Transfer (1-2 days)</option>
-              <option value="instant">Instant Transfer (Immediate)</option>
-            </select>
-          </div>
-
-          <div class="fee-warning" *ngIf="transferForm.get('transferType')?.value === 'instant'">
-            <mat-icon class="fee-icon">info</mat-icon>
-            <span>A 1% additional commission will be applied and deducted from your account at the end of the month.</span>
+            <label>Transfer Speed</label>
+            <app-transfer-speed-picker formControlName="transferType" [userId]="userId" [currency]="userCurrency"
+                                       [beneficiary]="routeBeneficiary"
+                                       [amount]="transferForm.value.amount ?? null"></app-transfer-speed-picker>
           </div>
 
           <div class="form-group">
@@ -142,7 +130,7 @@
         </div>
 
         <button mat-flat-button type="submit" class="fintech-btn primary full-width"
-                [disabled]="transferForm.invalid || isAdding || isLoadingFormat || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
+                [disabled]="transferForm.invalid || isAdding || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
           <mat-spinner diameter="20" *ngIf="isAdding"></mat-spinner>
           <mat-icon *ngIf="!isAdding">add</mat-icon>
           {{ isAdding ? 'Adding...' : 'Add to batch' }}

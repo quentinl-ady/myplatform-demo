@@ -13,6 +13,7 @@ import com.adyen.service.balanceplatform.ManageScaDevicesApi;
 import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.model.InitiateTransferResponse;
 import com.myplatform.demo.model.PendingTransfer;
+import com.myplatform.demo.model.RecipientCountry;
 import com.myplatform.demo.model.TransferRequest;
 import com.myplatform.demo.repository.PendingTransferRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -25,8 +26,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static com.myplatform.demo.util.AdyenConstants.SEPA_COUNTRIES;
 
 @Service
 public class TransferService {
@@ -107,8 +106,8 @@ public class TransferService {
         }
     }
 
-    public InitiateTransferResponse initiateTransfer(TransferRequest request, String paymentInstrumentId) {
-        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+    public InitiateTransferResponse initiateTransfer(TransferRequest request, String paymentInstrumentId, RecipientCountry recipientCountry) {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId, recipientCountry);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -130,7 +129,7 @@ public class TransferService {
         InitiateTransferResponse initiateTransferResponse = new InitiateTransferResponse();
         initiateTransferResponse.setAmount(transferBody.getAmount().getValue());
         initiateTransferResponse.setCounterpartyCountry(request.getCounterpartyCountry());
-        populateCounterpartyDetails(initiateTransferResponse, request);
+        populateCounterpartyDetails(initiateTransferResponse, request, recipientCountry);
 
         List<String> authParam1Values = transferHeaders.get("auth-param1");
         if (authParam1Values != null && !authParam1Values.isEmpty()) {
@@ -140,8 +139,8 @@ public class TransferService {
         return initiateTransferResponse;
     }
 
-    public void finalizeTransfer(TransferRequest request, String paymentInstrumentId) {
-        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+    public void finalizeTransfer(TransferRequest request, String paymentInstrumentId, RecipientCountry recipientCountry) {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId, recipientCountry);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -157,20 +156,21 @@ public class TransferService {
         restTemplate.exchange(url, HttpMethod.POST, entity, Transfer.class);
     }
 
-    public void populateCounterpartyDetails(InitiateTransferResponse response, TransferRequest request) {
-        if (SEPA_COUNTRIES.contains(request.getCounterpartyCountry())) {
+    public void populateCounterpartyDetails(InitiateTransferResponse response, TransferRequest request, RecipientCountry recipientCountry) {
+        String bankAccountFormat = recipientCountry.getBankAccountFormat();
+        if ("iban".equals(bankAccountFormat)) {
             response.setIban(request.getIban());
-        } else if ("US".equals(request.getCounterpartyCountry())) {
+        } else if ("accountNumberRoutingNumber".equals(bankAccountFormat)) {
             response.setAccountNumber(request.getAccountNumber());
             response.setRoutingNumber(request.getRoutingNumber());
-        } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())) {
+        } else if ("accountNumberSortCode".equals(bankAccountFormat)) {
             response.setAccountNumber(request.getAccountNumber());
             response.setSortCode(request.getSortCode());
         }
     }
 
-    public Map<String, Object> initiateBatchTransfer(TransferRequest request, String paymentInstrumentId, String accountHolderId) {
-        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId);
+    public Map<String, Object> initiateBatchTransfer(TransferRequest request, String paymentInstrumentId, String accountHolderId, RecipientCountry recipientCountry) {
+        TransferInfo transferInfo = getTransferInfo(request, paymentInstrumentId, recipientCountry);
 
         TransferRequestReview review = new TransferRequestReview()
                 .numberOfApprovalsRequired(1)
@@ -313,40 +313,37 @@ public class TransferService {
         }
     }
 
-    private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId) {
+    private TransferInfo getTransferInfo(TransferRequest request, String paymentInstrumentId, RecipientCountry recipientCountry) {
         TransferInfo transferInfo = new TransferInfo();
         BankAccountV3AccountIdentification accountIdentification = new BankAccountV3AccountIdentification();
         Address address = new Address();
+        String bankAccountFormat = recipientCountry.getBankAccountFormat();
 
-        if (SEPA_COUNTRIES.contains(request.getCounterpartyCountry())) {
-            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("EUR").value(request.getAmount()));
+        transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency(recipientCountry.getCurrency()).value(request.getAmount()));
+        address.setCountry(recipientCountry.getCountryCode());
+
+        if ("iban".equals(bankAccountFormat)) {
             IbanAccountIdentification iban = new IbanAccountIdentification();
             iban.setIban(request.getIban());
             iban.setType(IbanAccountIdentification.TypeEnum.IBAN);
             accountIdentification = new BankAccountV3AccountIdentification(iban);
-
-            address.setCountry(request.getCounterpartyCountry());
-        } else if ("US".equals(request.getCounterpartyCountry())) {
-            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("USD").value(request.getAmount()));
+        } else if ("accountNumberRoutingNumber".equals(bankAccountFormat)) {
             USLocalAccountIdentification usLocalAccountIdentification = new USLocalAccountIdentification();
             usLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
             usLocalAccountIdentification.setRoutingNumber(request.getRoutingNumber());
             usLocalAccountIdentification.setType(USLocalAccountIdentification.TypeEnum.USLOCAL);
             accountIdentification = new BankAccountV3AccountIdentification(usLocalAccountIdentification);
 
-            address.setCountry(request.getCounterpartyCountry());
             address.setPostalCode("20001");
             address.setCity("Washington");
             address.setLine1("71 5th Avenue");
-        } else if ("UK".equals(request.getCounterpartyCountry()) || "GB".equals(request.getCounterpartyCountry())) {
-            transferInfo.setAmount(new com.adyen.model.transfers.Amount().currency("GBP").value(request.getAmount()));
+        } else if ("accountNumberSortCode".equals(bankAccountFormat)) {
             UKLocalAccountIdentification ukLocalAccountIdentification = new UKLocalAccountIdentification();
             ukLocalAccountIdentification.setAccountNumber(request.getAccountNumber());
             ukLocalAccountIdentification.setSortCode(request.getSortCode());
             ukLocalAccountIdentification.setType(UKLocalAccountIdentification.TypeEnum.UKLOCAL);
             accountIdentification = new BankAccountV3AccountIdentification(ukLocalAccountIdentification);
 
-            address.setCountry("GB");
             address.setPostalCode("SW1A 1AA");
             address.setCity("London");
             address.setLine1("123 Main St");

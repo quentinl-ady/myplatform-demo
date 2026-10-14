@@ -3,14 +3,26 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
 import { Subscription, combineLatest, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter, map } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
-import { BankAccountInformationResponse, BatchTransferRequest, BatchTransferResponse, User, VerifyCounterpartyNameRequest } from '../models';
+import {
+  BankAccountFormat,
+  BankAccountInformationResponse,
+  BatchTransferRequest,
+  BatchTransferResponse,
+  RecipientCountry,
+  TestAccount,
+  TransferRouteRequest,
+  User,
+  VerifyCounterpartyNameRequest
+} from '../models';
 import { AccountService, TransferService } from '../services';
+import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
+import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
 
 @Component({
   selector: 'app-batch-transfer',
@@ -19,7 +31,9 @@ import { AccountService, TransferService } from '../services';
     CommonModule,
     ReactiveFormsModule,
     MaterialModule,
-    DeviceRegistrationComponent
+    DeviceRegistrationComponent,
+    RecipientCountryPickerComponent,
+    TransferSpeedPickerComponent
   ],
   templateUrl: './batch-transfer.component.html',
   styleUrl: './batch-transfer.component.css'
@@ -40,12 +54,15 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   hasDevices = signal<boolean | null>(null);
 
   userCurrency = 'EUR';
-  bankAccountFormat: 'iban' | 'accountNumberRoutingNumber' | 'accountNumberSortCode' | null = null;
-  isLoadingFormat = false;
+  recipientCountries: RecipientCountry[] = [];
+  bankAccountFormat: BankAccountFormat | null = null;
   isCheckingAccountFormat = false;
   isAccountFormatValid = false;
   accountFormatError = '';
   private validationSub?: Subscription;
+
+  // Bank details the transfer routes are calculated for, set once they pass the format check.
+  routeBeneficiary: TransferRouteRequest | null = null;
 
   // VoP
   showExactMatchModal = false;
@@ -61,7 +78,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     accountNumber: [''],
     routingNumber: [''],
     sortCode: [''],
-    transferType: ['regular', [Validators.required]],
+    transferType: [null as string | null, [Validators.required]],
     reference: [''],
     description: ['']
   });
@@ -83,6 +100,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadUser();
+        this.loadRecipientCountries();
         this.fetchAccountInformation();
         this.checkDevices();
         this.loadPendingTransfers();
@@ -94,14 +112,24 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.accountService.getUserById(this.userId).subscribe({
       next: (user) => {
         this.user = user;
-        if (user.countryCode === 'US') this.userCurrency = 'USD';
-        else if (user.countryCode === 'GB') this.userCurrency = 'GBP';
-        else this.userCurrency = 'EUR';
+        this.userCurrency = user.currencyCode || 'EUR';
         this.cdr.detectChanges();
       },
       error: () => {
         this.user = null;
         this.cdr.detectChanges();
+      }
+    });
+  }
+
+  loadRecipientCountries() {
+    this.transferService.getRecipientCountries(this.userId).subscribe({
+      next: (countries) => {
+        this.recipientCountries = countries;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.snack.open('Failed to load recipient countries', 'Close', { duration: 3000 });
       }
     });
   }
@@ -179,33 +207,28 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   // ─────────── Bank format validation ───────────
 
-  onCountryChange() {
-    const country = this.transferForm.value.counterpartyCountry;
-    if (!country) return;
-
-    if (country === 'US') this.userCurrency = 'USD';
-    else if (country === 'GB') this.userCurrency = 'GBP';
-    else this.userCurrency = 'EUR';
-
-    this.isLoadingFormat = true;
-    this.bankAccountFormat = null;
+  onCountryChange(countryCode: string) {
     this.clearDynamicValidators();
-    this.cdr.detectChanges();
+    this.bankAccountFormat = this.findRecipientCountry(countryCode)?.bankAccountFormat ?? null;
+    if (!this.bankAccountFormat) return;
 
-    this.transferService.getBankAccountFormat(country).subscribe({
-      next: (res) => {
-        this.bankAccountFormat = res.bankAccountFormat as any;
-        this.applyDynamicValidators();
-        this.setupAsyncValidation();
-        this.isLoadingFormat = false;
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.isLoadingFormat = false;
-        this.snack.open('Failed to detect bank account format', 'Close', { duration: 3000 });
-        this.cdr.detectChanges();
-      }
-    });
+    this.applyDynamicValidators();
+    this.setupAsyncValidation();
+  }
+
+  get testAccount(): TestAccount | null {
+    return this.findRecipientCountry(this.transferForm.value.counterpartyCountry)?.testAccount ?? null;
+  }
+
+  fillTestAccount() {
+    const testAccount = this.testAccount;
+    if (testAccount) {
+      this.transferForm.patchValue(testAccount);
+    }
+  }
+
+  private findRecipientCountry(countryCode: string | null | undefined): RecipientCountry | undefined {
+    return this.recipientCountries.find(country => country.countryCode === countryCode);
   }
 
   clearDynamicValidators() {
@@ -215,6 +238,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.isAccountFormatValid = false;
     this.accountFormatError = '';
     this.isCheckingAccountFormat = false;
+    this.routeBeneficiary = null;
 
     ['iban', 'accountNumber', 'routingNumber', 'sortCode'].forEach(field => {
       this.transferForm.get(field)?.clearValidators();
@@ -258,6 +282,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       debounceTime(1000),
       distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
       tap(() => {
+        this.routeBeneficiary = null;
         const allFilled = controlsToWatch.every(c => c?.value && c.valid);
         if (!allFilled) {
           this.isAccountFormatValid = false;
@@ -281,14 +306,22 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
           sortCode: this.transferForm.value.sortCode || ''
         };
         return this.transferService.isBankAccountValid(req).pipe(
-          catchError(() => of({ isBankAccountValid: 'false' }))
+          catchError(() => of({ isBankAccountValid: 'false' })),
+          map(res => ({ res, req }))
         );
       })
-    ).subscribe((res) => {
+    ).subscribe(({ res, req }) => {
       this.isCheckingAccountFormat = false;
       if (res.isBankAccountValid === 'true' || res.isBankAccountValid === true as any) {
         this.isAccountFormatValid = true;
         this.accountFormatError = '';
+        this.routeBeneficiary = {
+          counterpartyCountry: req.counterpartyCountry,
+          iban: req.iban,
+          accountNumber: req.accountNumber,
+          routingNumber: req.routingNumber,
+          sortCode: req.sortCode
+        };
       } else {
         this.isAccountFormatValid = false;
         this.accountFormatError = 'Invalid account format or checksum.';
@@ -305,7 +338,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.isAccountFormatValid = false;
     this.accountFormatError = '';
     this.isCheckingAccountFormat = false;
-    this.isLoadingFormat = false;
+    this.routeBeneficiary = null;
   }
 
   // ─────────── VoP (Verification of Payee) ───────────
@@ -315,7 +348,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
     const country = this.transferForm.value.counterpartyCountry;
 
-    if (country === 'US') {
+    if (!this.findRecipientCountry(country)?.payeeVerification) {
       this.addToBatch();
       return;
     }
@@ -426,7 +459,10 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.ngZone.run(() => {
           this.isAdding = false;
-          this.snack.open(err.error?.message || 'Failed to add transfer to batch', 'Close', { duration: 3000 });
+          const message = err.status === 400 && err.error?.error
+            ? err.error.error
+            : (err.error?.message || 'Failed to add transfer to batch');
+          this.snack.open(message, 'Close', { duration: 5000 });
           this.cdr.detectChanges();
         });
       }
@@ -565,7 +601,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     const currentCountry = this.transferForm.value.counterpartyCountry;
     this.clearDynamicValidators();
     this.transferForm.reset({
-      transferType: 'regular',
+      transferType: null,
       counterpartyCountry: currentCountry
     });
     if (currentCountry) {

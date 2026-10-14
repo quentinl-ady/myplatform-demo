@@ -1,0 +1,24 @@
+:host { display: flex; flex-direction: column; gap: 10px; }
+
+.speed-status { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border: 1px dashed var(--fintech-border, #e5e5e5); border-radius: 10px; font-size: 13px; color: var(--fintech-text-secondary, #737373); }
+.speed-status.error { border-style: solid; border-color: #ffcdd2; background: #fff5f5; color: #c62828; }
+.speed-status mat-icon, .speed-message mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+.retry-btn { margin-left: auto; background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: var(--fintech-primary, #000000); text-decoration: underline; cursor: pointer; }
+
+.speed-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.speed-option { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--fintech-border, #e5e5e5); border-radius: 10px; background: var(--fintech-surface, #ffffff); cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+.speed-option:hover:not(.unavailable) { border-color: var(--fintech-text-secondary, #737373); }
+.speed-option.selected { border-color: var(--fintech-primary, #000000); box-shadow: inset 0 0 0 1px var(--fintech-primary, #000000); }
+.speed-option:focus-within { outline: 2px solid var(--fintech-primary, #000000); outline-offset: 2px; }
+.speed-option.unavailable { cursor: not-allowed; background: var(--fintech-bg, #f5f6f8); border-style: dashed; }
+.speed-option input { position: absolute; opacity: 0; pointer-events: none; }
+.speed-label { font-size: 15px; font-weight: 600; color: var(--fintech-text, #1a1a1a); }
+.speed-option.unavailable .speed-label { color: var(--fintech-text-secondary, #737373); }
+.speed-timing { font-size: 12px; color: var(--fintech-text-secondary, #737373); }
+.speed-limits { font-size: 11px; color: var(--fintech-text-secondary, #737373); margin-top: 4px; }
+
+.speed-message { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; font-weight: 500; color: #f44336; }
+
+@media (max-width: 520px) {
+  .speed-options { grid-template-columns: 1fr; }
+}

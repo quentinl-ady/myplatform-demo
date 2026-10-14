@@ -38,6 +38,7 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .fintech-btn:disabled { background-color: var(--fintech-border) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; opacity: 0.7; box-shadow: none !important; }
 .fintech-btn.secondary { background-color: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
 .fintech-btn.full-width { width: 100%; padding: 12px 24px !important; font-size: 16px !important; }
+.test-account-btn { align-self: flex-start; }
 
 /* Transfer form */
 .transfer-card h2 { font-size: 20px; font-weight: 600; margin: 0 0 24px 0; color: var(--fintech-text); }
@@ -49,9 +50,6 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--fintech-text-secondary); margin-bottom: 6px; }
 .fintech-input { width: 100%; padding: 14px 16px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface); transition: border-color 0.2s; }
 .fintech-input:focus { outline: none; border-color: var(--fintech-primary); }
-.fee-warning { display: flex; align-items: flex-start; gap: 12px; background-color: var(--fintech-warning-bg); border-left: 4px solid var(--fintech-warning); padding: 12px 16px; border-radius: 8px; font-size: 13px; line-height: 1.4; color: #3e2723; }
-.fee-icon { color: var(--fintech-warning); font-size: 20px; width: 20px; height: 20px; }
-.loading-format { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fintech-text-secondary); padding: 8px 0; }
 .validation-status { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; padding: 4px 8px; margin-top: -4px; border-radius: 8px; }
 .success-icon-small { color: #4caf50; font-size: 18px; width: 18px; height: 18px; }
 .error-icon-small { color: #f44336; font-size: 18px; width: 18px; height: 18px; }

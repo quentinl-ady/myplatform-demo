@@ -27,12 +27,6 @@ public class BankValidationController {
         this.bankValidationService = bankValidationService;
     }
 
-    @GetMapping("/format/{countryCode}")
-    public ResponseEntity<Map<String, String>> getBankAccountFormat(@PathVariable String countryCode) {
-        String bankAccountFormat = bankValidationService.getBankAccountFormat(countryCode);
-        return ResponseEntity.ok(Map.of("bankAccountFormat", bankAccountFormat));
-    }
-
     @PostMapping("/cross-border")
     public ResponseEntity<Map<String, String>> isCrossBorder(@RequestBody IsCrossBorderRequest request) {
         User user = userRepository.findById(request.getUserId())

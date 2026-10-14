@@ -11,9 +11,12 @@ import {
   InitiateTransferResponse,
   IsBankAccountValidRequest,
   IsCrossBorderRequest,
+  RecipientCountry,
   RegisterSCAFinalResponse,
   RegisterSCAResponse,
   TransferDetail,
+  TransferRouteOption,
+  TransferRouteRequest,
   VerifyCounterpartyNameRequest,
   BatchTransferRequest,
   BatchTransferResponse,
@@ -96,8 +99,12 @@ export class TransferService {
     return this.http.post<{ status: string }>(`${this.baseUrl}/api/transfers/finalize`, request);
   }
 
-  getBankAccountFormat(countryCode: string): Observable<{ bankAccountFormat: string }> {
-    return this.http.get<{ bankAccountFormat: string }>(`${this.baseUrl}/api/bank-validation/format/${countryCode}`);
+  getRecipientCountries(userId: string): Observable<RecipientCountry[]> {
+    return this.http.get<RecipientCountry[]>(`${this.baseUrl}/api/transfers/${userId}/recipient-countries`);
+  }
+
+  calculateTransferRoutes(userId: string, request: TransferRouteRequest): Observable<TransferRouteOption[]> {
+    return this.http.post<TransferRouteOption[]>(`${this.baseUrl}/api/transfers/${userId}/transfer-routes`, request);
   }
 
   isCrossBorder(request: IsCrossBorderRequest): Observable<{ isCrossBorder: string }> {

@@ -1,0 +1,48 @@
+<div class="speed-status" *ngIf="status === 'idle'">
+  <mat-icon>speed</mat-icon>
+  <span>Enter valid bank details to see which transfer speeds are available.</span>
+</div>
+
+<div class="speed-status" *ngIf="status === 'loading'">
+  <mat-spinner diameter="16"></mat-spinner>
+  <span>Checking the available transfer routes...</span>
+</div>
+
+<div class="speed-status error" *ngIf="status === 'error'">
+  <mat-icon>error</mat-icon>
+  <span>{{ errorMessage }}</span>
+  <button type="button" class="retry-btn" (click)="retry()">Retry</button>
+</div>
+
+<ng-container *ngIf="status === 'loaded'">
+
+  <div class="speed-status error" *ngIf="!hasAvailableRoute">
+    <mat-icon>block</mat-icon>
+    <span>No transfer route is available for this beneficiary.</span>
+  </div>
+
+  <div class="speed-options" role="radiogroup" *ngIf="hasAvailableRoute">
+    <label class="speed-option" *ngFor="let option of options"
+           [class.selected]="!!option.route && value === option.priority"
+           [class.unavailable]="!option.route">
+      <input type="radio" [name]="radioName" [value]="option.priority"
+             [checked]="!!option.route && value === option.priority"
+             [disabled]="disabled || !option.route"
+             (change)="select(option.priority)" (blur)="onTouched()" />
+      <span class="speed-label">{{ option.label }}</span>
+      <span class="speed-timing">{{ option.route ? option.timing : 'Not available' }}</span>
+      <span class="speed-limits" *ngIf="option.route && limitsOf(option.route) as limits">{{ limits }}</span>
+    </label>
+  </div>
+
+  <div class="speed-message" *ngIf="value && hasAvailableRoute && !selectedRoute">
+    <mat-icon>error</mat-icon>
+    <span>{{ selectedLabel }} is not available for this beneficiary. Choose another speed.</span>
+  </div>
+
+  <div class="speed-message" *ngIf="amountError">
+    <mat-icon>error</mat-icon>
+    <span>{{ amountError }}</span>
+  </div>
+
+</ng-container>

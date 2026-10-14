@@ -10,7 +10,15 @@ export interface StandingOrderCounterparty {
     };
     accountIdentification: {
       type: string;
-      iban: string;
+      iban?: string;
+      accountNumber?: string;
+      routingNumber?: string;
+      sortCode?: string;
+      bankCode?: string;
+      bsbCode?: string;
+      clearingCode?: string;
+      clearingNumber?: string;
+      bic?: string;
     };
   };
 }

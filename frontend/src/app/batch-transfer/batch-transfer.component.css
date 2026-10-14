@@ -28,6 +28,7 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .fintech-btn.secondary { background-color: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
 .fintech-btn.full-width { width: 100%; padding: 12px 24px !important; font-size: 16px !important; }
 .fintech-btn.danger { background-color: #f44336 !important; color: white !important; }
+.test-account-btn { align-self: flex-start; }
 
 /* Transfer form */
 .transfer-card h2 { font-size: 20px; font-weight: 600; margin: 0 0 24px 0; color: var(--fintech-text); }
@@ -47,8 +48,6 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .error-text { color: #f44336; }
 .pending-text { color: var(--fintech-text-secondary); }
 .hint-text { font-size: 12px; color: var(--fintech-text-secondary); margin-top: 6px; display: block; font-style: italic; }
-.fee-warning { display: flex; align-items: flex-start; gap: 12px; background-color: var(--fintech-warning-bg); border-left: 4px solid var(--fintech-warning); padding: 12px 16px; border-radius: 8px; font-size: 13px; line-height: 1.4; color: #3e2723; }
-.fee-icon { color: var(--fintech-warning); font-size: 20px; width: 20px; height: 20px; }
 
 /* Pending transfers list */
 .pending-card h2 { font-size: 20px; font-weight: 600; margin: 0 0 4px 0; color: var(--fintech-text); }

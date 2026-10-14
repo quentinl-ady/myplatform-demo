@@ -81,6 +81,37 @@ export interface IsCrossBorderRequest {
   countryCodeCounterparty: string;
 }
 
+export type BankAccountFormat = 'iban' | 'accountNumberRoutingNumber' | 'accountNumberSortCode';
+
+export type TestAccount = Partial<Record<'iban' | 'accountNumber' | 'routingNumber' | 'sortCode', string>>;
+
+export interface RecipientCountry {
+  countryCode: string;
+  currency: string;
+  group: string;
+  bankAccountFormat: BankAccountFormat;
+  payeeVerification: boolean;
+  testAccount: TestAccount | null;
+}
+
+export type TransferPriority = 'regular' | 'fast' | 'instant';
+
+export interface TransferRouteRequest {
+  counterpartyCountry: string;
+  iban: string;
+  accountNumber: string;
+  routingNumber: string;
+  sortCode: string;
+}
+
+export interface TransferRouteOption {
+  priority: TransferPriority;
+  minAmount: number | null;
+  maxAmount: number | null;
+  wholeAmountsOnly: boolean;
+  requirements: string[];
+}
+
 export interface IsBankAccountValidRequest {
   transferType: string;
   accountNumber: string;
