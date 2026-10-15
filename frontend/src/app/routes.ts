@@ -5,25 +5,31 @@ const routeConfig: Routes = [
   {
     path: '',
     loadComponent: () => import('./main/main.component').then(m => m.MainComponent),
-    title: 'Homepage'
+    title: 'Log in'
   },
   {
     path: 'result/:status',
-    loadComponent: () => import('./result/paymentresult.component').then(m => m.PaymentResultComponent)
+    loadComponent: () => import('./result/paymentresult.component').then(m => m.PaymentResultComponent),
+    title: 'Payment result'
   },
   {
     path: 'login',
-    loadComponent: () => import('./login/login.component').then(m => m.LoginComponent),
-    title: 'Login'
+    pathMatch: 'full',
+    redirectTo: ''
   },
   {
     path: ':id',
     component: LayoutComponent,
     children: [
       {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'dashboard'
+      },
+      {
         path: 'dashboard',
         loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent),
-        title: 'Dashboard'
+        title: 'Onboarding'
       },
       {
         path: 'transactions',
@@ -33,17 +39,17 @@ const routeConfig: Routes = [
       {
         path: 'report',
         loadComponent: () => import('./report/report.component').then(m => m.ReportComponent),
-        title: 'Report'
+        title: 'Reports'
       },
       {
         path: 'cash-management',
         loadComponent: () => import('./cash-management/cash-management.component').then(m => m.CashManagementComponent),
-        title: 'Cash Management'
+        title: 'Cash management'
       },
       {
         path: 'dispute',
         loadComponent: () => import('./dispute/dispute.component').then(m => m.DisputeComponent),
-        title: 'Dispute'
+        title: 'Disputes'
       },
       {
         path: 'businessloans',
@@ -53,7 +59,7 @@ const routeConfig: Routes = [
       {
         path: 'store',
         loadComponent: () => import('./store/store.component').then(m => m.StoreComponent),
-        title: 'Store'
+        title: 'Stores'
       },
       {
         path: 'checkout',
@@ -63,57 +69,57 @@ const routeConfig: Routes = [
       {
          path: 'paybylink',
          loadComponent: () => import('./paybylink/paybylink.component').then(m => m.PayByLinkComponent),
-         title: 'Pay-by-Link'
+         title: 'Pay by Link'
       },
       {
         path: 'business-account-device',
         loadComponent: () => import('./device/device.component').then(m => m.DeviceComponent),
-        title: 'Trusted Devices'
+        title: 'Trusted devices'
       },
       {
         path: 'business-account',
         loadComponent: () => import('./transfer/transfer.component').then(m => m.TransferComponent),
-        title: 'Business Account'
+        title: 'Business account'
       },
       {
         path: 'banktransfer',
         loadComponent: () => import('./banktransfer/banktransfer.component').then(m => m.BankTransferComponent),
-        title: 'Bank Transfers'
+        title: 'Bank transfers'
       },
       {
         path: 'batch-transfer',
         loadComponent: () => import('./batch-transfer/batch-transfer.component').then(m => m.BatchTransferComponent),
-        title: 'Batch Transfers'
+        title: 'Batch transfers'
       },
       {
         path: 'pos',
         loadComponent: () => import('./pos/pos.component').then(m => m.PosComponent),
-        title: 'Point of Sale'
+        title: 'Point of sale'
       },
       {
         path: 'cards',
         loadComponent: () => import('./card-list/card-list.component').then(m => m.CardListComponent),
-        title: 'My Cards'
+        title: 'My cards'
       },
       {
         path: 'card-create',
         loadComponent: () => import('./card-create/card-create.component').then(m => m.CardCreateComponent),
-        title: 'Create Card'
+        title: 'Create card'
       },
       {
         path: 'card-transactions',
         loadComponent: () => import('./card-transactions/card-transactions.component').then(m => m.CardTransactionsComponent),
-        title: 'Card Transactions'
+        title: 'Card transactions'
       },
       {
         path: 'issuing-checkout',
         loadComponent: () => import('./issuing-checkout/issuing-checkout.component').then(m => m.IssuingCheckoutComponent),
-        title: 'Test Issued Cards'
+        title: 'Test issued cards'
       },
       {
         path: 'relayed-auth',
         loadComponent: () => import('./relayed-auth/relayed-auth.component').then(m => m.RelayedAuthComponent),
-        title: 'Relayed Authorisation'
+        title: 'Relayed authorisation'
       },
       {
         path: 'notifications',

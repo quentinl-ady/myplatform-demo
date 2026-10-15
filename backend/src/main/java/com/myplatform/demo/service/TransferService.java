@@ -249,6 +249,55 @@ public class TransferService {
         return result;
     }
 
+    /**
+     * Cancels batch transfers that are still waiting for approval, so "Clear" in the UI doesn't
+     * leave them pending on Adyen. Only transfers recorded for this account holder are sent.
+     */
+    public Map<String, Object> cancelTransfers(String accountHolderId, List<String> transferIds) {
+        java.util.Set<String> ownTransferIds = new java.util.HashSet<>();
+        for (PendingTransfer pt : pendingTransferRepository.findByAccountHolderId(accountHolderId)) {
+            ownTransferIds.add(pt.getTransferId());
+        }
+        List<String> idsToCancel = transferIds.stream().filter(ownTransferIds::contains).distinct().toList();
+        if (idsToCancel.isEmpty()) {
+            throw new com.myplatform.demo.exception.BadRequestException("These transfers are not pending for this account");
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("X-API-Key", balancePlatformApiKey);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("transferIds", idsToCancel);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+        String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers/cancel";
+
+        int maxRetries = 3;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+                break;
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                String responseBody = e.getResponseBodyAsString();
+                if (attempt < maxRetries && responseBody != null && responseBody.contains("Transfer not found")) {
+                    log.info("Transfer not found on cancel attempt {}/{}, retrying in 2s...", attempt, maxRetries);
+                    try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        pendingTransferRepository.deleteAllById(idsToCancel);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "cancelled");
+        result.put("transferIds", idsToCancel);
+        return result;
+    }
+
     public Map<String, Object> getPendingTransfers(String accountHolderId) {
         List<PendingTransfer> stored = pendingTransferRepository.findByAccountHolderId(accountHolderId);
         List<Map<String, Object>> results = new java.util.ArrayList<>();

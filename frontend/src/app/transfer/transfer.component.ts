@@ -1,21 +1,30 @@
-import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from "@angular/common";
+import { A11yModule } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
+import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
 import { BankAccountInformationResponse, BankTransaction, TransferDetail } from "../models";
 import { AccountService, TransferService } from "../services";
+import { MoneyPipe, httpErrorMessage, scaErrorMessage } from '../shared';
+import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
+import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
 
 @Component({
   selector: 'app-transfer',
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
+    A11yModule,
     MaterialModule,
-    DeviceRegistrationComponent
+    MoneyPipe,
+    DeviceRegistrationComponent,
+    AccountSetupStateComponent
   ],
   templateUrl: './transfer.component.html',
   styleUrl: './transfer.component.css'
@@ -33,7 +42,10 @@ export class TransferComponent implements OnInit, OnDestroy {
   accountInfo?: BankAccountInformationResponse;
   isDownloadingRib = false;
 
-  hasDevices = signal<boolean | null>(null);
+  accountState: LoadState = 'loading';
+  devicesState: LoadState = 'loading';
+  hasDevices = false;
+  loadErrorMessage = '';
 
   transactions: BankTransaction[] = [];
   isLoadingTransactions = false;
@@ -44,7 +56,11 @@ export class TransferComponent implements OnInit, OnDestroy {
   detailError = '';
 
   lastUpdated: number | null = null;
-  private lastUpdatedTimer: any = null;
+  private lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
+
+  readonly formatDate = formatDate;
+  readonly formatDateTime = formatDateTime;
+  readonly speedLabel = speedLabel;
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -56,48 +72,68 @@ export class TransferComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngOnDestroy() {
+    this.stopLastUpdatedTimer();
+  }
+
+  get setupState(): LoadState {
+    return combineLoadStates(this.accountState, this.devicesState);
+  }
+
+  retryPage() {
+    if (this.accountState !== 'ready') this.fetchAccountInformation();
+    if (this.devicesState !== 'ready') this.checkDevices();
+  }
+
   fetchAccountInformation() {
+    this.accountState = 'loading';
     this.accountService.getBankAccountInformation(this.userId).subscribe({
       next: (info) => {
         this.accountInfo = info;
+        this.accountState = 'ready';
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.snack.open('Failed to load account information', 'Close', { duration: 3000 });
+      error: (err) => {
+        this.accountState = failedLoadState(err);
+        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your account. Try again.");
+        this.cdr.detectChanges();
       }
     });
   }
 
   checkDevices() {
+    this.devicesState = 'loading';
     this.transferService.listDevices(this.userId).subscribe({
       next: (devices) => {
-        this.hasDevices.set(devices && devices.length > 0);
-        if (this.hasDevices()) {
+        this.hasDevices = !!devices && devices.length > 0;
+        this.devicesState = 'ready';
+        if (this.hasDevices) {
           this.loadTransactions();
         }
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.hasDevices.set(false);
+      error: (err) => {
+        this.devicesState = failedLoadState(err);
+        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
         this.cdr.detectChanges();
       }
     });
   }
 
   onDeviceRegistered() {
-    this.hasDevices.set(true);
-    this.snack.open('Device registered successfully! You can now view transactions.', 'Close', { duration: 4000 });
+    this.hasDevices = true;
+    this.snack.open('Device registered. You can now view your transactions.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
     this.loadTransactions();
     this.cdr.detectChanges();
   }
 
   async loadTransactions(forceRefresh = false) {
+    if (this.isLoadingTransactions) return;
     if (!forceRefresh) {
       const cached = this.transferService.getCachedTransactions(this.userId);
       if (cached) {
         this.transactions = cached;
         this.lastUpdated = this.transferService.getCacheTimestamp(this.userId);
-        this.isLoadingTransactions = false;
         this.startLastUpdatedTimer();
         this.cdr.detectChanges();
         return;
@@ -118,32 +154,20 @@ export class TransferComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.ngZone.run(() => {
             if (res.status === 'completed') {
-              this.transactions = res.transactions || [];
-              this.transferService.setCachedTransactions(this.userId, this.transactions);
-              this.lastUpdated = Date.now();
-              this.startLastUpdatedTimer();
-              this.isLoadingTransactions = false;
+              this.onTransactionsLoaded(res.transactions);
             } else if (res.status === 'sca_required') {
               this.handleScaChallenge(res.authParam1, res.createdSince, res.createdUntil);
             } else {
-              this.isLoadingTransactions = false;
-              this.transactionsError = 'Unexpected response';
+              this.failTransactions("Couldn't load your transactions: unexpected response. Try again.");
             }
-            this.cdr.detectChanges();
           });
         },
         error: (err) => {
-          this.ngZone.run(() => {
-            this.isLoadingTransactions = false;
-            this.transactionsError = err.error?.message || 'Failed to load transactions';
-            this.cdr.detectChanges();
-          });
+          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "Couldn't load your transactions. Try again.")));
         }
       });
     } catch (e) {
-      this.isLoadingTransactions = false;
-      this.transactionsError = 'SCA initialization failed';
-      this.cdr.detectChanges();
+      this.ngZone.run(() => this.failTransactions(scaErrorMessage(e, "Couldn't start the authentication. Try again.")));
     }
   }
 
@@ -154,28 +178,31 @@ export class TransferComponent implements OnInit, OnDestroy {
 
       this.transferService.finalizeBankTransactions(this.userId, String(sdkOutput), createdSince, createdUntil).subscribe({
         next: (res) => {
-          this.ngZone.run(() => {
-            this.transactions = res.transactions || [];
-            this.transferService.setCachedTransactions(this.userId, this.transactions);
-            this.lastUpdated = Date.now();
-            this.startLastUpdatedTimer();
-            this.isLoadingTransactions = false;
-            this.cdr.detectChanges();
-          });
+          this.ngZone.run(() => this.onTransactionsLoaded(res.transactions));
         },
         error: (err) => {
-          this.ngZone.run(() => {
-            this.isLoadingTransactions = false;
-            this.transactionsError = err.error?.message || 'Failed to finalize transactions';
-            this.cdr.detectChanges();
-          });
+          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "Couldn't load your transactions. Try again.")));
         }
       });
     } catch (e) {
-      this.isLoadingTransactions = false;
-      this.transactionsError = 'SCA authentication failed';
-      this.cdr.detectChanges();
+      this.ngZone.run(() => this.failTransactions(scaErrorMessage(e, 'Authentication failed. Try again.')));
     }
+  }
+
+  private onTransactionsLoaded(transactions: BankTransaction[] | null | undefined) {
+    this.transactions = transactions || [];
+    this.transferService.setCachedTransactions(this.userId, this.transactions);
+    this.lastUpdated = Date.now();
+    this.startLastUpdatedTimer();
+    this.isLoadingTransactions = false;
+    this.transactionsError = '';
+    this.cdr.detectChanges();
+  }
+
+  private failTransactions(message: string) {
+    this.isLoadingTransactions = false;
+    this.transactionsError = message;
+    this.cdr.detectChanges();
   }
 
   refresh() {
@@ -184,7 +211,7 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   openDetail(tx: BankTransaction) {
     if (!tx.transferId) {
-      this.snack.open('No transfer detail available for this transaction', 'Close', { duration: 3000 });
+      this.snack.open('No transfer details are available for this transaction.', 'Close', { duration: 3000 });
       return;
     }
     this.transferDetail = undefined;
@@ -200,7 +227,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isLoadingDetail = false;
-        this.detailError = err.error?.message || 'Failed to load transfer detail';
+        this.detailError = httpErrorMessage(err, "Couldn't load the transfer details. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -228,52 +255,36 @@ export class TransferComponent implements OnInit, OnDestroy {
         this.isDownloadingRib = false;
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.isDownloadingRib = false;
-        this.snack.open('Failed to download RIB', 'Close', { duration: 3000 });
+        this.snack.open(httpErrorMessage(err, "Couldn't download your bank details (RIB). Try again."), 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
         this.cdr.detectChanges();
       }
     });
-  }
-
-  formatAmount(minorUnits: number): string {
-    const abs = Math.abs(minorUnits);
-    return (abs / 100).toFixed(2);
-  }
-
-  formatDate(dateStr: string): string {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  }
-
-  formatDateTime(dateStr: string): string {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
-        ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch {
-      return dateStr;
-    }
   }
 
   isIncoming(tx: BankTransaction): boolean {
     return tx.amount > 0;
   }
 
+  /** The detail amount is unsigned: its sign comes from the direction. */
+  detailSignedAmount(d: TransferDetail): number {
+    if (d.direction === 'outgoing' && d.amount > 0) return -d.amount;
+    if (d.direction === 'incoming' && d.amount < 0) return -d.amount;
+    return d.amount;
+  }
+
   isDetailOpen(): boolean {
     return this.isLoadingDetail || !!this.transferDetail || !!this.detailError;
   }
 
-  getCounterpartyAccount(d: TransferDetail): string {
-    if (d.counterpartyIban) return d.counterpartyIban;
-    if (d.counterpartyAccountNumber) return d.counterpartyAccountNumber;
-    return '-';
+  counterpartyRows(d: TransferDetail): DetailRow[] {
+    return bankDetailRows({
+      iban: d.counterpartyIban,
+      accountNumber: d.counterpartyAccountNumber,
+      sortCode: d.counterpartySortCode,
+      routingNumber: d.counterpartyRoutingNumber
+    });
   }
 
   getDirectionLabel(direction: string): string {
@@ -290,11 +301,14 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   private startLastUpdatedTimer() {
     this.stopLastUpdatedTimer();
-    this.lastUpdatedTimer = setInterval(() => {
-      if (this.lastUpdated) {
-        this.cdr.detectChanges();
-      }
-    }, 30_000);
+    // Outside the zone: refreshing the label must not trigger a full change detection every 30 seconds.
+    this.ngZone.runOutsideAngular(() => {
+      this.lastUpdatedTimer = setInterval(() => {
+        if (this.lastUpdated) {
+          this.cdr.detectChanges();
+        }
+      }, 30_000);
+    });
   }
 
   private stopLastUpdatedTimer() {
@@ -302,9 +316,5 @@ export class TransferComponent implements OnInit, OnDestroy {
       clearInterval(this.lastUpdatedTimer);
       this.lastUpdatedTimer = null;
     }
-  }
-
-  ngOnDestroy() {
-    this.stopLastUpdatedTimer();
   }
 }

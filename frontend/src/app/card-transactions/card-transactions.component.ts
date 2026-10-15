@@ -1,21 +1,29 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { FormsModule } from '@angular/forms';
+import { A11yModule } from '@angular/cdk/a11y';
 import { MaterialModule } from '../material.module';
 
 import {
   CardResponse,
-  CardTransfer
+  CardTransfer,
+  CardTransferValidationFact
 } from '../models';
 import { IssuingService } from '../services';
+import { formatMoney, httpErrorMessage } from '../shared';
 import { MCC_CODES } from '../industry-codes';
+
+const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { ...DATE_FORMAT, hour: '2-digit', minute: '2-digit' };
 
 @Component({
   selector: 'app-card-transactions',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
+    A11yModule,
     MaterialModule
   ],
   templateUrl: './card-transactions.component.html',
@@ -23,8 +31,8 @@ import { MCC_CODES } from '../industry-codes';
 })
 export class CardTransactionsComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private issuingService = inject(IssuingService);
-  private snack = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
 
   userId = '';
@@ -34,9 +42,10 @@ export class CardTransactionsComponent implements OnInit {
   selectedTransfer?: CardTransfer;
   isLoading = false;
   isLoadingCards = false;
-  cardDropdownOpen = false;
+  cardsError: string | null = null;
+  transfersError: string | null = null;
 
-  allMccs = MCC_CODES;
+  private detailOpener: HTMLElement | null = null;
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -49,27 +58,28 @@ export class CardTransactionsComponent implements OnInit {
 
   loadCards() {
     this.isLoadingCards = true;
+    this.cardsError = null;
+    this.cdr.detectChanges();
     this.issuingService.getCards(this.userId).subscribe({
       next: (cards) => {
-        this.cards = cards;
+        this.cards = cards || [];
         this.isLoadingCards = false;
-        if (this.cards.length > 0 && !this.selectedPaymentInstrumentId) {
-          this.selectedPaymentInstrumentId = this.cards[0].paymentInstrumentId;
+        const stillExists = this.cards.some(c => c.paymentInstrumentId === this.selectedPaymentInstrumentId);
+        if (!stillExists) {
+          this.selectedPaymentInstrumentId = this.cards[0]?.paymentInstrumentId || '';
         }
         this.loadTransfers();
-        this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.isLoadingCards = false;
+        this.cardsError = httpErrorMessage(err, "Couldn't load your cards. Try again.");
         this.cdr.detectChanges();
       }
     });
   }
 
   loadTransfers() {
-    this.isLoading = true;
-    this.cdr.detectChanges();
-
+    this.transfersError = null;
     if (!this.selectedPaymentInstrumentId) {
       this.isLoading = false;
       this.transfers = [];
@@ -77,18 +87,19 @@ export class CardTransactionsComponent implements OnInit {
       return;
     }
 
-    const piId = this.selectedPaymentInstrumentId;
+    this.isLoading = true;
+    this.cdr.detectChanges();
 
-    this.issuingService.getCardTransfers(this.userId, piId).subscribe({
+    this.issuingService.getCardTransfers(this.userId, this.selectedPaymentInstrumentId).subscribe({
       next: (transfers) => {
-        this.transfers = transfers;
+        this.transfers = transfers || [];
         this.isLoading = false;
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.transfers = [];
         this.isLoading = false;
-        this.snack.open('Failed to load card transactions', 'Close', { duration: 3000 });
+        this.transfersError = httpErrorMessage(err, "Couldn't load the card transactions. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -98,14 +109,9 @@ export class CardTransactionsComponent implements OnInit {
     return this.cards.find(c => c.paymentInstrumentId === this.selectedPaymentInstrumentId);
   }
 
-  toggleCardDropdown() {
-    this.cardDropdownOpen = !this.cardDropdownOpen;
-  }
-
-  selectCardFilter(piId: string) {
-    this.selectedPaymentInstrumentId = piId;
-    this.cardDropdownOpen = false;
-    this.loadTransfers();
+  cardOptionLabel(card: CardResponse): string {
+    const brand = card.brand === 'visa' ? 'Visa' : card.brand === 'mc' ? 'Mastercard' : card.brand;
+    return `${card.cardholderName} · ${brand} •••• ${card.lastFour} (${card.status})`;
   }
 
   onCardFilterChange() {
@@ -113,10 +119,19 @@ export class CardTransactionsComponent implements OnInit {
   }
 
   refresh() {
-    this.loadTransfers();
+    if (this.cardsError || !this.cards.length) {
+      this.loadCards();
+    } else {
+      this.loadTransfers();
+    }
   }
 
-  openDetail(transfer: CardTransfer) {
+  navigateToCreate() {
+    this.router.navigate(['/', this.userId, 'card-create']);
+  }
+
+  openDetail(transfer: CardTransfer, event?: Event) {
+    this.detailOpener = (event?.currentTarget as HTMLElement | null) ?? null;
     this.selectedTransfer = transfer;
     this.cdr.detectChanges();
   }
@@ -124,59 +139,79 @@ export class CardTransactionsComponent implements OnInit {
   closeDetail() {
     this.selectedTransfer = undefined;
     this.cdr.detectChanges();
+    const opener = this.detailOpener;
+    this.detailOpener = null;
+    if (opener?.isConnected) opener.focus();
   }
 
   getMccLabel(code: string): string {
-    const mcc = this.allMccs.find(m => m.code === code);
+    const mcc = MCC_CODES.find(m => m.code === code);
     return mcc ? mcc.label : code;
   }
 
-  formatAmount(minorUnits: number): string {
-    const abs = Math.abs(minorUnits);
-    return (abs / 100).toFixed(2);
+  /** Card spend is negative (money leaving the balance account); refunds and reversals are positive. */
+  formatAmount(minorUnits: number, currency: string): string {
+    return formatMoney(minorUnits, currency, 'exceptZero');
+  }
+
+  /** Event amounts carry no direction, so they are shown unsigned. */
+  formatEventAmount(minorUnits: number, currency: string): string {
+    return formatMoney(Math.abs(minorUnits || 0), currency);
+  }
+
+  /** Transfers API amounts are unsigned; the direction tells whether money left or reached the account. */
+  signedAmount(transfer: CardTransfer): number {
+    const value = Math.abs(transfer.amount || 0);
+    if (transfer.direction === 'outgoing') return -value;
+    if (transfer.direction === 'incoming') return value;
+    return transfer.amount || 0;
+  }
+
+  isCredit(transfer: CardTransfer): boolean {
+    return this.signedAmount(transfer) > 0;
+  }
+
+  directionLabel(transfer: CardTransfer): string {
+    const status = (transfer.status || '').toLowerCase();
+    if (status.startsWith('refund')) return 'Refund';
+    const amount = this.signedAmount(transfer);
+    if (amount > 0) return 'Credit';
+    if (amount < 0) return 'Payment';
+    return '';
   }
 
   formatDate(dateStr: string): string {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
+    return this.formatWith(dateStr, DATE_FORMAT);
   }
 
   formatDateTime(dateStr: string): string {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
-        ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch {
-      return dateStr;
-    }
+    return this.formatWith(dateStr, DATE_TIME_FORMAT);
   }
 
-  formatReason(reason: string): string {
-    if (!reason) return '';
-    return reason.replace(/([A-Z])/g, ' $1').trim();
+  private formatWith(dateStr: string, options: Intl.DateTimeFormatOptions): string {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleString('en-GB', options);
   }
 
-  formatValidationType(type: string): string {
-    if (!type) return '';
-    return type.replace(/([A-Z])/g, ' $1').trim();
+  /** "refundPending" -> "Refund pending", "TransactionValidation" -> "Transaction validation". */
+  humanize(value: string): string {
+    if (!value) return '';
+    const words = value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
   }
 
-  getInvalidFacts(facts: any[]): any[] {
+  channelLabel(processingType: string): string {
+    if (processingType === 'ecommerce') return 'Online';
+    if (processingType === 'pos') return 'In store';
+    return processingType ? this.humanize(processingType) : '—';
+  }
+
+  getInvalidFacts(facts: CardTransferValidationFact[] | null | undefined): CardTransferValidationFact[] {
     return facts ? facts.filter(f => f.result === 'invalid') : [];
   }
 
   formatLocation(city?: string, country?: string): string {
     return [city, country].filter(Boolean).join(', ');
-  }
-
-  // Helper used in template for array filtering
-  filter(arr: any[], fn: (x: any) => boolean): any[] {
-    return arr ? arr.filter(fn) : [];
   }
 }

@@ -17,6 +17,7 @@ import com.myplatform.demo.dto.TokenPaymentResponse;
 import com.myplatform.demo.model.PaymentSessionResponse;
 import com.myplatform.demo.model.StoreCustomer;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import com.myplatform.demo.util.PaymentResultRedirects;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class PaymentCheckoutService {
     @Getter
     private final PaymentsApi paymentsApi;
     private final RecurringApi recurringApi;
+    @Getter
     private final String merchantAccount;
     @Getter
     private final String clientKey;
@@ -97,7 +99,7 @@ public class PaymentCheckoutService {
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0)
                 .telephoneNumber("+33610101010")
-                .returnUrl(backendUrl + "/api/payments/redirect");
+                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/payments/redirect", userId, PaymentResultRedirects.SOURCE_CHECKOUT));
 
         if (activityReason.equals("embeddedPayment")) {
             createCheckoutSessionRequest.setStore(storeRef);
@@ -178,7 +180,7 @@ public class PaymentCheckoutService {
                 .shopperName(new ShopperName().firstName("John").lastName("Doe"))
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .telephoneNumber("+33610101010")
-                .returnUrl(backendUrl + "/api/payments/redirect");
+                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/payments/redirect", userId, PaymentResultRedirects.SOURCE_CHECKOUT));
 
         if ("embeddedPayment".equals(activityReason)) {
             request.setStore(storeRef);

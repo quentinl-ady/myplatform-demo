@@ -12,6 +12,8 @@ public class CardTransferDTO {
     private String status;
     private long amount;
     private String currency;
+    /** incoming or outgoing: Transfers API amounts are unsigned. */
+    private String direction;
     private String description;
     private String type;
     private String reason;

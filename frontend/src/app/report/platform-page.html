@@ -1,0 +1,28 @@
+<div class="platform-page">
+  <header class="page-header">
+    <div>
+      <h1>{{ pageTitle }}</h1>
+      <p>{{ pageDescription }}</p>
+    </div>
+    <button mat-icon-button type="button" class="refresh-btn" (click)="refresh()" [disabled]="loading()"
+            [matTooltip]="'Refresh ' + itemLabel" [attr.aria-label]="'Refresh ' + itemLabel">
+      <mat-icon [class.spinning]="loading()" aria-hidden="true">refresh</mat-icon>
+    </button>
+  </header>
+
+  <mat-card class="component-card" [attr.aria-busy]="loading()">
+    <div class="page-state" *ngIf="loading()" role="status">
+      <mat-spinner diameter="32"></mat-spinner>
+      <p>Loading {{ itemLabel }}…</p>
+    </div>
+
+    <div class="page-state" *ngIf="!loading() && error() as message" role="alert">
+      <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
+      <h2 class="mat-h3">{{ pageTitle }} could not be loaded</h2>
+      <p>{{ message }}</p>
+      <button mat-flat-button type="button" class="fintech-btn" (click)="refresh()">Retry</button>
+    </div>
+
+    <div class="component-container" [id]="containerId" [hidden]="!!error()"></div>
+  </mat-card>
+</div>

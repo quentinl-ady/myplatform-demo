@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,8 @@ import java.util.regex.Pattern;
 public class TransferController {
 
     private static final Logger log = LoggerFactory.getLogger(TransferController.class);
+
+    public static final String NO_BANK_ACCOUNT_MESSAGE = "No business bank account has been created yet.";
 
     private final UserRepository userRepository;
     private final TransferService transferService;
@@ -59,6 +62,9 @@ public class TransferController {
     @GetMapping("/{userId}/devices")
     public ResponseEntity<List<Device>> listDevices(@PathVariable String userId) throws Exception {
         User user = findUser(userId);
+        if (!hasBankAccount(user)) {
+            throw new ResourceNotFoundException(NO_BANK_ACCOUNT_MESSAGE);
+        }
         return ResponseEntity.ok(transferService.getListDevices(resolvePhysicalPi(user)));
     }
 
@@ -89,6 +95,9 @@ public class TransferController {
     @PostMapping("/devices/register")
     public ResponseEntity<?> initiateDeviceRegistration(@RequestBody InitiateDeviceRegistrationRequest request) throws Exception {
         User user = findUser(request.getUserId());
+        if (!hasBankAccount(user)) {
+            throw new BadRequestException(NO_BANK_ACCOUNT_MESSAGE);
+        }
 
         if (request.getOtpCode() == null || !otpService.verifyOtp(request.getUserId(), request.getOtpCode())) {
             return ResponseEntity.status(403).body(Map.of("error", "Invalid or expired OTP code"));
@@ -100,6 +109,9 @@ public class TransferController {
     @PostMapping("/devices/register/finalize")
     public ResponseEntity<RegisterSCAFinalResponse> finalizeRegistration(@RequestBody FinalizeRegistrationRequest request) throws Exception {
         User user = findUser(request.getUserId());
+        if (!hasBankAccount(user)) {
+            throw new BadRequestException(NO_BANK_ACCOUNT_MESSAGE);
+        }
         return ResponseEntity.ok(transferService.finalizeRegistration(request.getId(), request.getSdkOutput(), resolvePhysicalPi(user)));
     }
 
@@ -259,6 +271,33 @@ public class TransferController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/batch/cancel")
+    public ResponseEntity<Map<String, Object>> cancelBatchTransfers(@RequestBody Map<String, Object> payload) {
+        String userId = (String) payload.get("userId");
+        if (userId == null || userId.isBlank()) {
+            throw new BadRequestException("userId is required");
+        }
+        User user = findUser(userId);
+        if (user.getAccountHolderId() == null) {
+            throw new BadRequestException("User has no account holder");
+        }
+
+        Object rawIds = payload.get("transferIds");
+        List<String> transferIds = new ArrayList<>();
+        if (rawIds instanceof List<?> ids) {
+            for (Object id : ids) {
+                if (id instanceof String s && !s.isBlank()) {
+                    transferIds.add(s);
+                }
+            }
+        }
+        if (transferIds.isEmpty()) {
+            throw new BadRequestException("Select at least one transfer to cancel");
+        }
+
+        return ResponseEntity.ok(transferService.cancelTransfers(user.getAccountHolderId(), transferIds));
+    }
+
     @GetMapping("/batch/pending")
     public ResponseEntity<Map<String, Object>> getPendingTransfers(@RequestParam String userId) throws Exception {
         User user = findUser(userId);
@@ -306,6 +345,10 @@ public class TransferController {
             @PathVariable String transferId) {
         findUser(userId); // validate user exists
         return ResponseEntity.ok(bankTransferService.getTransferDetail(transferId));
+    }
+
+    private boolean hasBankAccount(User user) {
+        return user.getBankAccountId() != null && !user.getBankAccountId().isBlank();
     }
 
     private String resolvePhysicalPi(User user) throws Exception {

@@ -17,6 +17,17 @@ import { Router } from '@angular/router';
 import { MaterialModule } from '../material.module';
 import { AuthService } from '../services';
 import { INDUSTRY_CODES } from '../industry-codes';
+import { httpErrorMessage, httpStatus } from '../shared';
+
+const EXTRA_OPTION_CONTROLS = ['capital', 'bank', 'issuing'] as const;
+
+const FIELD_LABELS: Record<string, string> = {
+    legalEntityName: 'company name',
+    firstName: 'first name',
+    lastName: 'last name',
+    email: 'email address',
+    password: 'password',
+};
 
 @Component({
     selector: 'app-signup',
@@ -35,11 +46,12 @@ export class SignupComponent {
     form: FormGroup;
     error: string | null = null;
     loading = false;
+    showPassword = false;
 
     userTypes = [
         { value: 'organization', label: 'Organization', disabled: false },
         { value: 'individual', label: 'Individual', disabled: false },
-        { value: 'soleProprietorship', label: 'Sole Proprietorship', disabled: false },
+        { value: 'soleProprietorship', label: 'Sole proprietorship', disabled: false },
     ];
 
     readonly countryCurrencyMap: Record<string, string> = {
@@ -131,7 +143,7 @@ export class SignupComponent {
         }));
 
         this.individualDisabledMessage = restrictIndividual
-            ? "You cannot select 'Individual' if activity is Embedded Payment or extra options are selected."
+            ? 'Individual accounts can\'t use embedded payments, Capital, Bank or Issuing. Clear those options to choose Individual.'
             : null;
 
         if (restrictIndividual && userType === 'individual') {
@@ -149,6 +161,16 @@ export class SignupComponent {
 
         this.disableEmbeddedPayment = userType === 'individual';
         this.disableExtraOptions = userType === 'individual';
+        // Toggled on the controls rather than with [disabled] (unsupported with reactive forms);
+        // getRawValue() still sends the values.
+        for (const name of EXTRA_OPTION_CONTROLS) {
+            const control = this.form.get(name)!;
+            if (this.disableExtraOptions && control.enabled) {
+                control.disable({ emitEvent: false });
+            } else if (!this.disableExtraOptions && control.disabled) {
+                control.enable({ emitEvent: false });
+            }
+        }
 
         if (activity !== 'embeddedPayment') {
             this.businessActivities = [];
@@ -170,9 +192,10 @@ export class SignupComponent {
         const c = this.form.get('lastName');
         return c && c.invalid && (c.dirty || c.touched);
     }
-    emailInvalid() {
+    emailError(): string | null {
         const c = this.form.get('email');
-        return c && c.invalid && (c.dirty || c.touched);
+        if (!c || !c.invalid || !(c.dirty || c.touched)) return null;
+        return c.hasError('required') ? 'Enter your email address.' : 'Enter a valid email address, e.g. name@company.com.';
     }
     passwordInvalid() {
         const c = this.form.get('password');
@@ -199,7 +222,7 @@ export class SignupComponent {
 
     addActivity() {
         if (!this.newActivity.industryCode) {
-            this.businessActivityError = 'Select an industry.';
+            this.businessActivityError = 'Select an industry from the list first.';
             this.cdr.markForCheck();
             return;
         }
@@ -225,6 +248,32 @@ export class SignupComponent {
         return ind ? ind.label : code;
     }
 
+    togglePassword() {
+        this.showPassword = !this.showPassword;
+    }
+
+    /** What still blocks the submit button, in reading order. */
+    missingFields(): string[] {
+        const missing: string[] = [];
+        for (const name of ['legalEntityName', 'firstName', 'lastName', 'email', 'password']) {
+            const control = this.form.get(name);
+            if (!control || control.valid) continue;
+            if (name === 'email' && !control.hasError('required')) {
+                missing.push('a valid email address');
+            } else if (name === 'password' && control.hasError('minlength')) {
+                missing.push('a password of at least 4 characters');
+            } else if (name === 'legalEntityName' && control.hasError('minlength')) {
+                missing.push('a company name of at least 3 characters');
+            } else {
+                missing.push(FIELD_LABELS[name]);
+            }
+        }
+        if (this.isEmbeddedPayment() && this.businessActivities.length === 0) {
+            missing.push('at least one business activity');
+        }
+        return missing;
+    }
+
     canSubmit(): boolean {
         if (this.form.invalid || this.loading) return false;
         if (this.isEmbeddedPayment() && this.businessActivities.length === 0) return false;
@@ -232,9 +281,14 @@ export class SignupComponent {
     }
 
     onSubmit() {
-        if (!this.form.valid) return;
+        if (this.loading) return;
+        if (!this.form.valid) {
+            this.form.markAllAsTouched();
+            this.cdr.markForCheck();
+            return;
+        }
         if (this.isEmbeddedPayment() && this.businessActivities.length === 0) {
-            this.businessActivityError = 'At least one business activity is required for Embedded Payment.';
+            this.businessActivityError = 'Add at least one business activity to use embedded payments.';
             this.cdr.markForCheck();
             return;
         }
@@ -255,21 +309,27 @@ export class SignupComponent {
 
         this.authService.signup(payload).subscribe({
             next: (res) => {
-                this.loading = false;
-                if (res.id) {
+                if (res?.id) {
                     this.router.navigate([`/${res.id}/dashboard`]);
                     this.signupSuccess.emit(res);
+                } else {
+                    this.loading = false;
+                    this.error = 'We couldn\'t create your account. Please try again.';
                 }
                 this.cdr.markForCheck();
             },
             error: (err) => {
                 this.loading = false;
-                if (err.status === 409 || err.error === 'ErrorEmailAlreadyExists') {
-                    this.error = 'Email already exists';
-                } else if (err.status === 400) {
-                    this.error = 'Invalid signup data';
+                const body = err?.error;
+                const emailTaken = httpStatus(err) === 409
+                    || body === 'ErrorEmailAlreadyExists'
+                    || body?.error === 'ErrorEmailAlreadyExists';
+                if (emailTaken) {
+                    this.error = 'An account with this email address already exists. Log in instead or use another email.';
+                } else if (httpStatus(err) === 400) {
+                    this.error = httpErrorMessage(err, 'Some details are invalid. Check the form and try again.');
                 } else {
-                    this.error = 'Signup failed. Please retry.';
+                    this.error = httpErrorMessage(err, 'We couldn\'t create your account. Please try again.');
                 }
                 this.cdr.markForCheck();
             },

@@ -1,10 +1,13 @@
 package com.myplatform.demo.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.myplatform.demo.util.UtcDateTimeSerializer;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Getter
@@ -36,12 +39,13 @@ public class ApiLog {
 
     private boolean error;
 
+    @JsonSerialize(using = UtcDateTimeSerializer.class)
     private LocalDateTime timestamp;
 
     @PrePersist
     public void prePersist() {
         if (timestamp == null) {
-            timestamp = LocalDateTime.now();
+            timestamp = LocalDateTime.now(ZoneOffset.UTC);
         }
     }
 }

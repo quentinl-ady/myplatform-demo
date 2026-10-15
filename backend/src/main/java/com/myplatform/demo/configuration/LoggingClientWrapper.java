@@ -10,6 +10,7 @@ import com.myplatform.demo.service.ApiLogService;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 
 public class LoggingClientWrapper implements ClientInterface {
@@ -82,7 +83,7 @@ public class LoggingClientWrapper implements ClientInterface {
             log.setStatusCode(statusCode);
             log.setDurationMs(durationMs);
             log.setError(isError);
-            log.setTimestamp(LocalDateTime.now());
+            log.setTimestamp(LocalDateTime.now(ZoneOffset.UTC));
             apiLogService.save(log);
         } catch (Exception ex) {
             // Never let logging break the actual API call

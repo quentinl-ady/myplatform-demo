@@ -1,43 +1,54 @@
 <div class="fintech-wrapper">
 
   <div class="header-section">
-    <h2>Trusted Devices</h2>
+    <h1>Trusted devices</h1>
     <p>Manage the devices you use to securely approve transactions.</p>
   </div>
 
-  <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
+  <app-account-setup-state *ngIf="state() !== 'ready'"
+                           [state]="state()" [userId]="userId" [message]="errorMessage()"
+                           loadingText="Loading your devices..." purpose="register a trusted device"
+                           (retry)="loadDevices()"></app-account-setup-state>
 
-  <div class="device-list" *ngIf="devices().length > 0">
-    <h3 class="section-title">Your Devices</h3>
+  <ng-container *ngIf="state() === 'ready'">
 
-    <mat-card *ngFor="let d of devices()" class="device-card">
-      <div class="device-info">
-        <div class="device-icon">
-          <mat-icon>devices</mat-icon>
+    <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
+
+    <section class="device-list" *ngIf="devices().length > 0" aria-labelledby="devices-title">
+      <h2 class="section-title" id="devices-title">Your devices ({{ devices().length }})</h2>
+
+      <mat-card *ngFor="let d of devices()" class="device-card">
+        <div class="device-info">
+          <div class="device-icon" aria-hidden="true">
+            <mat-icon>devices</mat-icon>
+          </div>
+          <div class="device-details">
+            <h3>{{ d.name || 'Unnamed device' }}</h3>
+            <span class="device-meta"><strong>Type:</strong> {{ d.type }}</span>
+            <span class="device-meta"><strong>ID: </strong><span class="mono">{{ d.id }}</span></span>
+            <span class="device-meta"><strong>Payment instrument: </strong><span class="mono">{{ d.paymentInstrumentId }}</span></span>
+          </div>
         </div>
-        <div class="device-details">
-          <h4>{{ d.name || 'Unnamed Device' }}</h4>
-          <span class="device-meta"><strong>Type:</strong> {{ d.type }}</span>
-          <span class="device-meta"><strong>ID:</strong> {{ d.id }}</span>
-          <span class="device-meta"><strong>Payment Instrument:</strong> {{ d.paymentInstrumentId }}</span>
-        </div>
-      </div>
 
-      <div class="device-actions">
-        <button mat-icon-button class="delete-btn" color="warn" (click)="deleteDevice(d)" [disabled]="deletingId() === d.id">
-          <mat-icon *ngIf="deletingId() !== d.id">delete_outline</mat-icon>
-          <mat-spinner *ngIf="deletingId() === d.id" diameter="20"></mat-spinner>
-        </button>
+        <div class="device-actions">
+          <button mat-icon-button type="button" class="delete-btn" (click)="deleteDevice(d)"
+                  [disabled]="!!deletingId()"
+                  [attr.aria-label]="'Remove ' + (d.name || 'unnamed device')" matTooltip="Remove device">
+            <mat-icon *ngIf="deletingId() !== d.id" aria-hidden="true">delete_outline</mat-icon>
+            <mat-spinner *ngIf="deletingId() === d.id" diameter="20"></mat-spinner>
+          </button>
+        </div>
+      </mat-card>
+    </section>
+
+    <mat-card class="empty-state" *ngIf="devices().length === 0">
+      <div class="empty-icon-wrapper" aria-hidden="true">
+        <mat-icon>phonelink_off</mat-icon>
       </div>
+      <h2>No trusted devices yet</h2>
+      <p>Register this device above to approve transfers and view your bank transactions.</p>
     </mat-card>
-  </div>
 
-  <mat-card class="empty-state" *ngIf="!devices().length">
-    <div class="empty-icon-wrapper">
-      <mat-icon>phonelink_off</mat-icon>
-    </div>
-    <h3>No devices found</h3>
-    <p>You haven't registered any devices yet. Register this one to get started.</p>
-  </mat-card>
+  </ng-container>
 
 </div>

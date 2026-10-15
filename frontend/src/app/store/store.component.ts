@@ -3,16 +3,24 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatStepperModule } from '@angular/material/stepper';
+import { MatStepper, MatStepperModule } from '@angular/material/stepper';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
 import { MaterialModule } from '../material.module';
 import { Store, StorePayload, BusinessLine, BalanceAccount, VerificationStatus } from '../models';
 import { AccountService, ActivityService, StoreService } from '../services';
 import { INDUSTRY_CODES } from "../industry-codes";
+import { httpErrorMessage } from '../shared';
 
 export interface PaymentMethodDef {
   key: string;
   label: string;
+}
+
+export interface VerificationStatusView {
+  label: string;
+  icon: string;
+  cls: string;
 }
 
 const COMMON_PAYMENT_METHODS: PaymentMethodDef[] = [
@@ -83,8 +91,13 @@ const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone:
 export class StoreComponent implements OnInit {
   userId = '';
   isSubmitting = false;
-  isLoading = false;
+  isLoading = true;
+  loadError: string | null = null;
+  balanceAccountsError: string | null = null;
+  businessLinesError: string | null = null;
   lastUpdated: number | null = null;
+  lastCreatedStore: Store | null = null;
+  readonly busyPmIds = new Set<string>();
   userCountryCode = '';
   userCountryLabel = '';
 
@@ -112,7 +125,7 @@ export class StoreComponent implements OnInit {
     city: ['', Validators.required],
     postalCode: ['', Validators.required],
     lineAdresse1: ['', Validators.required],
-    reference: ['', Validators.required],
+    reference: ['', [Validators.required, Validators.pattern(/[a-zA-Z0-9]/)]],
     phoneNumber: ['', Validators.required],
     balanceAccountId: ['', Validators.required]
   });
@@ -145,7 +158,8 @@ export class StoreComponent implements OnInit {
         this.applySuggestions(user.countryCode);
         this.buildPaymentsForm();
         this.buildAddPmForm();
-      }
+      },
+      error: err => this.showError(httpErrorMessage(err, 'Could not load your account country. Refresh the page to try again.'))
     });
   }
 
@@ -178,14 +192,15 @@ export class StoreComponent implements OnInit {
 
   loadStores() {
     this.isLoading = true;
+    this.loadError = null;
     this.storeService.getStores(this.userId).subscribe({
       next: res => {
         this.stores.set(res);
         this.lastUpdated = Date.now();
         this.isLoading = false;
       },
-      error: () => {
-        this.snack.open('Error loading stores', 'Close', { duration: 3000 });
+      error: err => {
+        this.loadError = httpErrorMessage(err, 'Could not load your stores.');
         this.isLoading = false;
       }
     });
@@ -206,22 +221,19 @@ export class StoreComponent implements OnInit {
   }
 
   loadBalanceAccounts() {
+    this.balanceAccountsError = null;
     this.accountService.getBalanceAccounts(this.userId).subscribe({
       next: res => this.balanceAccounts.set(res),
-      error: () => this.snack.open('Error loading balance accounts', 'Close', { duration: 3000 })
+      error: err => this.balanceAccountsError = httpErrorMessage(err, 'Could not load balance accounts.')
     });
   }
 
   loadBusinessLines() {
+    this.businessLinesError = null;
     this.activityService.getBusinessLines(this.userId).subscribe({
       next: res => this.businessLines.set(res),
-      error: () => this.snack.open('Error loading business lines', 'Close', { duration: 3000 })
+      error: err => this.businessLinesError = httpErrorMessage(err, 'Could not load business lines.')
     });
-  }
-
-  onCountryChange(event: any) {
-    const country = event.target.value;
-    this.applySuggestions(country);
   }
 
   applySuggestions(country: string) {
@@ -234,6 +246,56 @@ export class StoreComponent implements OnInit {
         lineAdresse1: s.lineAdresse1
       });
     }
+  }
+
+  private resetGeneralForm() {
+    const s = COUNTRY_SUGGESTIONS[this.userCountryCode];
+    this.generalForm.reset({
+      country: this.userCountryCode,
+      city: s?.city ?? '',
+      postalCode: s?.postal ?? '',
+      phoneNumber: s?.phone ?? '',
+      lineAdresse1: s?.lineAdresse1 ?? '',
+      reference: '',
+      balanceAccountId: ''
+    });
+  }
+
+  generalHint(): string {
+    const f = this.generalForm.controls;
+    if (f.reference.hasError('required')) return 'Enter a store reference to continue.';
+    if (f.reference.hasError('pattern')) return 'The store reference must contain at least one letter or digit.';
+    if (f.city.invalid || f.postalCode.invalid || f.lineAdresse1.invalid || f.phoneNumber.invalid) {
+      return 'Complete the address and phone number to continue.';
+    }
+    if (f.balanceAccountId.invalid) {
+      return this.balanceAccounts().length ? 'Select a balance account to continue.' : 'No balance account is available for this account holder.';
+    }
+    return '';
+  }
+
+  activityHint(): string {
+    if (this.activityForm.valid) return '';
+    return this.businessLines().length
+      ? 'Select at least one business activity to continue.'
+      : 'Create a business line first, then come back to add a store.';
+  }
+
+  isInvalid(name: 'reference' | 'city' | 'postalCode' | 'lineAdresse1' | 'phoneNumber' | 'balanceAccountId'): boolean {
+    const c = this.generalForm.controls[name];
+    return c.invalid && (c.touched || c.dirty);
+  }
+
+  addPmHasSelection(): boolean {
+    if (!this.addPmForm) return false;
+    return this.getAllPaymentMethods().some(p => {
+      const c = this.addPmForm.get(p.key);
+      return !!c && c.enabled && !!c.value;
+    });
+  }
+
+  private showError(message: string) {
+    this.snack.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
   }
 
   sanitizeReference(ref: string): string {
@@ -255,13 +317,14 @@ export class StoreComponent implements OnInit {
     return ind ? ind.label : code;
   }
 
-  getStatusIcon(status: string): string {
+  getStatusView(status: VerificationStatus | string | null | undefined): VerificationStatusView {
     switch (status) {
-      case 'valid': return '✅';
-      case 'invalid': return '❌';
-      case 'pending': return '⏳';
-      case 'reject': return '🚫';
-      default: return '';
+      case 'valid': return { label: 'Verified', icon: 'check_circle', cls: 'valid' };
+      case 'invalid': return { label: 'Action required', icon: 'error', cls: 'invalid' };
+      case 'pending': return { label: 'Pending verification', icon: 'schedule', cls: 'pending' };
+      case 'rejected':
+      case 'reject': return { label: 'Rejected', icon: 'block', cls: 'rejected' };
+      default: return { label: 'Status unknown', icon: 'help_outline', cls: 'unknown' };
     }
   }
 
@@ -273,6 +336,7 @@ export class StoreComponent implements OnInit {
   // --- Add PM to existing store ---
 
   openAddPm(store: Store) {
+    if (!this.addPmForm) return;
     this.addPmStoreId = store.storeId;
     this.buildAddPmForm();
     // Disable PMs already on this store
@@ -293,10 +357,7 @@ export class StoreComponent implements OnInit {
     const selected = this.getAllPaymentMethods()
       .filter(p => this.addPmForm.get(p.key)?.value)
       .map(p => p.key);
-    if (selected.length === 0) {
-      this.snack.open('Select at least one payment method', 'Close', { duration: 3000 });
-      return;
-    }
+    if (selected.length === 0) return;
     this.addPmLoading = true;
     this.storeService.addPaymentMethods(this.userId, this.addPmStoreId, selected).subscribe({
       next: updatedPMs => {
@@ -314,12 +375,13 @@ export class StoreComponent implements OnInit {
           return s;
         });
         this.stores.set(updated);
-        this.snack.open('Payment methods added successfully', 'Close', { duration: 3000 });
+        const labels = selected.map(k => this.getPmLabel(k)).join(', ');
+        this.snack.open(`Requested ${labels}. Verification can take a few minutes.`, 'Close', { duration: 4000 });
         this.addPmLoading = false;
         this.addPmStoreId = null;
       },
-      error: () => {
-        this.snack.open('Error adding payment methods', 'Close', { duration: 3000 });
+      error: err => {
+        this.showError(httpErrorMessage(err, 'Could not add the payment methods.'));
         this.addPmLoading = false;
       }
     });
@@ -327,8 +389,10 @@ export class StoreComponent implements OnInit {
 
   // --- Toggle PM enabled/disabled ---
 
-  togglePaymentMethod(storeId: string, pm: { paymentMethodId: string; enabled: boolean }) {
-    const newEnabled = !pm.enabled;
+  togglePaymentMethod(storeId: string, pm: { type: string; paymentMethodId: string; enabled: boolean }, event: MatSlideToggleChange) {
+    if (this.busyPmIds.has(pm.paymentMethodId)) return;
+    const newEnabled = event.checked;
+    this.busyPmIds.add(pm.paymentMethodId);
     this.storeService.togglePaymentMethod(pm.paymentMethodId, newEnabled).subscribe({
       next: updated => {
         const storesList = this.stores();
@@ -346,19 +410,25 @@ export class StoreComponent implements OnInit {
           return s;
         });
         this.stores.set(updatedStores);
+        this.busyPmIds.delete(pm.paymentMethodId);
         this.snack.open(
-          `${this.getPmLabel(pm.paymentMethodId)} ${newEnabled ? 'enabled' : 'disabled'}`,
+          `${this.getPmLabel(pm.type)} ${updated.enabled ? 'enabled' : 'disabled'}`,
           'Close', { duration: 3000 }
         );
       },
-      error: () => this.snack.open('Error toggling payment method', 'Close', { duration: 3000 })
+      error: err => {
+        this.busyPmIds.delete(pm.paymentMethodId);
+        // The toggle already flipped visually; put it back to the server state.
+        event.source.checked = pm.enabled;
+        this.showError(httpErrorMessage(err, `Could not ${newEnabled ? 'enable' : 'disable'} ${this.getPmLabel(pm.type)}.`));
+      }
     });
   }
 
   // --- Create store ---
 
-  submitCreate(stepper: any) {
-    if (this.generalForm.invalid || this.activityForm.invalid || this.paymentsForm.invalid) return;
+  submitCreate(stepper: MatStepper) {
+    if (this.isSubmitting || this.generalForm.invalid || this.activityForm.invalid || !this.paymentsForm || this.paymentsForm.invalid) return;
 
     this.isSubmitting = true;
     const general = this.generalForm.value;
@@ -383,17 +453,17 @@ export class StoreComponent implements OnInit {
     this.storeService.createStore(this.userId, payload).subscribe({
       next: res => {
         this.stores.set([...this.stores(), res]);
-        this.snack.open('Store created successfully', 'Close', { duration: 3000 });
-        this.generalForm.reset();
-        this.generalForm.patchValue({ country: this.userCountryCode });
-        this.applySuggestions(this.userCountryCode);
+        this.lastCreatedStore = res;
+        this.lastUpdated = Date.now();
+        // stepper.reset() resets every step control, so defaults must be applied after it.
+        stepper.reset();
+        this.resetGeneralForm();
         this.activityForm.reset({ businessLineIds: [] });
         this.buildPaymentsForm();
-        stepper.reset();
         this.isSubmitting = false;
       },
-      error: () => {
-        this.snack.open('Error creating store', 'Close', { duration: 3000 });
+      error: err => {
+        this.showError(httpErrorMessage(err, 'Could not create the store.'));
         this.isSubmitting = false;
       }
     });

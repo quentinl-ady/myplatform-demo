@@ -1,20 +1,17 @@
-import { Component, OnInit, OnDestroy, inject, NgZone, ChangeDetectorRef, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, NgZone, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { A11yModule } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
-
-import { Subscription, combineLatest, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap, tap, startWith, catchError, filter, map } from 'rxjs/operators';
+import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
 import {
-  BankAccountFormat,
-  InitiateTransferRequest,
-  InitiateTransferResponse,
   BankAccountInformationResponse,
+  InitiateTransferRequest,
   RecipientCountry,
   VerifyCounterpartyNameRequest,
   StandingOrder,
@@ -25,8 +22,32 @@ import {
   User
 } from '../models';
 import { AccountService, TransferService, StandingOrderService } from '../services';
+import { ConfirmService, MoneyPipe, formatMoney, fromMinorUnits, httpErrorMessage, scaErrorMessage, toMinorUnits } from '../shared';
 import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
 import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
+import { BankDetailsCheck, DetailRow, bankDetailRows, bankDetailsSummary, speedBlockReason } from './bank-details';
+import { BankDetailsFieldsComponent } from './bank-details-fields.component';
+import { countryName, formatDateTime, speedLabel } from './format-date';
+import { describeSchedule } from './schedule-label';
+
+type PageState = LoadState | 'no-device';
+
+export interface TransferRecap {
+  amount: number;
+  currency: string;
+  beneficiary: string;
+  country: string;
+  accountRows: DetailRow[];
+  speed: string;
+  reference: string;
+  description: string;
+  date: string;
+}
+
+const STANDING_ORDER_SCHEDULES: Record<string, string> = {
+  weekly: 'Every week, on the first business day',
+  monthly: 'Every month, on the first business day'
+};
 
 @Component({
   selector: 'app-banktransfer',
@@ -34,10 +55,14 @@ import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    A11yModule,
     MaterialModule,
+    MoneyPipe,
     DeviceRegistrationComponent,
+    AccountSetupStateComponent,
     RecipientCountryPickerComponent,
-    TransferSpeedPickerComponent
+    TransferSpeedPickerComponent,
+    BankDetailsFieldsComponent
   ],
   templateUrl: './banktransfer.component.html',
   styleUrl: './banktransfer.component.css'
@@ -48,6 +73,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountService);
   private transferService = inject(TransferService);
   private soService = inject(StandingOrderService);
+  private confirmService = inject(ConfirmService);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
   private ngZone = inject(NgZone);
@@ -56,23 +82,19 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   userId = '';
   user: User | null = null;
   accountInfo?: BankAccountInformationResponse;
-  hasDevices = signal<boolean | null>(null);
+
+  // ─── Page state ───
+  accountState: LoadState = 'loading';
+  devicesState: LoadState = 'loading';
+  hasDevices = false;
+  loadErrorMessage = '';
 
   // ─── Tab management ───
   activeTab: 'oneshot' | 'standing' = 'oneshot';
 
   // ─── Recipient countries reachable from the account currency ───
   recipientCountries: RecipientCountry[] = [];
-
-  // ─── Shared bank format validation state ───
-  bankAccountFormat: BankAccountFormat | null = null;
-  isCheckingAccountFormat = false;
-  isAccountFormatValid = false;
-  accountFormatError = '';
-  private validationSub?: Subscription;
-
-  // Bank details the transfer routes are calculated for, set once they pass the format check.
-  routeBeneficiary: TransferRouteRequest | null = null;
+  countriesError = '';
 
   // ─── Shared VoP modals ───
   showExactMatchModal = false;
@@ -94,17 +116,21 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     routingNumber: [''],
     sortCode: ['']
   });
+  readonly oneshotBank = new BankDetailsCheck(this.oneshotForm, this.transferService, () => this.cdr.detectChanges());
 
   isOneshotProcessing = false;
-  isOneshotSuccess = false;
   showOneshotScaModal = false;
-  transferResponse?: InitiateTransferResponse;
+  private oneshotAuthParam = '';
+  // Recap of the transfer being approved, then of the completed one.
+  oneshotDraft: TransferRecap | null = null;
+  oneshotRecap: TransferRecap | null = null;
 
   // ─── Standing orders state ───
   standingOrders: StandingOrder[] = [];
   soLoading = true;
   soError = '';
   soView: 'list' | 'create' | 'edit' = 'list';
+  deletingSoId: string | null = null;
 
   createForm = this.fb.group({
     amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
@@ -120,6 +146,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     description: [''],
     referenceForBeneficiary: ['']
   });
+  readonly standingBank = new BankDetailsCheck(this.createForm, this.transferService, () => this.cdr.detectChanges());
 
   isCreating = false;
   scaStatus = '';
@@ -154,16 +181,31 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.validationSub) {
-      this.validationSub.unsubscribe();
-    }
+    this.oneshotBank.destroy();
+    this.standingBank.destroy();
   }
 
-  // ─────────── Tab switching ───────────
+  // ─────────── Page state ───────────
+
+  get pageState(): PageState {
+    const state = combineLoadStates(this.accountState, this.devicesState);
+    return state === 'ready' && !this.hasDevices ? 'no-device' : state;
+  }
+
+  /** Loading, missing and error states of the page; 'ready' once the account and the devices are known. */
+  get setupState(): LoadState {
+    const state = this.pageState;
+    return state === 'no-device' ? 'ready' : state;
+  }
+
+  retryPage() {
+    if (this.accountState !== 'ready') this.fetchAccountInformation();
+    if (this.devicesState !== 'ready') this.checkDevices();
+    if (!this.recipientCountries.length) this.loadRecipientCountries();
+  }
 
   onTabChange(index: number) {
     this.activeTab = index === 0 ? 'oneshot' : 'standing';
-    this.resetBankFormatState();
   }
 
   // ─────────── Shared data loading ───────────
@@ -182,193 +224,78 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   }
 
   loadRecipientCountries() {
+    this.countriesError = '';
     this.transferService.getRecipientCountries(this.userId).subscribe({
       next: (countries) => {
         this.recipientCountries = countries;
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.snack.open('Failed to load recipient countries', 'Close', { duration: 3000 });
+      error: (err) => {
+        this.countriesError = httpErrorMessage(err, "Couldn't load the recipient countries.");
+        this.cdr.detectChanges();
       }
     });
   }
 
-  fetchAccountInformation() {
+  /** A refresh after a transfer keeps the page as it is if it fails. */
+  fetchAccountInformation(refresh = false) {
+    if (!refresh) this.accountState = 'loading';
     this.accountService.getBankAccountInformation(this.userId).subscribe({
       next: (info) => {
         this.accountInfo = info;
+        this.accountState = 'ready';
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.snack.open('Failed to load account information', 'Close', { duration: 3000 });
+      error: (err) => {
+        if (!refresh) {
+          this.accountState = failedLoadState(err);
+          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your account. Try again.");
+        }
+        this.cdr.detectChanges();
       }
     });
   }
 
   checkDevices() {
+    this.devicesState = 'loading';
     this.transferService.listDevices(this.userId).subscribe({
       next: (devices) => {
-        this.hasDevices.set(devices && devices.length > 0);
+        this.hasDevices = !!devices && devices.length > 0;
+        this.devicesState = 'ready';
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.hasDevices.set(false);
+      error: (err) => {
+        this.devicesState = failedLoadState(err);
+        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
         this.cdr.detectChanges();
       }
     });
   }
 
   onDeviceRegistered() {
-    this.hasDevices.set(true);
-    this.snack.open('Device registered successfully! You can now make transfers.', 'Close', { duration: 4000 });
+    this.hasDevices = true;
+    this.snack.open('Device registered. You can now make transfers.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
     this.cdr.detectChanges();
   }
 
   get userCurrency(): string {
-    return this.user?.currencyCode || 'EUR';
+    return this.accountInfo?.currency || this.user?.currencyCode || 'EUR';
   }
 
-  // ─────────── Shared bank format validation ───────────
+  // ─────────── Shared bank details ───────────
 
-  private get activeForm(): FormGroup<any> {
-    return this.activeTab === 'oneshot' ? this.oneshotForm : this.createForm;
+  onCountryChange(context: 'oneshot' | 'standing', countryCode: string) {
+    const check = context === 'oneshot' ? this.oneshotBank : this.standingBank;
+    check.setFormat(this.findRecipientCountry(countryCode)?.bankAccountFormat ?? null);
   }
 
-  resetBankFormatState() {
-    if (this.validationSub) {
-      this.validationSub.unsubscribe();
-    }
-    this.bankAccountFormat = null;
-    this.isAccountFormatValid = false;
-    this.accountFormatError = '';
-    this.isCheckingAccountFormat = false;
-    this.routeBeneficiary = null;
-  }
-
-  onCountryChange(countryCode: string) {
-    this.clearDynamicValidators();
-    this.bankAccountFormat = this.findRecipientCountry(countryCode)?.bankAccountFormat ?? null;
-    if (!this.bankAccountFormat) return;
-
-    this.applyDynamicValidators();
-    this.setupAsyncValidation();
-  }
-
-  get testAccount(): TestAccount | null {
-    return this.findRecipientCountry(this.activeForm.value.counterpartyCountry)?.testAccount ?? null;
-  }
-
-  fillTestAccount() {
-    const testAccount = this.testAccount;
-    if (testAccount) {
-      this.activeForm.patchValue(testAccount);
-    }
+  testAccountOf(context: 'oneshot' | 'standing'): TestAccount | null {
+    const form = context === 'oneshot' ? this.oneshotForm : this.createForm;
+    return this.findRecipientCountry(form.value.counterpartyCountry)?.testAccount ?? null;
   }
 
   private findRecipientCountry(countryCode: string | null | undefined): RecipientCountry | undefined {
     return this.recipientCountries.find(country => country.countryCode === countryCode);
-  }
-
-  clearDynamicValidators() {
-    if (this.validationSub) {
-      this.validationSub.unsubscribe();
-    }
-    this.isAccountFormatValid = false;
-    this.accountFormatError = '';
-    this.isCheckingAccountFormat = false;
-    this.routeBeneficiary = null;
-
-    const form = this.activeForm;
-    ['iban', 'accountNumber', 'routingNumber', 'sortCode'].forEach(field => {
-      form.get(field)?.clearValidators();
-      form.get(field)?.setValue('');
-      form.get(field)?.updateValueAndValidity();
-    });
-  }
-
-  applyDynamicValidators() {
-    const form = this.activeForm;
-    if (this.bankAccountFormat === 'iban') {
-      form.get('iban')?.setValidators([Validators.required]);
-    } else if (this.bankAccountFormat === 'accountNumberRoutingNumber') {
-      form.get('accountNumber')?.setValidators([Validators.required]);
-      form.get('routingNumber')?.setValidators([Validators.required]);
-    } else if (this.bankAccountFormat === 'accountNumberSortCode') {
-      form.get('accountNumber')?.setValidators([Validators.required]);
-      form.get('sortCode')?.setValidators([Validators.required]);
-    }
-
-    ['iban', 'accountNumber', 'routingNumber', 'sortCode'].forEach(field => {
-      form.get(field)?.updateValueAndValidity();
-    });
-  }
-
-  setupAsyncValidation() {
-    const form = this.activeForm;
-    let controlsToWatch: any[] = [];
-
-    if (this.bankAccountFormat === 'iban') {
-      controlsToWatch = [form.get('iban')];
-    } else if (this.bankAccountFormat === 'accountNumberRoutingNumber') {
-      controlsToWatch = [form.get('accountNumber'), form.get('routingNumber')];
-    } else if (this.bankAccountFormat === 'accountNumberSortCode') {
-      controlsToWatch = [form.get('accountNumber'), form.get('sortCode')];
-    }
-
-    if (controlsToWatch.length === 0) return;
-
-    this.validationSub = combineLatest(
-      controlsToWatch.map(c => c.valueChanges.pipe(startWith(c.value)))
-    ).pipe(
-      debounceTime(1000),
-      distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr)),
-      tap(() => {
-        this.routeBeneficiary = null;
-        const allFilled = controlsToWatch.every(c => c?.value && c.valid);
-        if (!allFilled) {
-          this.isAccountFormatValid = false;
-          this.isCheckingAccountFormat = false;
-          this.accountFormatError = '';
-          this.cdr.detectChanges();
-        } else {
-          this.isCheckingAccountFormat = true;
-          this.accountFormatError = '';
-          this.cdr.detectChanges();
-        }
-      }),
-      filter(() => controlsToWatch.every(c => c?.value && c.valid)),
-      switchMap(() => {
-        const req: any = {
-          bankAccountFormat: this.bankAccountFormat,
-          counterpartyCountry: form.value.counterpartyCountry,
-          iban: form.value.iban || '',
-          accountNumber: form.value.accountNumber || '',
-          routingNumber: form.value.routingNumber || '',
-          sortCode: form.value.sortCode || ''
-        };
-        return this.transferService.isBankAccountValid(req).pipe(
-          catchError(() => of({ isBankAccountValid: 'false' })),
-          map(res => ({ res, req }))
-        );
-      })
-    ).subscribe(({ res, req }) => {
-      this.isCheckingAccountFormat = false;
-      if (res.isBankAccountValid === 'true' || res.isBankAccountValid === true as any) {
-        this.isAccountFormatValid = true;
-        this.accountFormatError = '';
-        this.routeBeneficiary = {
-          counterpartyCountry: req.counterpartyCountry,
-          iban: req.iban,
-          accountNumber: req.accountNumber,
-          routingNumber: req.routingNumber,
-          sortCode: req.sortCode
-        };
-      } else {
-        this.isAccountFormatValid = false;
-        this.accountFormatError = 'Invalid account format or checksum.';
-      }
-      this.cdr.detectChanges();
-    });
   }
 
   // ─────────── Shared VoP modal handlers ───────────
@@ -424,59 +351,37 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ═══════════════════════════════════════════
-  //  ONE-SHOT TRANSFER
-  // ═══════════════════════════════════════════
-
-  private buildTransferRequest(sdkOutput: string): InitiateTransferRequest {
-    const minorUnitAmount = Math.round(this.oneshotForm.value.amount! * 100);
-    const formVals = this.oneshotForm.value;
-
+  private verifyPayloadOf(context: 'oneshot' | 'standing'): VerifyCounterpartyNameRequest {
+    const isOneshot = context === 'oneshot';
+    const check = isOneshot ? this.oneshotBank : this.standingBank;
+    const values = isOneshot ? this.oneshotForm.value : this.createForm.value;
+    const bank = check.normalized();
     return {
-      sdkOutput: String(sdkOutput),
-      amount: minorUnitAmount,
-      reference: formVals.reference || '',
-      description: formVals.description || '',
-      userId: this.userId,
-      transferType: formVals.transferType!,
-      counterpartyCountry: formVals.counterpartyCountry!,
-      iban: this.bankAccountFormat === 'iban' ? formVals.iban! : '',
-      accountNumber: this.bankAccountFormat !== 'iban' ? formVals.accountNumber! : '',
-      routingNumber: this.bankAccountFormat === 'accountNumberRoutingNumber' ? formVals.routingNumber! : '',
-      sortCode: this.bankAccountFormat === 'accountNumberSortCode' ? formVals.sortCode! : '',
-      counterpartyName: formVals.accountHolderName || ''
+      accountHolderName: (isOneshot ? this.oneshotForm.value.accountHolderName : this.createForm.value.counterpartyName) || '',
+      iban: bank.iban,
+      reference: values.reference || '',
+      accountNumber: bank.accountNumber,
+      sortCode: bank.sortCode,
+      accountType: check.format || '',
+      transferType: (isOneshot ? this.oneshotForm.value.transferType : this.createForm.value.priority) || 'regular',
+      counterpartyCountry: values.counterpartyCountry || ''
     };
   }
 
-  async submitOneshot() {
-    if (this.oneshotForm.invalid || !this.bankAccountFormat || !this.isAccountFormatValid) return;
-
-    const country = this.oneshotForm.value.counterpartyCountry;
-    this.vopContext = 'oneshot';
-
+  /** Verification of payee, then the matching modal or the next step directly. */
+  private verifyPayee(context: 'oneshot' | 'standing', next: () => void, setBusy: (busy: boolean) => void) {
+    this.vopContext = context;
+    const country = context === 'oneshot' ? this.oneshotForm.value.counterpartyCountry : this.createForm.value.counterpartyCountry;
     if (!this.findRecipientCountry(country)?.payeeVerification) {
-      this.initiateTransferFlow();
+      next();
       return;
     }
 
-    this.isOneshotProcessing = true;
-
-    const verifyPayload: VerifyCounterpartyNameRequest = {
-      accountHolderName: this.oneshotForm.value.accountHolderName || '',
-      iban: this.oneshotForm.value.iban || '',
-      reference: this.oneshotForm.value.reference || '',
-      accountNumber: this.oneshotForm.value.accountNumber || '',
-      sortCode: this.oneshotForm.value.sortCode || '',
-      accountType: this.bankAccountFormat,
-      transferType: this.oneshotForm.value.transferType || '',
-      counterpartyCountry: country || ''
-    };
-
-    this.transferService.verifyCounterpartyName(verifyPayload).subscribe({
+    setBusy(true);
+    this.transferService.verifyCounterpartyName(this.verifyPayloadOf(context)).subscribe({
       next: (res) => {
         this.ngZone.run(() => {
-          this.isOneshotProcessing = false;
-
+          setBusy(false);
           if (res.response === 'nameMatch') {
             this.showExactMatchModal = true;
           } else if (res.response === 'partialNameMatch') {
@@ -485,41 +390,108 @@ export class BankTransferComponent implements OnInit, OnDestroy {
           } else if (res.response === 'noNameMatch') {
             this.showNoMatchModal = true;
           } else {
-            this.initiateTransferFlow();
+            next();
           }
-
           this.cdr.detectChanges();
         });
       },
-      error: () => {
+      error: (err) => {
         this.ngZone.run(() => {
-          this.isOneshotProcessing = false;
-          this.snack.open('Failed to verify counterparty name', 'Close', { duration: 3000 });
+          setBusy(false);
+          this.toastError(httpErrorMessage(err, "Couldn't verify the beneficiary name. Try again."));
           this.cdr.detectChanges();
         });
       }
     });
   }
 
+  // ═══════════════════════════════════════════
+  //  ONE-SHOT TRANSFER
+  // ═══════════════════════════════════════════
+
+  get oneshotAmountMinor(): number | null {
+    const amount = this.oneshotForm.value.amount;
+    return typeof amount === 'number' && Number.isFinite(amount) ? toMinorUnits(amount, this.userCurrency) : null;
+  }
+
+  get oneshotExceedsBalance(): boolean {
+    const amount = this.oneshotAmountMinor;
+    return !!this.accountInfo && amount !== null && this.accountInfo.currency === this.userCurrency && amount > this.accountInfo.amount;
+  }
+
+  get oneshotBlockReason(): string {
+    const controls = this.oneshotForm.controls;
+    if (controls.amount.invalid) return 'Enter an amount to continue.';
+    if (this.oneshotExceedsBalance) return 'The amount is higher than your available balance.';
+    if (controls.accountHolderName.invalid) return 'Enter the beneficiary name to continue.';
+    if (controls.counterpartyCountry.invalid) return 'Choose the recipient country to continue.';
+    return this.oneshotBank.blockReason || speedBlockReason(controls.transferType);
+  }
+
+  amountError(control: 'oneshot' | 'standing'): string {
+    const amount = control === 'oneshot' ? this.oneshotForm.controls.amount : this.createForm.controls.amount;
+    if (amount.errors?.['min'] && (amount.touched || amount.dirty)) {
+      return `Enter an amount of at least ${formatMoney(1, this.userCurrency)}.`;
+    }
+    return '';
+  }
+
+  private buildTransferRequest(sdkOutput: string): InitiateTransferRequest {
+    const formVals = this.oneshotForm.value;
+    const bank = this.oneshotBank.normalized();
+
+    return {
+      sdkOutput: String(sdkOutput),
+      amount: this.oneshotAmountMinor ?? 0,
+      reference: formVals.reference || '',
+      description: formVals.description || '',
+      userId: this.userId,
+      transferType: formVals.transferType!,
+      counterpartyCountry: formVals.counterpartyCountry!,
+      ...bank,
+      counterpartyName: formVals.accountHolderName || ''
+    };
+  }
+
+  private buildOneshotRecap(): TransferRecap {
+    const formVals = this.oneshotForm.value;
+    return {
+      amount: this.oneshotAmountMinor ?? 0,
+      currency: this.userCurrency,
+      beneficiary: formVals.accountHolderName || '',
+      country: countryName(formVals.counterpartyCountry),
+      accountRows: bankDetailRows(this.oneshotBank.normalized()),
+      speed: speedLabel(formVals.transferType),
+      reference: formVals.reference || '',
+      description: formVals.description || '',
+      date: formatDateTime(new Date())
+    };
+  }
+
+  submitOneshot() {
+    if (this.oneshotBlockReason || this.isOneshotProcessing) return;
+    this.verifyPayee('oneshot', () => this.initiateTransferFlow(), busy => this.isOneshotProcessing = busy);
+  }
+
   async initiateTransferFlow() {
     this.isOneshotProcessing = true;
+    this.cdr.detectChanges();
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.checkAvailability();
       const request = this.buildTransferRequest(String(sdkOutput));
+      const draft = this.buildOneshotRecap();
 
       this.transferService.initiateTransfer(request).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
+            this.isOneshotProcessing = false;
             if (!res.authParam1) {
-              this.isOneshotSuccess = true;
-              this.isOneshotProcessing = false;
-              this.transferService.invalidateTransactionCache(this.userId);
-              this.fetchAccountInformation();
+              this.completeOneshot(draft);
             } else {
-              this.transferResponse = res;
+              this.oneshotAuthParam = res.authParam1;
+              this.oneshotDraft = draft;
               this.showOneshotScaModal = true;
-              this.isOneshotProcessing = false;
             }
             this.cdr.detectChanges();
           });
@@ -527,66 +499,83 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.ngZone.run(() => {
             this.isOneshotProcessing = false;
-            const message = err.status === 400 && err.error?.error ? err.error.error : 'Transfer initiation failed';
-            this.snack.open(message, 'Close', { duration: 5000 });
+            this.toastError(httpErrorMessage(err, "Couldn't start the transfer. Try again."));
             this.cdr.detectChanges();
           });
         }
       });
     } catch (e) {
-      this.isOneshotProcessing = false;
-      this.snack.open('SCA initialization failed', 'Close', { duration: 3000 });
+      this.ngZone.run(() => {
+        this.isOneshotProcessing = false;
+        this.toastError(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+        this.cdr.detectChanges();
+      });
     }
   }
 
   declineOneshot() {
+    if (this.isOneshotProcessing) return;
     this.showOneshotScaModal = false;
+    this.oneshotAuthParam = '';
   }
 
   async approveOneshot() {
-    if (!this.transferResponse) return;
+    if (!this.oneshotAuthParam || !this.oneshotDraft) return;
     this.isOneshotProcessing = true;
+    const draft = this.oneshotDraft;
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
-      const sdkInput = this.transferResponse.authParam1;
-      const sdkOutput = await scaWebauthn.authenticate(sdkInput);
+      const sdkOutput = await scaWebauthn.authenticate(this.oneshotAuthParam);
       const request = this.buildTransferRequest(String(sdkOutput));
 
       this.transferService.finalizeTransfer(request).subscribe({
         next: () => {
           this.ngZone.run(() => {
-            this.isOneshotSuccess = true;
             this.showOneshotScaModal = false;
             this.isOneshotProcessing = false;
-            this.transferService.invalidateTransactionCache(this.userId);
-            this.fetchAccountInformation();
+            this.completeOneshot(draft);
             this.cdr.detectChanges();
           });
         },
-        error: () => {
+        error: (err) => {
           this.ngZone.run(() => {
             this.isOneshotProcessing = false;
-            this.snack.open('Transfer finalization failed', 'Close', { duration: 3000 });
+            this.toastError(httpErrorMessage(err, "Couldn't complete the transfer. Try again."));
             this.cdr.detectChanges();
           });
         }
       });
     } catch (e) {
-      this.isOneshotProcessing = false;
-      this.snack.open('SCA authentication failed', 'Close', { duration: 3000 });
+      this.ngZone.run(() => {
+        this.isOneshotProcessing = false;
+        this.toastError(scaErrorMessage(e, 'Authentication failed. Try again.'));
+        this.cdr.detectChanges();
+      });
     }
   }
 
+  private completeOneshot(recap: TransferRecap) {
+    this.oneshotRecap = { ...recap, date: formatDateTime(new Date()) };
+    this.oneshotDraft = null;
+    this.oneshotAuthParam = '';
+    this.transferService.invalidateTransactionCache(this.userId);
+    this.fetchAccountInformation(true);
+  }
+
   resetOneshotForm() {
-    this.isOneshotSuccess = false;
-    this.bankAccountFormat = null;
-    this.clearDynamicValidators();
+    this.oneshotRecap = null;
+    this.oneshotDraft = null;
+    this.oneshotBank.setFormat(null);
     this.oneshotForm.reset({
+      amount: null,
       transferType: null,
       counterpartyCountry: '',
-      accountHolderName: ''
+      accountHolderName: '',
+      reference: '',
+      description: ''
     });
+    this.cdr.detectChanges();
   }
 
   // ═══════════════════════════════════════════
@@ -603,7 +592,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.soError = err.error?.message || 'Failed to load standing orders';
+        this.soError = httpErrorMessage(err, "Couldn't load your scheduled transfers. Try again.");
         this.standingOrders = [];
         this.soLoading = false;
         this.cdr.detectChanges();
@@ -611,15 +600,28 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     });
   }
 
+  get createBlockReason(): string {
+    const controls = this.createForm.controls;
+    if (controls.amount.invalid) return 'Enter an amount to continue.';
+    if (controls.counterpartyName.invalid) return 'Enter the beneficiary name to continue.';
+    if (controls.counterpartyCountry.invalid) return 'Choose the recipient country to continue.';
+    if (controls.schedule.invalid) return 'Choose a schedule to continue.';
+    return this.standingBank.blockReason || speedBlockReason(controls.priority);
+  }
+
   showSoCreate() {
     this.soView = 'create';
     this.scaStatus = '';
-    this.bankAccountFormat = null;
-    this.clearDynamicValidators();
+    this.standingBank.setFormat(null);
     this.createForm.reset({
+      amount: null,
+      counterpartyName: '',
       counterpartyCountry: '',
       schedule: 'daily',
-      priority: null
+      priority: null,
+      reference: '',
+      description: '',
+      referenceForBeneficiary: ''
     });
   }
 
@@ -628,7 +630,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.editingOrder = null;
     this.editRouteBeneficiary = null;
     this.scaStatus = '';
-    this.resetBankFormatState();
+    this.standingBank.setFormat(null);
     this.loadStandingOrders();
   }
 
@@ -636,7 +638,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.editingOrder = order;
     this.editRouteBeneficiary = this.routeBeneficiaryOf(order);
     this.soView = 'edit';
-    this.editForm.patchValue({
+    this.editForm.reset({
       reference: order.reference || '',
       description: order.description || '',
       referenceForBeneficiary: order.referenceForBeneficiary || '',
@@ -645,7 +647,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   }
 
   private routeBeneficiaryOf(order: StandingOrder): TransferRouteRequest | null {
-    const account = order.counterparty?.bankAccount?.accountIdentification;
+    const account = this.soAccount(order);
     const countryByType: Record<string, string> = {
       iban: (account?.iban || '').slice(0, 2).toUpperCase(),
       ukLocal: 'GB',
@@ -663,21 +665,75 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     };
   }
 
-  onDeleteSo(order: StandingOrder) {
-    if (!confirm('Delete this scheduled transfer?')) return;
+  soAccount(order: StandingOrder) {
+    return order.counterparty?.bankAccount?.accountIdentification ?? null;
+  }
+
+  soBeneficiary(order: StandingOrder): string {
+    return order.counterparty?.bankAccount?.accountHolder?.fullName || 'Unknown beneficiary';
+  }
+
+  soAccountSummary(order: StandingOrder): string {
+    return bankDetailsSummary(this.soAccount(order) ?? {});
+  }
+
+  soAccountRows(order: StandingOrder): DetailRow[] {
+    return bankDetailRows(this.soAccount(order) ?? {});
+  }
+
+  soAmountValue(order: StandingOrder): number {
+    return order.amount?.value ?? 0;
+  }
+
+  soCurrency(order: StandingOrder): string {
+    return order.amount?.currency || this.userCurrency;
+  }
+
+  soAmountMajor(order: StandingOrder): number {
+    return fromMinorUnits(this.soAmountValue(order), this.soCurrency(order));
+  }
+
+  getScheduleLabel(schedule: unknown): string {
+    return describeSchedule(schedule, STANDING_ORDER_SCHEDULES);
+  }
+
+  soStatusLabel(order: StandingOrder): string {
+    return order.status === 'active' ? 'Active' : 'Inactive';
+  }
+
+  async onDeleteSo(order: StandingOrder) {
+    if (this.deletingSoId) return;
+    const confirmed = await this.confirmService.confirm({
+      title: 'Delete this scheduled transfer?',
+      message: 'No further transfers will be sent on this schedule. Transfers already sent are not affected.',
+      details: [
+        { label: 'Beneficiary', value: this.soBeneficiary(order) },
+        { label: 'Amount', value: formatMoney(this.soAmountValue(order), this.soCurrency(order)) },
+        { label: 'Schedule', value: this.getScheduleLabel(order.schedule) }
+      ],
+      confirmText: 'Delete scheduled transfer',
+      danger: true
+    });
+    if (!confirmed) return;
+
+    this.deletingSoId = order.id;
+    this.cdr.detectChanges();
     this.soService.delete(this.userId, order.id).subscribe({
       next: () => {
-        this.snack.open('Scheduled transfer deleted', 'Close', { duration: 3000 });
+        this.deletingSoId = null;
+        this.snack.open('Scheduled transfer deleted', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
         this.loadStandingOrders();
       },
       error: (err) => {
-        this.snack.open(err.error?.message || 'Failed to delete', 'Close', { duration: 3000 });
+        this.deletingSoId = null;
+        this.toastError(httpErrorMessage(err, "Couldn't delete the scheduled transfer. Try again."));
+        this.cdr.detectChanges();
       }
     });
   }
 
   onSaveEdit() {
-    if (!this.editingOrder) return;
+    if (!this.editingOrder || this.isSaving || this.editForm.invalid) return;
     this.isSaving = true;
 
     const patch = {
@@ -691,12 +747,13 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       next: (updated) => {
         this.editingOrder = updated;
         this.isSaving = false;
-        this.snack.open('Scheduled transfer updated', 'Close', { duration: 3000 });
+        this.editForm.markAsPristine();
+        this.snack.open('Scheduled transfer updated', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.isSaving = false;
-        this.snack.open(err.error?.message || 'Failed to update', 'Close', { duration: 3000 });
+        this.toastError(httpErrorMessage(err, "Couldn't update the scheduled transfer. Try again."));
         this.cdr.detectChanges();
       }
     });
@@ -704,22 +761,21 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   private buildCreatePayload(): StandingOrderCreateRequest {
     const f = this.createForm.value;
+    const bank = this.standingBank.normalized();
 
-    let accountIdentification: any;
-    if (this.bankAccountFormat === 'iban') {
-      accountIdentification = { type: 'iban', iban: f.iban || '' };
-    } else if (this.bankAccountFormat === 'accountNumberRoutingNumber') {
-      accountIdentification = { type: 'usLocal', accountNumber: f.accountNumber || '', routingNumber: f.routingNumber || '' };
-    } else if (this.bankAccountFormat === 'accountNumberSortCode') {
-      accountIdentification = { type: 'ukLocal', accountNumber: f.accountNumber || '', sortCode: f.sortCode || '' };
+    let accountIdentification: StandingOrderCreateRequest['counterparty']['bankAccount']['accountIdentification'];
+    if (this.standingBank.format === 'accountNumberRoutingNumber') {
+      accountIdentification = { type: 'usLocal', accountNumber: bank.accountNumber, routingNumber: bank.routingNumber };
+    } else if (this.standingBank.format === 'accountNumberSortCode') {
+      accountIdentification = { type: 'ukLocal', accountNumber: bank.accountNumber, sortCode: bank.sortCode };
     } else {
-      accountIdentification = { type: 'iban', iban: f.iban || '' };
+      accountIdentification = { type: 'iban', iban: bank.iban };
     }
 
     return {
       amount: {
         currency: this.userCurrency,
-        value: Math.round((f.amount || 0) * 100)
+        value: toMinorUnits(f.amount || 0, this.userCurrency)
       },
       counterparty: {
         bankAccount: {
@@ -735,57 +791,9 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     };
   }
 
-  async onCreateSo() {
-    if (this.createForm.invalid || !this.bankAccountFormat || !this.isAccountFormatValid) return;
-
-    const country = this.createForm.value.counterpartyCountry;
-    this.vopContext = 'standing';
-
-    if (!this.findRecipientCountry(country)?.payeeVerification) {
-      this.initiateStandingOrderFlow();
-      return;
-    }
-
-    this.isCreating = true;
-
-    const verifyPayload: VerifyCounterpartyNameRequest = {
-      accountHolderName: this.createForm.value.counterpartyName || '',
-      iban: this.createForm.value.iban || '',
-      reference: this.createForm.value.reference || '',
-      accountNumber: this.createForm.value.accountNumber || '',
-      sortCode: this.createForm.value.sortCode || '',
-      accountType: this.bankAccountFormat,
-      transferType: this.createForm.value.priority || 'regular',
-      counterpartyCountry: country || ''
-    };
-
-    this.transferService.verifyCounterpartyName(verifyPayload).subscribe({
-      next: (res) => {
-        this.ngZone.run(() => {
-          this.isCreating = false;
-
-          if (res.response === 'nameMatch') {
-            this.showExactMatchModal = true;
-          } else if (res.response === 'partialNameMatch') {
-            this.suggestedName = res.name;
-            this.showPartialMatchModal = true;
-          } else if (res.response === 'noNameMatch') {
-            this.showNoMatchModal = true;
-          } else {
-            this.initiateStandingOrderFlow();
-          }
-
-          this.cdr.detectChanges();
-        });
-      },
-      error: () => {
-        this.ngZone.run(() => {
-          this.isCreating = false;
-          this.snack.open('Failed to verify counterparty name', 'Close', { duration: 3000 });
-          this.cdr.detectChanges();
-        });
-      }
-    });
+  onCreateSo() {
+    if (this.createBlockReason || this.isCreating) return;
+    this.verifyPayee('standing', () => this.initiateStandingOrderFlow(), busy => this.isCreating = busy);
   }
 
   async initiateStandingOrderFlow() {
@@ -796,12 +804,12 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.pendingStandingOrder = standingOrder;
 
     try {
-      this.scaStatus = 'Checking SCA availability...';
+      this.scaStatus = 'Checking passkey availability...';
       this.cdr.detectChanges();
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutputInit = await scaWebauthn.checkAvailability();
 
-      this.scaStatus = 'Initiating scheduled transfer...';
+      this.scaStatus = 'Creating the scheduled transfer...';
       this.cdr.detectChanges();
 
       this.soService.initiate(this.userId, standingOrder, String(sdkOutputInit)).subscribe({
@@ -810,17 +818,16 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             if (result.status === 'completed') {
               this.scaStatus = '';
               this.isCreating = false;
-              this.snack.open('Scheduled transfer created successfully!', 'Close', { duration: 3000 });
-              this.showSoList();
+              this.onStandingOrderCreated(standingOrder);
             } else if (result.status === 'sca_required') {
               this.scaInitiateResult = result;
-              this.scaStatus = 'SCA authentication required...';
+              this.scaStatus = '';
               this.showSoScaModal = true;
               this.isCreating = false;
             } else {
               this.scaStatus = '';
               this.isCreating = false;
-              this.snack.open('Unexpected response', 'Close', { duration: 3000 });
+              this.toastError("Couldn't create the scheduled transfer: unexpected response. Try again.");
             }
             this.cdr.detectChanges();
           });
@@ -829,42 +836,43 @@ export class BankTransferComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.isCreating = false;
             this.scaStatus = '';
-            this.snack.open(err.error?.message || 'Failed to create scheduled transfer', 'Close', { duration: 3000 });
+            this.toastError(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."));
             this.cdr.detectChanges();
           });
         }
       });
     } catch (e) {
-      this.isCreating = false;
-      this.scaStatus = '';
-      this.snack.open('SCA initialization failed', 'Close', { duration: 3000 });
-      this.cdr.detectChanges();
+      this.ngZone.run(() => {
+        this.isCreating = false;
+        this.scaStatus = '';
+        this.toastError(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+        this.cdr.detectChanges();
+      });
     }
   }
 
   async approveSoScaChallenge() {
-    if (!this.scaInitiateResult || !this.pendingStandingOrder) return;
+    if (!this.scaInitiateResult?.authParam1 || !this.pendingStandingOrder) return;
     this.isCreating = true;
+    const standingOrder = this.pendingStandingOrder;
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
-      const sdkInput = this.scaInitiateResult.authParam1!;
-      this.scaStatus = 'Authenticating (WebAuthn)...';
+      this.scaStatus = 'Waiting for your passkey...';
       this.cdr.detectChanges();
 
-      const sdkOutput = await scaWebauthn.authenticate(sdkInput);
+      const sdkOutput = await scaWebauthn.authenticate(this.scaInitiateResult.authParam1);
 
-      this.scaStatus = 'Finalizing scheduled transfer...';
+      this.scaStatus = 'Creating the scheduled transfer...';
       this.cdr.detectChanges();
 
-      this.soService.finalize(this.userId, this.pendingStandingOrder, String(sdkOutput)).subscribe({
+      this.soService.finalize(this.userId, standingOrder, String(sdkOutput)).subscribe({
         next: () => {
           this.ngZone.run(() => {
             this.showSoScaModal = false;
             this.isCreating = false;
             this.scaStatus = '';
-            this.snack.open('Scheduled transfer created successfully!', 'Close', { duration: 3000 });
-            this.showSoList();
+            this.onStandingOrderCreated(standingOrder);
             this.cdr.detectChanges();
           });
         },
@@ -872,32 +880,41 @@ export class BankTransferComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => {
             this.isCreating = false;
             this.scaStatus = '';
-            this.snack.open(err.error?.message || 'Failed to finalize scheduled transfer', 'Close', { duration: 3000 });
+            this.toastError(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."));
             this.cdr.detectChanges();
           });
         }
       });
     } catch (e) {
-      this.isCreating = false;
-      this.scaStatus = '';
-      this.snack.open('SCA authentication failed', 'Close', { duration: 3000 });
-      this.cdr.detectChanges();
+      this.ngZone.run(() => {
+        this.isCreating = false;
+        this.scaStatus = '';
+        this.toastError(scaErrorMessage(e, 'Authentication failed. Try again.'));
+        this.cdr.detectChanges();
+      });
     }
   }
 
-  cancelSoSca() {
-    this.showSoScaModal = false;
-    this.scaStatus = '';
-    this.isCreating = false;
+  private onStandingOrderCreated(order: StandingOrderCreateRequest) {
+    const amount = formatMoney(order.amount.value, order.amount.currency);
+    const beneficiary = order.counterparty.bankAccount.accountHolder.fullName;
+    this.snack.open(
+      `Scheduled transfer created: ${amount} to ${beneficiary}, ${this.getScheduleLabel(order.schedule).toLowerCase()}.`,
+      'Close',
+      { duration: 5000, panelClass: 'fintech-snack-success' }
+    );
+    this.pendingStandingOrder = null;
+    this.scaInitiateResult = null;
+    this.showSoList();
   }
 
-  getScheduleLabel(schedule: string): string {
-    const labels: Record<string, string> = {
-      daily: 'Daily',
-      weekdays: 'Weekdays',
-      weekly: 'Weekly',
-      monthly: 'Monthly'
-    };
-    return labels[schedule] || schedule;
+  cancelSoSca() {
+    if (this.isCreating) return;
+    this.showSoScaModal = false;
+    this.scaStatus = '';
+  }
+
+  private toastError(message: string) {
+    this.snack.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-error' });
   }
 }

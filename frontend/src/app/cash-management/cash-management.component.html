@@ -3,86 +3,114 @@
   <!-- HEADER -->
   <div class="header-section">
     <div class="header-title">
-      <h2>Cash Management</h2>
+      <h1>Cash management</h1>
       <p>Manage your balance accounts, transfer funds and configure payouts.</p>
     </div>
-    <div class="header-actions">
+    <div class="header-actions" *ngIf="accountsState !== 'missing'">
       <span class="last-updated-label" *ngIf="lastUpdated && !loadingAccounts">{{ getLastUpdatedLabel() }}</span>
-      <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="loadingAccounts">
-        <mat-icon>refresh</mat-icon>
-        Refresh
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="loadingAccounts">
+        <mat-icon *ngIf="!loadingAccounts" aria-hidden="true">refresh</mat-icon>
+        <mat-spinner *ngIf="loadingAccounts" diameter="18" aria-hidden="true"></mat-spinner>
+        {{ loadingAccounts ? 'Refreshing...' : 'Refresh' }}
       </button>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!--  BALANCE ACCOUNTS DASHBOARD (always visible)       -->
-  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- ACCOUNT HOLDER NOT SET UP -->
+  <mat-card class="state-card" *ngIf="accountsState === 'missing'">
+    <div class="state-icon" aria-hidden="true"><mat-icon>account_balance_wallet</mat-icon></div>
+    <h2>Finish onboarding first</h2>
+    <p>Your balance accounts are created during onboarding. Complete it, then come back here to manage your funds.</p>
+    <a mat-flat-button class="fintech-btn primary" [routerLink]="['/', userId, 'dashboard']">Go to Onboarding</a>
+  </mat-card>
+
+  <!-- LOAD ERROR (first load) -->
+  <mat-card class="state-card" *ngIf="accountsState === 'error' && balanceAccounts().length === 0" role="alert">
+    <div class="state-icon error" aria-hidden="true"><mat-icon>error_outline</mat-icon></div>
+    <h2>Couldn't load your balance accounts</h2>
+    <p>{{ accountsError }}</p>
+    <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()">Retry</button>
+  </mat-card>
+
+  <ng-container *ngIf="accountsState === 'loading' || accountsState === 'ready' || (accountsState === 'error' && balanceAccounts().length > 0)">
+
+  <!-- BALANCE ACCOUNTS -->
   <mat-card class="dashboard-card">
     <div class="card-header">
-      <h3 class="card-title">Balance Accounts</h3>
-      <button mat-flat-button class="fintech-btn primary small" (click)="showCreateForm = !showCreateForm">
-        <mat-icon>add</mat-icon> New Account
+      <h2 class="card-title">Balance accounts</h2>
+      <button mat-flat-button type="button" class="fintech-btn primary small" (click)="toggleCreateForm()"
+              [attr.aria-expanded]="showCreateForm" aria-controls="create-account-form">
+        <mat-icon aria-hidden="true">{{ showCreateForm ? 'close' : 'add' }}</mat-icon> {{ showCreateForm ? 'Cancel' : 'New account' }}
       </button>
     </div>
 
-    <!-- Create form -->
-    <div class="create-form" *ngIf="showCreateForm">
-      <div class="create-form-row">
-        <input class="fintech-input" [(ngModel)]="newAccountDescription" placeholder="Account description (e.g. Operations EUR)" />
-        <button mat-flat-button class="fintech-btn primary" (click)="createBalanceAccount()" [disabled]="creatingAccount || !newAccountDescription.trim()">
-          <span *ngIf="!creatingAccount">Create</span>
-          <mat-spinner *ngIf="creatingAccount" diameter="18" color="accent"></mat-spinner>
-        </button>
-        <button mat-button class="fintech-btn" (click)="showCreateForm = false">Cancel</button>
-      </div>
+    <!-- Refresh error while data is still shown -->
+    <div class="inline-alert error" *ngIf="accountsState === 'error' && balanceAccounts().length > 0" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ accountsError }}</span>
+      <button type="button" class="link-btn" (click)="refresh()">Retry</button>
     </div>
 
+    <!-- Create form -->
+    <form class="create-form" id="create-account-form" *ngIf="showCreateForm" (ngSubmit)="createBalanceAccount()">
+      <label for="new-account-description">Account description</label>
+      <div class="create-form-row">
+        <input id="new-account-description" name="newAccountDescription" class="fintech-input" [(ngModel)]="newAccountDescription"
+               placeholder="e.g. Operations EUR" maxlength="150" autocomplete="off"
+               [attr.aria-invalid]="createError ? true : null" [attr.aria-describedby]="createError ? 'create-account-error' : null" />
+        <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="creatingAccount || !newAccountDescription.trim()">
+          <span *ngIf="!creatingAccount">Create account</span>
+          <mat-spinner *ngIf="creatingAccount" diameter="18" aria-label="Creating account"></mat-spinner>
+        </button>
+      </div>
+      <p class="field-error" id="create-account-error" *ngIf="createError" role="alert">{{ createError }}</p>
+    </form>
+
     <!-- Loading -->
-    <div class="loading-container" *ngIf="loadingAccounts">
-      <mat-spinner diameter="24"></mat-spinner>
+    <div class="loading-container" *ngIf="loadingAccounts" role="status">
+      <mat-spinner diameter="24" aria-hidden="true"></mat-spinner>
       <span>Loading accounts...</span>
     </div>
 
     <!-- Account cards grid -->
     <div class="accounts-grid" *ngIf="!loadingAccounts">
-      <div class="account-card" *ngFor="let account of balanceAccounts()">
+      <section class="account-card" *ngFor="let account of balanceAccounts()" [attr.aria-label]="accountName(account)">
         <div class="account-card-header">
-          <div class="account-name">{{ account.description || 'Balance Account' }}</div>
-          <span class="status-badge" [class.active]="account.status === 'active'" [class.inactive]="account.status !== 'active'">
+          <h3 class="account-name">{{ account.description || 'Balance account' }}</h3>
+          <span class="status-badge" [class.active]="account.status === 'active' || !account.status" [class.inactive]="account.status && account.status !== 'active'">
             {{ account.status || 'active' }}
           </span>
         </div>
-        <div class="account-id">{{ account.balanceAccountId }}</div>
+        <div class="account-id mono">{{ account.balanceAccountId }}</div>
 
         <!-- Balances -->
         <div class="balances-section" *ngIf="account.balances?.length">
           <div class="balance-row" *ngFor="let bal of account.balances">
             <div class="balance-main">
               <span class="balance-currency">{{ bal.currency }}</span>
-              <span class="balance-amount">{{ formatAmount(bal.available, bal.currency) }}</span>
+              <span class="balance-amount"><span class="visually-hidden">Available: </span>{{ bal.available | money:bal.currency }}</span>
             </div>
             <div class="balance-details">
-              <span class="balance-detail" matTooltip="Total balance">Balance: {{ formatAmount(bal.balance, bal.currency) }}</span>
-              <span class="balance-detail" *ngIf="bal.pending > 0" matTooltip="Pending settlement">Pending: {{ formatAmount(bal.pending, bal.currency) }}</span>
-              <span class="balance-detail" *ngIf="bal.reserved > 0" matTooltip="Reserved">Reserved: {{ formatAmount(bal.reserved, bal.currency) }}</span>
+              <span class="balance-detail">Balance: {{ bal.balance | money:bal.currency }}</span>
+              <span class="balance-detail" *ngIf="bal.pending > 0">Pending: {{ bal.pending | money:bal.currency }}</span>
+              <span class="balance-detail" *ngIf="bal.reserved > 0">Reserved: {{ bal.reserved | money:bal.currency }}</span>
             </div>
           </div>
         </div>
-        <div *ngIf="!account.balances?.length" class="no-balance">No balance data</div>
+        <p *ngIf="!account.balances?.length" class="no-balance">No funds on this account yet.</p>
 
         <!-- Sweeps -->
         <div class="sweeps-section" *ngIf="account.sweeps?.length">
-          <div class="sweeps-title">
-            <mat-icon class="sweep-icon">schedule</mat-icon> Scheduled Configurations
-          </div>
+          <h4 class="sweeps-title">
+            <mat-icon class="sweep-icon" aria-hidden="true">schedule</mat-icon> Scheduled payouts and transfers
+          </h4>
           <div class="sweep-card" *ngFor="let sweep of account.sweeps" [class.sweep-inactive]="sweep.status === 'inactive'">
             <div class="sweep-card-top">
               <div class="sweep-card-left">
                 <div class="sweep-category-row">
                   <span class="sweep-category-badge" [class.bank]="sweep.category === 'bank'" [class.internal]="sweep.category === 'internal'">
-                    <mat-icon class="sweep-cat-icon">{{ sweep.category === 'internal' ? 'swap_horiz' : 'account_balance' }}</mat-icon>
-                    {{ sweep.category === 'internal' ? 'Internal' : 'Bank Payout' }}
+                    <mat-icon class="sweep-cat-icon" aria-hidden="true">{{ sweep.category === 'internal' ? 'swap_horiz' : 'account_balance' }}</mat-icon>
+                    {{ sweep.category === 'internal' ? 'Internal' : 'Bank payout' }}
                   </span>
                   <span class="sweep-status-badge" [class.active]="sweep.status !== 'inactive'" [class.inactive]="sweep.status === 'inactive'">
                     {{ sweep.status === 'inactive' ? 'Suspended' : 'Active' }}
@@ -90,73 +118,93 @@
                 </div>
                 <div class="sweep-description" *ngIf="sweep.description">{{ sweep.description }}</div>
               </div>
-              <button mat-icon-button class="sweep-toggle-btn"
+              <button mat-icon-button type="button" class="sweep-toggle-btn"
                       [matTooltip]="sweep.status === 'inactive' ? 'Activate' : 'Suspend'"
-                      (click)="toggleSweep(account.balanceAccountId, sweep.id, sweep.status)">
-                <mat-icon>{{ sweep.status === 'inactive' ? 'play_circle_outline' : 'pause_circle_outline' }}</mat-icon>
+                      [attr.aria-label]="(sweep.status === 'inactive' ? 'Activate' : 'Suspend') + ' schedule: ' + getSweepScheduleLabel(sweep) + ' to ' + getSweepBeneficiary(sweep)"
+                      [disabled]="togglingSweepId !== null"
+                      (click)="toggleSweep(account, sweep)">
+                <mat-spinner *ngIf="togglingSweepId === sweep.id" diameter="18" aria-hidden="true"></mat-spinner>
+                <mat-icon *ngIf="togglingSweepId !== sweep.id" aria-hidden="true">{{ sweep.status === 'inactive' ? 'play_circle_outline' : 'pause_circle_outline' }}</mat-icon>
               </button>
             </div>
-            <div class="sweep-details-grid">
+            <dl class="sweep-details-grid">
               <div class="sweep-detail">
-                <span class="sweep-detail-label">Schedule</span>
-                <span class="sweep-detail-value">{{ getSweepScheduleLabel(sweep) }}</span>
+                <dt class="sweep-detail-label">Schedule</dt>
+                <dd class="sweep-detail-value">{{ getSweepScheduleLabel(sweep) }}</dd>
               </div>
               <div class="sweep-detail">
-                <span class="sweep-detail-label">Currency</span>
-                <span class="sweep-detail-value">{{ sweep.currency }}</span>
+                <dt class="sweep-detail-label">Currency</dt>
+                <dd class="sweep-detail-value">{{ sweep.currency }}</dd>
               </div>
               <div class="sweep-detail">
-                <span class="sweep-detail-label">Beneficiary</span>
-                <span class="sweep-detail-value sweep-beneficiary">{{ getSweepBeneficiary(sweep) }}</span>
+                <dt class="sweep-detail-label">Beneficiary</dt>
+                <dd class="sweep-detail-value sweep-beneficiary">{{ getSweepBeneficiary(sweep) }}</dd>
               </div>
               <div class="sweep-detail" *ngIf="sweep.priorities?.length">
-                <span class="sweep-detail-label">Priority</span>
-                <span class="sweep-detail-value">{{ sweep.priorities.join(', ') }}</span>
+                <dt class="sweep-detail-label">Speed</dt>
+                <dd class="sweep-detail-value">{{ getSweepPriorities(sweep) }}</dd>
               </div>
-            </div>
+            </dl>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div *ngIf="balanceAccounts().length === 0 && !loadingAccounts" class="empty-text">
-        No balance accounts found.
+      <div *ngIf="balanceAccounts().length === 0" class="empty-state">
+        <mat-icon aria-hidden="true">account_balance_wallet</mat-icon>
+        <h3>No balance accounts yet</h3>
+        <p>Create one to separate funds, for example for operations or taxes.</p>
+        <button mat-flat-button type="button" class="fintech-btn primary small" *ngIf="!showCreateForm" (click)="toggleCreateForm()">
+          <mat-icon aria-hidden="true">add</mat-icon> New account
+        </button>
       </div>
     </div>
   </mat-card>
 
-  <!-- ═══════════════════════════════════════════════════ -->
-  <!--  ACTION TABS                                        -->
-  <!-- ═══════════════════════════════════════════════════ -->
-  <mat-card class="tabs-card">
-    <mat-tab-group [(selectedIndex)]="activeTab" animationDuration="200ms">
+  <!-- ACTION TABS -->
+  <mat-card class="tabs-card" *ngIf="!loadingAccounts && balanceAccounts().length > 0">
+    <mat-tab-group [(selectedIndex)]="activeTab" animationDuration="200ms" [preserveContent]="true">
 
-      <!-- ─── TAB 1: Internal Transfer ─── -->
+      <!-- TAB 1: Internal transfer -->
       <mat-tab>
         <ng-template mat-tab-label>
-          <mat-icon class="tab-icon">swap_horiz</mat-icon> Transfer
+          <mat-icon class="tab-icon" aria-hidden="true">swap_horiz</mat-icon> Transfer
         </ng-template>
 
         <div class="tab-content">
-          <h3 class="tab-title">Internal Transfer</h3>
+          <h2 class="tab-title">Internal transfer</h2>
           <p class="tab-subtitle">Move funds between your balance accounts.</p>
 
-          <form [formGroup]="transferForm" (ngSubmit)="submitTransfer()" class="action-form">
+          <div class="success-panel" *ngIf="transferRecap" role="status">
+            <div class="success-header">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div>
+                <h3>{{ transferRecap.title }}</h3>
+                <p>{{ transferRecap.message }}</p>
+              </div>
+            </div>
+            <dl class="recap-list">
+              <div class="recap-row" *ngFor="let row of transferRecap.rows"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+            </dl>
+            <button mat-flat-button type="button" class="fintech-btn secondary" (click)="transferRecap = null">Make another transfer</button>
+          </div>
+
+          <form [formGroup]="transferForm" #transferDir="ngForm" (ngSubmit)="submitTransfer(transferDir)" class="action-form" *ngIf="!transferRecap">
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>From</label>
-                <select class="fintech-input" formControlName="sourceBalanceAccountId">
+                <label for="transfer-source">From</label>
+                <select id="transfer-source" class="fintech-input" formControlName="sourceBalanceAccountId">
                   <option value="" disabled>Select source account...</option>
                   <option *ngFor="let acc of balanceAccounts()" [value]="acc.balanceAccountId">
-                    {{ acc.description || acc.balanceAccountId }} — {{ getTotalAvailable(acc) }}
+                    {{ accountName(acc) }} ({{ getTotalAvailable(acc) }})
                   </option>
                 </select>
               </div>
               <div class="form-group flex-1">
-                <label>To</label>
-                <select class="fintech-input" formControlName="destinationBalanceAccountId">
+                <label for="transfer-destination">To</label>
+                <select id="transfer-destination" class="fintech-input" formControlName="destinationBalanceAccountId">
                   <option value="" disabled>Select destination account...</option>
                   <option *ngFor="let dest of getTransferDestinations()" [value]="dest.balanceAccountId">
-                    {{ dest.description || dest.balanceAccountId }}
+                    {{ accountName(dest) }}
                   </option>
                 </select>
               </div>
@@ -164,148 +212,187 @@
 
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>Currency</label>
-                <select class="fintech-input" formControlName="currency">
+                <label for="transfer-currency">Currency</label>
+                <select id="transfer-currency" class="fintech-input" formControlName="currency">
                   <option value="" disabled>Select currency...</option>
                   <option *ngFor="let c of availableCurrencies" [value]="c">{{ c }}</option>
                 </select>
               </div>
               <div class="form-group flex-1">
-                <label>Amount</label>
-                <input class="fintech-input" type="number" formControlName="amount" placeholder="0.00" step="0.01" min="0.01" />
+                <label for="transfer-amount">Amount</label>
+                <input id="transfer-amount" class="fintech-input" type="number" inputmode="decimal" formControlName="amount"
+                       placeholder="0.00" [step]="amountStep(transferForm.value.currency)" min="0.01" aria-describedby="transfer-amount-hint" />
+                <span class="hint-text" id="transfer-amount-hint">
+                  <ng-container *ngIf="transferSourceBalance as bal; else noSourceBalance">Available: {{ bal.available | money:bal.currency }}</ng-container>
+                  <ng-template #noSourceBalance>Select an account and a currency to see the available balance.</ng-template>
+                </span>
               </div>
             </div>
 
             <div class="form-group">
-              <label>Description (optional)</label>
-              <input class="fintech-input" formControlName="description" placeholder="e.g. Funding operations account" />
+              <label for="transfer-description">Description (optional)</label>
+              <input id="transfer-description" class="fintech-input" formControlName="description" placeholder="e.g. Funding operations account" maxlength="140" />
             </div>
 
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="transferForm.invalid || submittingTransfer">
-              <span *ngIf="!submittingTransfer">Transfer Funds</span>
-              <mat-spinner *ngIf="submittingTransfer" diameter="20" color="accent"></mat-spinner>
+                    [disabled]="!!transferBlockReason || submittingTransfer" aria-describedby="transfer-submit-hint">
+              <span *ngIf="!submittingTransfer">Transfer funds</span>
+              <mat-spinner *ngIf="submittingTransfer" diameter="20" aria-label="Sending transfer"></mat-spinner>
             </button>
+            <p class="submit-hint" id="transfer-submit-hint" aria-live="polite">{{ transferBlockReason }}</p>
           </form>
         </div>
       </mat-tab>
 
-      <!-- ─── TAB 2: Payout ─── -->
+      <!-- TAB 2: Payout -->
       <mat-tab>
         <ng-template mat-tab-label>
-          <mat-icon class="tab-icon">account_balance</mat-icon> Payout
+          <mat-icon class="tab-icon" aria-hidden="true">account_balance</mat-icon> Payout
         </ng-template>
 
         <div class="tab-content">
-          <h3 class="tab-title">Schedule a Payout</h3>
-          <p class="tab-subtitle">Configure an automatic payout to an external bank account.</p>
+          <h2 class="tab-title">Schedule a payout</h2>
+          <p class="tab-subtitle">Pay out your balance automatically to an external bank account.</p>
 
-          <form [formGroup]="payoutForm" (ngSubmit)="submitPayout()" class="action-form">
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Balance Account</label>
-                <select class="fintech-input" formControlName="balanceAccountId">
-                  <option value="" disabled>Select account...</option>
-                  <option *ngFor="let acc of getPayoutEligibleAccounts()" [value]="acc.balanceAccountId">
-                    {{ acc.description || acc.balanceAccountId }}
-                  </option>
-                </select>
-              </div>
-              <div class="form-group flex-1">
-                <label>Currency</label>
-                <select class="fintech-input" formControlName="currencyCode">
-                  <option value="" disabled>Select currency...</option>
-                  <option value="EUR">EUR</option>
-                  <option value="GBP">GBP</option>
-                  <option value="USD">USD</option>
-                </select>
+          <div class="success-panel" *ngIf="payoutRecap" role="status">
+            <div class="success-header">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div>
+                <h3>{{ payoutRecap.title }}</h3>
+                <p>{{ payoutRecap.message }}</p>
               </div>
             </div>
+            <dl class="recap-list">
+              <div class="recap-row" *ngFor="let row of payoutRecap.rows"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+            </dl>
+            <button mat-flat-button type="button" class="fintech-btn secondary" (click)="payoutRecap = null">Create another schedule</button>
+          </div>
 
-            <div class="form-row">
-              <div class="form-group flex-1">
-                <label>Payout Account (Bank)</label>
-                <select class="fintech-input" formControlName="transferInstrumentId">
-                  <option value="" disabled>Select bank account...</option>
-                  <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
-                    {{ acc.accountIdentifier }}
-                  </option>
+          <ng-container *ngIf="!payoutRecap">
+            <ng-container *ngTemplateOutlet="payoutAccountsStatus"></ng-container>
+
+            <form [formGroup]="payoutForm" #payoutDir="ngForm" (ngSubmit)="submitPayout(payoutDir)" class="action-form">
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="payout-account">Balance account</label>
+                  <select id="payout-account" class="fintech-input" formControlName="balanceAccountId" aria-describedby="payout-account-hint">
+                    <option value="" disabled>Select account...</option>
+                    <option *ngFor="let acc of getPayoutEligibleAccounts()" [value]="acc.balanceAccountId">
+                      {{ accountName(acc) }}
+                    </option>
+                  </select>
+                  <span class="hint-text" id="payout-account-hint">Scheduled payouts aren't available on the business bank account.</span>
+                </div>
+                <div class="form-group flex-1">
+                  <label for="payout-currency">Currency</label>
+                  <select id="payout-currency" class="fintech-input" formControlName="currencyCode">
+                    <option value="" disabled>Select currency...</option>
+                    <option *ngFor="let c of payoutCurrencies" [value]="c">{{ c }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="payout-bank">Payout bank account</label>
+                  <select id="payout-bank" class="fintech-input" formControlName="transferInstrumentId">
+                    <option value="" disabled>{{ loadingPayoutAccounts ? 'Loading bank accounts...' : 'Select bank account...' }}</option>
+                    <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
+                      {{ acc.accountIdentifier }}
+                    </option>
+                  </select>
+                </div>
+                <div class="form-group flex-1">
+                  <label for="payout-frequency">Frequency</label>
+                  <select id="payout-frequency" class="fintech-input" formControlName="schedule">
+                    <option value="" disabled>Select frequency...</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="payout-priority">Speed</label>
+                <select id="payout-priority" class="fintech-input" formControlName="priority">
+                  <option value="regular">Regular</option>
+                  <option value="instant">Instant</option>
                 </select>
               </div>
-              <div class="form-group flex-1">
-                <label>Frequency</label>
-                <select class="fintech-input" formControlName="schedule">
-                  <option value="" disabled>Select schedule...</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-            </div>
 
-            <div class="form-group">
-              <label>Priority</label>
-              <select class="fintech-input" formControlName="priority">
-                <option value="regular">Regular</option>
-                <option value="instant">Instant</option>
-              </select>
-            </div>
-
-            <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="payoutForm.invalid || submittingPayout">
-              <span *ngIf="!submittingPayout">Create Payout Schedule</span>
-              <mat-spinner *ngIf="submittingPayout" diameter="20" color="accent"></mat-spinner>
-            </button>
-          </form>
+              <button mat-flat-button class="fintech-btn primary full-width" type="submit"
+                      [disabled]="!!payoutBlockReason || submittingPayout" aria-describedby="payout-submit-hint">
+                <span *ngIf="!submittingPayout">Create payout schedule</span>
+                <mat-spinner *ngIf="submittingPayout" diameter="20" aria-label="Creating payout schedule"></mat-spinner>
+              </button>
+              <p class="submit-hint" id="payout-submit-hint" aria-live="polite">{{ payoutBlockReason }}</p>
+            </form>
+          </ng-container>
         </div>
       </mat-tab>
 
-      <!-- ─── TAB 3: Cash Out ─── -->
+      <!-- TAB 3: Cash out -->
       <mat-tab>
         <ng-template mat-tab-label>
-          <mat-icon class="tab-icon">money_off</mat-icon> Cash Out
+          <mat-icon class="tab-icon" aria-hidden="true">payments</mat-icon> Cash out
         </ng-template>
 
         <div class="tab-content">
-          <h3 class="tab-title">Cash Out</h3>
-          <p class="tab-subtitle">Instantly access your pending funds — pay out to a bank account or keep on your balance account.</p>
+          <h2 class="tab-title">Cash out</h2>
+          <p class="tab-subtitle">Get your pending funds now: pay them out to a bank account or keep them on your balance account.</p>
 
-          <form [formGroup]="cashoutForm" (ngSubmit)="submitCashout()" class="action-form">
+          <div class="success-panel" *ngIf="cashoutRecap" role="status">
+            <div class="success-header">
+              <mat-icon aria-hidden="true">check_circle</mat-icon>
+              <div>
+                <h3>{{ cashoutRecap.title }}</h3>
+                <p>{{ cashoutRecap.message }}</p>
+              </div>
+            </div>
+            <dl class="recap-list">
+              <div class="recap-row" *ngFor="let row of cashoutRecap.rows"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+            </dl>
+            <button mat-flat-button type="button" class="fintech-btn secondary" (click)="cashoutRecap = null">Make another cash out</button>
+          </div>
+
+          <form [formGroup]="cashoutForm" #cashoutDir="ngForm" (ngSubmit)="submitCashout(cashoutDir)" class="action-form" *ngIf="!cashoutRecap">
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>Balance Account</label>
-                <select class="fintech-input" formControlName="balanceAccountId">
+                <label for="cashout-account">Balance account</label>
+                <select id="cashout-account" class="fintech-input" formControlName="balanceAccountId">
                   <option value="" disabled>Select account...</option>
                   <option *ngFor="let acc of balanceAccounts()" [value]="acc.balanceAccountId">
-                    {{ acc.description || acc.balanceAccountId }}
+                    {{ accountName(acc) }}
                   </option>
                 </select>
               </div>
               <div class="form-group flex-1">
-                <label>Currency</label>
-                <input class="fintech-input" [value]="userCurrency" disabled />
-                <input type="hidden" formControlName="currency" />
+                <label for="cashout-currency">Currency</label>
+                <input id="cashout-currency" class="fintech-input" [value]="userCurrency || '—'" readonly aria-describedby="cashout-currency-hint" />
+                <span class="hint-text" id="cashout-currency-hint">Cash out is made in your account currency.</span>
               </div>
             </div>
 
             <div class="pending-info" *ngIf="cashoutPendingBalance > 0">
-              <mat-icon>info_outline</mat-icon>
-              Pending balance available: <strong>{{ formatAmount(cashoutPendingBalance, cashoutCurrency) }}</strong>
+              <mat-icon aria-hidden="true">info_outline</mat-icon>
+              <span>Pending balance available: <strong>{{ cashoutPendingBalance | money:cashoutCurrency }}</strong></span>
             </div>
-            <div class="instant-check instant-no" *ngIf="cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0">
-              <mat-icon>money_off</mat-icon>
-              <span>No pending funds available on this balance account. Cash out is not possible.</span>
+            <div class="instant-check instant-no" *ngIf="cashoutForm.value.balanceAccountId && cashoutPendingBalance <= 0">
+              <mat-icon aria-hidden="true">money_off</mat-icon>
+              <span>There are no pending funds on this balance account, so there is nothing to cash out.</span>
             </div>
 
             <div class="form-row">
               <div class="form-group flex-1">
-                <label>Amount</label>
-                <input class="fintech-input" type="number" formControlName="amount" placeholder="0.00" step="0.01" min="0.01" />
+                <label for="cashout-amount">Amount</label>
+                <input id="cashout-amount" class="fintech-input" type="number" inputmode="decimal" formControlName="amount"
+                       placeholder="0.00" [step]="amountStep(cashoutSelectedCurrency)" min="0.01" />
               </div>
               <div class="form-group flex-1">
-                <label>Destination (optional)</label>
-                <select class="fintech-input" formControlName="transferInstrumentId">
-                  <option value="">Keep on Balance Account</option>
+                <label for="cashout-destination">Destination (optional)</label>
+                <select id="cashout-destination" class="fintech-input" formControlName="transferInstrumentId">
+                  <option value="">Keep on balance account</option>
                   <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
                     {{ acc.accountIdentifier }}
                   </option>
@@ -313,56 +400,58 @@
               </div>
             </div>
 
-            <div class="instant-check" *ngIf="checkingInstant">
-              <mat-spinner diameter="16"></mat-spinner>
-              <span>Checking instant payout eligibility…</span>
+            <ng-container *ngTemplateOutlet="payoutAccountsStatus"></ng-container>
+
+            <div class="instant-check" *ngIf="checkingInstant" role="status">
+              <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+              <span>Checking instant payout eligibility...</span>
             </div>
-            <div class="instant-check instant-yes" *ngIf="!checkingInstant && instantAvailable === true">
-              <mat-icon>bolt</mat-icon>
-              <span>Instant payout available for this bank account</span>
+            <div class="instant-check instant-yes" *ngIf="!checkingInstant && instantAvailable === true" role="status">
+              <mat-icon aria-hidden="true">bolt</mat-icon>
+              <span>This bank account accepts instant payouts.</span>
             </div>
-            <div class="instant-check instant-no" *ngIf="!checkingInstant && instantAvailable === false">
-              <mat-icon>block</mat-icon>
-              <span>This bank account is not eligible for instant cashout. Please select another account or keep on balance account.</span>
+            <div class="instant-check instant-no" *ngIf="!checkingInstant && instantAvailable === false" role="alert">
+              <mat-icon aria-hidden="true">block</mat-icon>
+              <span>This bank account isn't eligible for instant cash out. Select another one or keep the funds on your balance account.</span>
             </div>
 
-            <div class="form-group">
-              <label>Description (optional)</label>
-              <input class="fintech-input" formControlName="description" placeholder="e.g. Urgent cashout for supplies" />
+            <div class="form-group" *ngIf="cashoutForm.value.transferInstrumentId">
+              <label for="cashout-description">Description (optional)</label>
+              <input id="cashout-description" class="fintech-input" formControlName="description" placeholder="e.g. Urgent cash out for supplies" maxlength="140" />
             </div>
 
             <!-- Fee breakdown -->
-            <div class="fee-breakdown" *ngIf="cashoutAmount > 0 && cashoutSelectedCurrency">
+            <dl class="fee-breakdown" *ngIf="cashoutAmountMinor > 0 && cashoutSelectedCurrency">
               <div class="fee-row">
-                <span>Amount</span>
-                <span>{{ formatAmount(cashoutAmount * 100, cashoutSelectedCurrency) }}</span>
+                <dt>Amount</dt>
+                <dd>{{ cashoutAmountMinor | money:cashoutSelectedCurrency }}</dd>
               </div>
               <div class="fee-row fee-highlight">
-                <span>Fee (5%)</span>
-                <span>{{ formatAmount(cashoutFee * 100, cashoutSelectedCurrency) }}</span>
+                <dt>Fee ({{ CASHOUT_FEE_RATE * 100 }}%)</dt>
+                <dd>{{ cashoutFeeMinor | money:cashoutSelectedCurrency }}</dd>
               </div>
               <div class="fee-row fee-total">
-                <span>Total debited</span>
-                <span>{{ formatAmount(cashoutTotal * 100, cashoutSelectedCurrency) }}</span>
+                <dt>Total debited</dt>
+                <dd>{{ cashoutTotalMinor | money:cashoutSelectedCurrency }}</dd>
               </div>
-            </div>
+            </dl>
 
             <!-- Cooldown banner -->
-            <div class="instant-check instant-no" *ngIf="cashoutCooldownRemaining > 0" style="margin-bottom: 12px;">
-              <mat-icon>hourglass_top</mat-icon>
+            <div class="instant-check instant-no" *ngIf="cashoutCooldownRemaining > 0">
+              <mat-icon aria-hidden="true">hourglass_top</mat-icon>
               <span>
-                Cooldown active — please wait <strong>{{ cashoutCooldownRemaining }}s</strong> before next request.
-                <br/>
-                <small style="opacity: 0.8;">In production, the cooldown period is 10 minutes.</small>
+                Please wait <strong>{{ cashoutCooldownRemaining }}s</strong> before the next cash out.
+                <small class="cooldown-note">In production, the waiting period is 10 minutes.</small>
               </span>
             </div>
 
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="cashoutForm.invalid || submittingCashout || checkingInstant || instantAvailable === false || (cashoutForm.get('balanceAccountId')?.value && cashoutPendingBalance <= 0) || cashoutCooldownRemaining > 0">
-              <span *ngIf="!submittingCashout && cashoutCooldownRemaining <= 0">Request Cash Out</span>
+                    [disabled]="!!cashoutBlockReason || submittingCashout" aria-describedby="cashout-submit-hint">
+              <span *ngIf="!submittingCashout && cashoutCooldownRemaining <= 0">Request cash out</span>
               <span *ngIf="!submittingCashout && cashoutCooldownRemaining > 0">Wait {{ cashoutCooldownRemaining }}s</span>
-              <mat-spinner *ngIf="submittingCashout" diameter="20" color="accent"></mat-spinner>
+              <mat-spinner *ngIf="submittingCashout" diameter="20" aria-label="Requesting cash out"></mat-spinner>
             </button>
+            <p class="submit-hint" id="cashout-submit-hint" aria-live="polite">{{ cashoutCooldownRemaining > 0 ? '' : cashoutBlockReason }}</p>
           </form>
         </div>
       </mat-tab>
@@ -370,4 +459,19 @@
     </mat-tab-group>
   </mat-card>
 
+  </ng-container>
+
 </div>
+
+<ng-template #payoutAccountsStatus>
+  <div class="inline-alert error" *ngIf="payoutAccountsError" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    <span>{{ payoutAccountsError }}</span>
+    <button type="button" class="link-btn" (click)="loadPayoutAccounts()">Retry</button>
+  </div>
+  <div class="inline-alert info" *ngIf="!payoutAccountsError && !loadingPayoutAccounts && payoutAccounts().length === 0">
+    <mat-icon aria-hidden="true">info_outline</mat-icon>
+    <span>You have no payout bank account yet. Add one during onboarding to pay out your funds.</span>
+    <a class="link-btn" [routerLink]="['/', userId, 'dashboard']">Go to Onboarding</a>
+  </div>
+</ng-template>

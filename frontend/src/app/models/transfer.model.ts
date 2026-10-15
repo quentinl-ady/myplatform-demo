@@ -74,6 +74,17 @@ export interface BatchTransferResponse {
 export interface BatchApproveResponse {
   status: string;
   authParam1?: string;
+  message?: string;
+}
+
+export interface BatchCancelResponse {
+  status: string;
+  transferIds: string[];
+}
+
+export interface PendingBatchTransfersResponse {
+  transfers?: BatchTransferResponse[];
+  notFoundCount?: number;
 }
 
 export interface IsCrossBorderRequest {

@@ -14,6 +14,10 @@ import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.service.IssuingPaymentCheckoutService;
+import com.myplatform.demo.util.PaymentResultRedirects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
@@ -25,13 +29,18 @@ import java.util.Map;
 @RequestMapping("/api/issuing-payments")
 public class IssuingPaymentController {
 
+    private static final Logger log = LoggerFactory.getLogger(IssuingPaymentController.class);
+
     private final UserRepository userRepository;
     private final IssuingPaymentCheckoutService issuingPaymentCheckoutService;
+    private final String frontendUrl;
 
     public IssuingPaymentController(UserRepository userRepository,
-                                    IssuingPaymentCheckoutService issuingPaymentCheckoutService) {
+                                    IssuingPaymentCheckoutService issuingPaymentCheckoutService,
+                                    @Value("${app.frontend.url}") String frontendUrl) {
         this.userRepository = userRepository;
         this.issuingPaymentCheckoutService = issuingPaymentCheckoutService;
+        this.frontendUrl = frontendUrl;
     }
 
     @PostMapping("/session")
@@ -51,14 +60,17 @@ public class IssuingPaymentController {
                 requestPayment.getReference(),
                 requestPayment.getStoreReference(),
                 user.getActivityReason(),
-                user.getBalanceAccountId());
+                user.getBalanceAccountId(),
+                requestPayment.getReturnUserId());
 
         return ResponseEntity.ok(paymentSessionResponse);
     }
 
     @GetMapping("/redirect")
     public RedirectView handleShopperRedirect(@RequestParam(required = false) String payload,
-                                              @RequestParam(required = false) String redirectResult) {
+                                              @RequestParam(required = false) String redirectResult,
+                                              @RequestParam(required = false) String userId) {
+        String source = PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT;
         try {
             PaymentCompletionDetails completionDetails = new PaymentCompletionDetails();
             if (redirectResult != null && !redirectResult.isEmpty()) {
@@ -70,10 +82,13 @@ public class IssuingPaymentController {
             PaymentDetailsRequest detailsRequest = new PaymentDetailsRequest();
             detailsRequest.setDetails(completionDetails);
 
-            String redirectURL = "/result/";
-            return new RedirectView(redirectURL + "success");
+            PaymentDetailsResponse paymentDetailsResponse = issuingPaymentCheckoutService.paymentDetails(detailsRequest);
+
+            return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, paymentDetailsResponse, userId, source));
         } catch (Exception e) {
-            return new RedirectView("/result/error?reason=" + e.getMessage());
+            log.warn("Could not complete the issuing shopper redirect: {}", e.getMessage());
+            return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, "error",
+                    "We couldn't confirm the payment result.", userId, source));
         }
     }
 
@@ -110,7 +125,8 @@ public class IssuingPaymentController {
                 requestPayment.getCurrencyCode(),
                 requestPayment.getReference(),
                 requestPayment.getStoreReference(),
-                user.getActivityReason());
+                user.getActivityReason(),
+                requestPayment.getReturnUserId());
 
         return ResponseEntity.ok(paymentSessionResponse);
     }

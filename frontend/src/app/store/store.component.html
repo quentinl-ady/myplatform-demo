@@ -2,219 +2,287 @@
 
   <div class="header-section">
     <div class="header-title">
-      <h2>Stores Management</h2>
+      <h1>Stores</h1>
       <p>Manage your physical or digital storefronts and configure their payment methods.</p>
     </div>
     <div class="header-actions">
       <span class="last-updated-label" *ngIf="lastUpdated && !isLoading">{{ getLastUpdatedLabel() }}</span>
-      <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading">
-        <mat-icon>refresh</mat-icon>
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading">
+        <mat-icon aria-hidden="true">refresh</mat-icon>
         Refresh
       </button>
     </div>
   </div>
 
-  <div class="stores-list-container" *ngIf="stores().length; else noStores">
-    <h3 class="section-title">Your Stores</h3>
+  <!-- Stores: loading / error / list / empty -->
+  <mat-card class="state-card" *ngIf="isLoading && !stores().length" role="status">
+    <mat-spinner diameter="36"></mat-spinner>
+    <p>Loading your stores…</p>
+  </mat-card>
 
-    <mat-card *ngFor="let s of stores()" class="store-card">
-      <div class="store-card-header">
-        <div class="store-title-area">
-          <div class="store-icon">
-            <mat-icon>storefront</mat-icon>
-          </div>
-          <div class="store-title-info">
-            <h4>{{ s.storeRef }}</h4>
-            <p class="store-location">{{ s.city }}, {{ s.country }}</p>
-          </div>
-        </div>
-        <div class="balance-info">
-          <span class="label">Balance Account</span>
-          <strong>{{ s.balanceAccountInfoCustomer.description }} ({{ s.balanceAccountInfoCustomer.currencyCode }})</strong>
-        </div>
-      </div>
+  <mat-card class="state-card error" *ngIf="!isLoading && loadError">
+    <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
+    <h2>Could not load your stores</h2>
+    <p>{{ loadError }}</p>
+    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadStores()">Retry</button>
+  </mat-card>
 
-      <div class="store-card-body">
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">Address</span>
-            <span>{{ s.lineAdresse }}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Phone</span>
-            <span>{{ s.phoneNumber }}</span>
-          </div>
-        </div>
+  <ng-container *ngIf="!loadError && !(isLoading && !stores().length)">
+    <section class="stores-list-container" *ngIf="stores().length; else noStores" aria-labelledby="stores-title">
+      <h2 class="section-title" id="stores-title">Your stores ({{ stores().length }})</h2>
 
-        <div class="pm-section">
-          <div class="pm-section-header">
-            <span class="label">Payment Methods</span>
-            <button mat-stroked-button class="fintech-btn-sm" (click)="openAddPm(s)"
-                    *ngIf="getAvailablePMsForStore(s).length > 0 && addPmStoreId !== s.storeId">
-              <mat-icon class="btn-icon">add</mat-icon> Add
-            </button>
-          </div>
-          <div class="pm-badges-container">
-            <div *ngFor="let pm of s.paymentMethods" class="pm-badge-row">
-              <span class="pm-badge" [ngClass]="[pm.verificationStatus, pm.enabled ? '' : 'disabled']">
-                {{ getPmLabel(pm.type) }}
-                <span class="pm-status-icon">{{ getStatusIcon(pm.verificationStatus) }}</span>
-              </span>
-              <mat-slide-toggle
-                [checked]="pm.enabled"
-                (change)="togglePaymentMethod(s.storeId, pm)"
-                color="primary"
-                class="pm-toggle">
-              </mat-slide-toggle>
+      <mat-card *ngFor="let s of stores()" class="store-card">
+        <div class="store-card-header">
+          <div class="store-title-area">
+            <div class="store-icon" aria-hidden="true">
+              <mat-icon>storefront</mat-icon>
+            </div>
+            <div class="store-title-info">
+              <h3>{{ s.storeRef }}</h3>
+              <p class="store-location">{{ s.city }}, {{ s.country }}</p>
             </div>
           </div>
+          <div class="balance-info">
+            <span class="label">Balance account</span>
+            <strong>{{ s.balanceAccountInfoCustomer.description }} ({{ s.balanceAccountInfoCustomer.currencyCode }})</strong>
+          </div>
         </div>
 
-        <!-- Add Payment Method Inline Panel -->
-        <div class="add-pm-panel" *ngIf="addPmStoreId === s.storeId">
-          <div class="add-pm-panel-header">
-            <strong>Add Payment Methods</strong>
-            <button mat-icon-button (click)="closeAddPm()"><mat-icon>close</mat-icon></button>
+        <div class="store-card-body">
+          <dl class="info-grid">
+            <div class="info-item">
+              <dt class="label">Address</dt>
+              <dd>{{ s.lineAdresse || '—' }}</dd>
+            </div>
+            <div class="info-item">
+              <dt class="label">Phone</dt>
+              <dd>{{ s.phoneNumber || '—' }}</dd>
+            </div>
+          </dl>
+
+          <div class="pm-section">
+            <div class="pm-section-header">
+              <h4 class="label" [id]="'pm-title-' + s.storeId">Payment methods</h4>
+              <button mat-stroked-button type="button" class="fintech-btn-sm" (click)="openAddPm(s)"
+                      [attr.aria-label]="'Add payment methods to ' + s.storeRef"
+                      *ngIf="getAvailablePMsForStore(s).length > 0 && addPmStoreId !== s.storeId">
+                <mat-icon class="btn-icon" aria-hidden="true">add</mat-icon> Add
+              </button>
+            </div>
+
+            <p class="pm-empty" *ngIf="!s.paymentMethods.length">No payment methods yet. Select Add to request one.</p>
+
+            <ul class="pm-badges-container" *ngIf="s.paymentMethods.length" [attr.aria-labelledby]="'pm-title-' + s.storeId">
+              <li *ngFor="let pm of s.paymentMethods" class="pm-badge-row">
+                <ng-container *ngIf="getStatusView(pm.verificationStatus) as st">
+                  <span class="pm-badge" [class.disabled]="!pm.enabled">
+                    <span class="pm-name">{{ getPmLabel(pm.type) }}</span>
+                    <span class="pm-status" [ngClass]="st.cls">
+                      <mat-icon class="pm-status-icon" aria-hidden="true">{{ st.icon }}</mat-icon>
+                      {{ st.label }}
+                    </span>
+                    <span class="pm-off-label" *ngIf="!pm.enabled">· Off</span>
+                  </span>
+                </ng-container>
+                <mat-slide-toggle
+                  [checked]="pm.enabled"
+                  [disabled]="busyPmIds.has(pm.paymentMethodId)"
+                  (change)="togglePaymentMethod(s.storeId, pm, $event)"
+                  [aria-label]="(pm.enabled ? 'Disable ' : 'Enable ') + getPmLabel(pm.type) + ' for ' + s.storeRef"
+                  color="primary"
+                  class="pm-toggle">
+                </mat-slide-toggle>
+              </li>
+            </ul>
           </div>
-          <form [formGroup]="addPmForm">
-            <div class="checkbox-grid">
-              <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
-                <mat-checkbox [formControlName]="p.key" color="primary">
-                  <div class="pm-label-content">
-                    <strong>{{ p.label }}</strong>
-                  </div>
-                </mat-checkbox>
+
+          <!-- Add payment method inline panel -->
+          <div class="add-pm-panel" *ngIf="addPmStoreId === s.storeId" role="group" [attr.aria-label]="'Add payment methods to ' + s.storeRef">
+            <div class="add-pm-panel-header">
+              <strong>Add payment methods</strong>
+              <button mat-icon-button type="button" (click)="closeAddPm()" aria-label="Close add payment methods">
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </div>
+            <p class="helper-text">Methods already on this store are greyed out.</p>
+            <form [formGroup]="addPmForm" (ngSubmit)="submitAddPm()">
+              <div class="checkbox-grid">
+                <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
+                  <mat-checkbox [formControlName]="p.key" color="primary">
+                    <span class="pm-label-content">
+                      <strong>{{ p.label }}</strong>
+                    </span>
+                  </mat-checkbox>
+                </div>
               </div>
-            </div>
-          </form>
-          <div class="add-pm-actions">
-            <button mat-stroked-button class="fintech-btn secondary" (click)="closeAddPm()">Cancel</button>
-            <button mat-flat-button class="fintech-btn primary" (click)="submitAddPm()" [disabled]="addPmLoading">
-              <span *ngIf="!addPmLoading">Confirm</span>
-              <mat-spinner *ngIf="addPmLoading" diameter="20" color="accent"></mat-spinner>
-            </button>
+              <div class="add-pm-actions">
+                <span class="submit-hint" *ngIf="!addPmHasSelection() && !addPmLoading">Select at least one payment method.</span>
+                <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="closeAddPm()">Cancel</button>
+                <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="addPmLoading || !addPmHasSelection()">
+                  <span *ngIf="!addPmLoading">Add selected</span>
+                  <mat-spinner *ngIf="addPmLoading" diameter="20" color="accent" aria-label="Adding payment methods"></mat-spinner>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
-    </mat-card>
-  </div>
+      </mat-card>
+    </section>
+  </ng-container>
+
   <ng-template #noStores>
     <mat-card class="empty-state">
-      <div class="empty-icon-wrapper">
+      <div class="empty-icon-wrapper" aria-hidden="true">
         <mat-icon>store_mall_directory</mat-icon>
       </div>
-      <h3>No stores found</h3>
-      <p>You haven't created any stores yet. Add your first store below to start processing payments.</p>
+      <h2>No stores yet</h2>
+      <p>Add your first store below to start processing payments.</p>
     </mat-card>
   </ng-template>
 
   <mat-card class="add-store-card">
-    <h3 class="card-title">Add a New Store</h3>
+    <h2 class="card-title">Add a new store</h2>
+
+    <div class="success-banner" *ngIf="lastCreatedStore as created" role="status">
+      <mat-icon aria-hidden="true">check_circle</mat-icon>
+      <div class="success-text">
+        <strong>Store {{ created.storeRef }} created</strong>
+        <span>{{ created.city }}, {{ created.country }} · {{ created.paymentMethods.length }} payment method{{ created.paymentMethods.length === 1 ? '' : 's' }} requested. Verification can take a few minutes; select Refresh to see the latest status.</span>
+      </div>
+      <button mat-icon-button type="button" (click)="lastCreatedStore = null" aria-label="Dismiss confirmation">
+        <mat-icon aria-hidden="true">close</mat-icon>
+      </button>
+    </div>
 
     <mat-vertical-stepper [linear]="true" #stepper class="fintech-stepper">
 
       <mat-step [stepControl]="generalForm">
         <form [formGroup]="generalForm">
-          <ng-template matStepLabel>General Information</ng-template>
+          <ng-template matStepLabel>General information</ng-template>
 
           <div class="form-grid">
             <div class="form-group">
-              <label>Store Reference</label>
-              <input type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Paris-HQ" />
+              <label for="store-reference">Store reference</label>
+              <input id="store-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. ParisHQ"
+                     aria-describedby="store-reference-help" [attr.aria-invalid]="isInvalid('reference')" />
+              <span class="helper-text" id="store-reference-help">Letters and digits only; a unique suffix is added automatically.</span>
             </div>
 
             <div class="form-group">
-              <label>Country</label>
-              <input type="text" class="fintech-input" [value]="userCountryLabel" readonly disabled />
+              <label for="store-country">Country</label>
+              <input id="store-country" type="text" class="fintech-input" [value]="userCountryLabel" readonly
+                     aria-describedby="store-country-help" />
+              <span class="helper-text" id="store-country-help">Same as the account holder's country.</span>
               <input type="hidden" formControlName="country" />
             </div>
 
             <div class="form-group">
-              <label>City</label>
-              <input type="text" class="fintech-input" formControlName="city" />
+              <label for="store-city">City</label>
+              <input id="store-city" type="text" class="fintech-input" formControlName="city" autocomplete="address-level2"
+                     [attr.aria-invalid]="isInvalid('city')" />
             </div>
 
             <div class="form-group">
-              <label>Postal Code</label>
-              <input type="text" class="fintech-input" formControlName="postalCode" />
+              <label for="store-postal">Postal code</label>
+              <input id="store-postal" type="text" class="fintech-input" formControlName="postalCode" autocomplete="postal-code"
+                     [attr.aria-invalid]="isInvalid('postalCode')" />
             </div>
 
             <div class="form-group full-width-grid">
-              <label>Address Line 1</label>
-              <input type="text" class="fintech-input" formControlName="lineAdresse1" />
+              <label for="store-address">Address line 1</label>
+              <input id="store-address" type="text" class="fintech-input" formControlName="lineAdresse1" autocomplete="address-line1"
+                     [attr.aria-invalid]="isInvalid('lineAdresse1')" />
             </div>
 
             <div class="form-group">
-              <label>Phone Number</label>
-              <input type="text" class="fintech-input" formControlName="phoneNumber" />
+              <label for="store-phone">Phone number</label>
+              <input id="store-phone" type="tel" class="fintech-input" formControlName="phoneNumber" autocomplete="tel"
+                     [attr.aria-invalid]="isInvalid('phoneNumber')" />
             </div>
 
             <div class="form-group">
-              <label>Balance Account</label>
-              <select class="fintech-input" formControlName="balanceAccountId">
-                <option value="" disabled selected>Select account</option>
+              <label for="store-balance-account">Balance account</label>
+              <select id="store-balance-account" class="fintech-input" formControlName="balanceAccountId"
+                      [attr.aria-invalid]="isInvalid('balanceAccountId')">
+                <option value="" disabled>Select account</option>
                 <option *ngFor="let b of balanceAccounts()" [value]="b.balanceAccountId">
                   {{ b.description }} ({{ b.currencyCode }})
                 </option>
               </select>
+              <span class="field-error" *ngIf="balanceAccountsError" role="alert">
+                {{ balanceAccountsError }}
+                <button type="button" class="link-btn" (click)="loadBalanceAccounts()">Retry</button>
+              </span>
             </div>
           </div>
 
           <div class="stepper-actions">
-            <button mat-flat-button class="fintech-btn primary" matStepperNext [disabled]="generalForm.invalid">
-              Next Step
+            <button mat-flat-button type="button" class="fintech-btn primary" matStepperNext [disabled]="generalForm.invalid">
+              Next step
             </button>
+            <span class="submit-hint" *ngIf="generalForm.invalid">{{ generalHint() }}</span>
           </div>
         </form>
       </mat-step>
 
       <mat-step [stepControl]="activityForm">
         <form [formGroup]="activityForm">
-          <ng-template matStepLabel>Business Activity</ng-template>
+          <ng-template matStepLabel>Business activity</ng-template>
 
           <div class="form-group">
-            <label>Business Activity Profiles</label>
-            <select multiple class="fintech-input multiple-select" formControlName="businessLineIds">
+            <label for="store-business-lines">Business activity profiles</label>
+            <select id="store-business-lines" multiple class="fintech-input multiple-select" formControlName="businessLineIds"
+                    aria-describedby="store-business-lines-help">
               <option *ngFor="let bl of businessLines()" [value]="bl.id">
                 {{ getIndustryLabel(bl.industryCode) }} ({{ bl.salesChannels.join(', ') }})
               </option>
             </select>
-            <span class="helper-text">Hold Ctrl (or Cmd) to select multiple activities.</span>
+            <span class="helper-text" id="store-business-lines-help">Hold Ctrl (or Cmd) to select multiple activities.</span>
+            <span class="field-error" *ngIf="businessLinesError" role="alert">
+              {{ businessLinesError }}
+              <button type="button" class="link-btn" (click)="loadBusinessLines()">Retry</button>
+            </span>
           </div>
 
           <div class="stepper-actions split">
-            <button mat-stroked-button class="fintech-btn secondary" matStepperPrevious>Back</button>
-            <button mat-flat-button class="fintech-btn primary" matStepperNext [disabled]="activityForm.invalid">
-              Next Step
-            </button>
+            <button mat-stroked-button type="button" class="fintech-btn secondary" matStepperPrevious>Back</button>
+            <div class="action-with-hint">
+              <span class="submit-hint" *ngIf="activityForm.invalid">{{ activityHint() }}</span>
+              <button mat-flat-button type="button" class="fintech-btn primary" matStepperNext [disabled]="activityForm.invalid">
+                Next step
+              </button>
+            </div>
           </div>
         </form>
       </mat-step>
 
       <mat-step [stepControl]="paymentsForm" *ngIf="paymentsForm">
-        <form [formGroup]="paymentsForm">
-          <ng-template matStepLabel>Payment Methods</ng-template>
+        <form [formGroup]="paymentsForm" (ngSubmit)="submitCreate(stepper)">
+          <ng-template matStepLabel>Payment methods</ng-template>
 
-          <div class="form-group">
-            <label>Select accepted payment methods for this store</label>
+          <fieldset class="form-group pm-fieldset">
+            <legend>Select accepted payment methods for this store</legend>
             <div class="checkbox-grid">
               <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
                 <mat-checkbox [formControlName]="p.key" color="primary">
-                  <div class="pm-label-content">
+                  <span class="pm-label-content">
                     <strong>{{ p.label }}</strong>
                     <span class="pm-fee">10% commission</span>
-                  </div>
+                  </span>
                 </mat-checkbox>
               </div>
             </div>
-          </div>
+          </fieldset>
 
           <div class="stepper-actions split">
-            <button mat-stroked-button class="fintech-btn secondary" matStepperPrevious>Back</button>
-            <button mat-flat-button class="fintech-btn primary" (click)="submitCreate(stepper)" [disabled]="paymentsForm.invalid || isSubmitting">
-              <span *ngIf="!isSubmitting">Create Store</span>
-              <mat-spinner *ngIf="isSubmitting" diameter="20" color="accent"></mat-spinner>
-            </button>
+            <button mat-stroked-button type="button" class="fintech-btn secondary" matStepperPrevious>Back</button>
+            <div class="action-with-hint">
+              <span class="submit-hint" *ngIf="paymentsForm.invalid && !isSubmitting">Select at least one payment method.</span>
+              <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="paymentsForm.invalid || isSubmitting">
+                <span *ngIf="!isSubmitting">Create store</span>
+                <mat-spinner *ngIf="isSubmitting" diameter="20" color="accent" aria-label="Creating store"></mat-spinner>
+              </button>
+            </div>
           </div>
         </form>
       </mat-step>

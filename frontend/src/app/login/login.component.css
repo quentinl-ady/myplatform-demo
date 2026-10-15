@@ -1,6 +1,4 @@
 :host {
-  --fintech-primary: #000000;
-  --fintech-danger: #d32f2f;
   display: block;
   width: 100%;
 }
@@ -11,17 +9,15 @@
   width: 100%;
 }
 
-/* Espacement des champs */
 .fintech-input {
   width: 100%;
   margin-bottom: 8px;
 }
 
-/* Style du bouton (identique au composant Device) */
 .fintech-btn {
   width: 100%;
   margin-top: 8px !important;
-  border-radius: 24px !important; /* Forme de pilule */
+  border-radius: 24px !important;
   padding: 12px 0 !important;
   font-size: 15px !important;
   font-weight: 600 !important;
@@ -29,7 +25,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 48px; /* Hauteur fixe pour éviter que le bouton saute au chargement */
+  /* Fixed height so the button doesn't jump when the spinner replaces the label. */
+  height: 48px;
 }
 .fintech-btn.primary {
   background-color: var(--fintech-primary) !important;
@@ -39,27 +36,28 @@
   background-color: #e5e5e5 !important;
   color: #a3a3a3 !important;
 }
+.fintech-btn mat-spinner {
+  margin: 0 auto;
+  --mdc-circular-progress-active-indicator-color: currentColor;
+}
 
-/* Message d'erreur stylisé */
 .error-msg {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   color: var(--fintech-danger);
-  background: rgba(211, 47, 47, 0.05);
+  background: var(--fintech-danger-bg);
   padding: 12px;
   border-radius: 8px;
   margin-top: 16px;
   font-size: 13px;
   font-weight: 500;
+  text-align: center;
 }
 .error-msg mat-icon {
   font-size: 18px;
   width: 18px;
   height: 18px;
-}
-
-::ng-deep .mat-mdc-progress-spinner {
-  margin: 0 auto;
+  flex-shrink: 0;
 }

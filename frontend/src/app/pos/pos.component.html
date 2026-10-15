@@ -1,112 +1,142 @@
 <div class="fintech-wrapper">
   <div class="header-section">
-    <h2>Point of Sale (POS)</h2>
-    <p>Manage physical payments directly from your terminal.</p>
+    <h1>Point of sale</h1>
+    <p>Send an in-person payment to one of your payment terminals.</p>
   </div>
 
-  <div class="loading-state" *ngIf="loadingStores()">
+  <div class="loading-state" *ngIf="loadingStores()" role="status">
     <mat-spinner diameter="40"></mat-spinner>
-    <span>Loading available stores...</span>
+    <span>Loading your stores…</span>
   </div>
 
-  <div class="checkout-layout" *ngIf="!loadingStores()">
+  <mat-card class="state-card error" *ngIf="!loadingStores() && storesError()">
+    <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
+    <h2>Could not load your stores</h2>
+    <p>{{ storesError() }}</p>
+    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadStores()">Retry</button>
+  </mat-card>
+
+  <div class="checkout-layout" *ngIf="!loadingStores() && !storesError()">
     <mat-card class="config-card">
-      <h3 class="card-title">Payment Details</h3>
+      <h2 class="card-title">Payment details</h2>
 
       <form [formGroup]="posForm" (ngSubmit)="onSubmit()" class="fintech-form">
-        <div class="form-group">
-          <label>Select Store</label>
-          <select class="fintech-input" formControlName="storeId">
-            <option value="" disabled selected>Choose a store...</option>
-            <option *ngFor="let s of stores()" [value]="s.storeId">
-              {{ s.storeRef }} - {{ s.city }}, {{ s.country }} ({{ s.lineAdresse }})
-            </option>
-          </select>
-          <span class="helper-text error" *ngIf="stores().length === 0">
-            No stores found for this user.
-          </span>
-        </div>
-
-        <div class="form-group">
-          <label>Select Terminal</label>
-          <div class="input-with-spinner">
-            <select class="fintech-input" formControlName="terminalId">
-              <option value="" disabled selected>Choose a terminal...</option>
-              <option *ngFor="let t of terminals()" [value]="t.id">
-                {{ t.model }} - ID: {{ t.id }} (Status: {{ t.status }})
+        <fieldset class="plain-fieldset" [disabled]="isPaying()">
+          <div class="form-group">
+            <label for="pos-store">Store</label>
+            <select id="pos-store" class="fintech-input" formControlName="storeId" aria-describedby="pos-store-help">
+              <option value="" disabled>Choose a store…</option>
+              <option *ngFor="let s of stores()" [value]="s.storeId">
+                {{ s.storeRef }} – {{ s.city }}, {{ s.country }}
               </option>
             </select>
-            <mat-spinner *ngIf="loadingTerminals()" diameter="20" class="inline-spinner"></mat-spinner>
+            <span class="helper-text error" id="pos-store-help" *ngIf="stores().length === 0">
+              No stores yet. Create a store and assign a terminal to it first.
+            </span>
           </div>
-          <span class="helper-text error" *ngIf="posForm.get('storeId')?.value && terminals().length === 0 && !loadingTerminals()">
-            No terminals available for this store.
-          </span>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group amount-group">
-            <label>Amount</label>
-            <div class="input-with-icon">
-              <mat-icon class="input-icon">payments</mat-icon>
-              <input type="number" class="fintech-input pl-40" formControlName="amount" placeholder="e.g. 15.50" min="0" step="0.01" />
+          <div class="form-group">
+            <label for="pos-terminal">Terminal</label>
+            <div class="input-with-spinner">
+              <select id="pos-terminal" class="fintech-input" formControlName="terminalId" [attr.aria-busy]="loadingTerminals()"
+                      aria-describedby="pos-terminal-help">
+                <option value="" disabled>{{ loadingTerminals() ? 'Loading terminals…' : 'Choose a terminal…' }}</option>
+                <option *ngFor="let t of terminals()" [value]="t.id">
+                  {{ t.model }} · {{ t.id }} ({{ t.status }})
+                </option>
+              </select>
+              <mat-spinner *ngIf="loadingTerminals()" diameter="20" class="inline-spinner" aria-hidden="true"></mat-spinner>
             </div>
-            <span class="helper-text error" *ngIf="posForm.get('amount')?.touched && posForm.get('amount')?.hasError('required')">Amount is required</span>
+            <span class="helper-text error" id="pos-terminal-help" *ngIf="terminalsError() as tErr" role="alert">
+              {{ tErr }}
+              <button type="button" class="link-btn" (click)="retryTerminals()">Retry</button>
+            </span>
+            <span class="helper-text error" *ngIf="posForm.controls.storeId.value && !terminalsError() && terminals().length === 0 && !loadingTerminals()">
+              No terminal is assigned to this store.
+            </span>
           </div>
 
-          <div class="form-group currency-group">
-            <label>Currency</label>
-            <select class="fintech-input" formControlName="currency">
-              <option value="EUR">EUR (€)</option>
-              <option value="USD">USD ($)</option>
-              <option value="GBP">GBP (£)</option>
-            </select>
-          </div>
-        </div>
+          <div class="form-row">
+            <div class="form-group amount-group">
+              <label for="pos-amount">Amount</label>
+              <div class="input-with-icon">
+                <mat-icon class="input-icon" aria-hidden="true">payments</mat-icon>
+                <input id="pos-amount" type="number" inputmode="decimal" class="fintech-input pl-40" formControlName="amount"
+                       placeholder="e.g. 15.50" min="0.01" step="0.01"
+                       [attr.aria-invalid]="showError('amount')" aria-describedby="pos-amount-error" />
+              </div>
+              <span class="helper-text error" id="pos-amount-error" *ngIf="showError('amount')">
+                {{ posForm.controls.amount.hasError('required') ? 'Enter an amount.' : 'The amount must be at least 0.01.' }}
+              </span>
+            </div>
 
-        <div class="form-group">
-          <label>Transaction Reference</label>
-          <div class="input-with-icon">
-            <mat-icon class="input-icon">receipt</mat-icon>
-            <input type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. ORDER-POS-1234" />
+            <div class="form-group currency-group">
+              <label for="pos-currency">Currency</label>
+              <select id="pos-currency" class="fintech-input" formControlName="currency">
+                <option *ngFor="let c of currencies" [value]="c.code">{{ c.label }}</option>
+              </select>
+            </div>
           </div>
-          <span class="helper-text error" *ngIf="posForm.get('reference')?.touched && posForm.get('reference')?.hasError('required')">Reference is required</span>
-        </div>
+
+          <div class="form-group">
+            <label for="pos-reference">Transaction reference</label>
+            <div class="input-with-icon">
+              <mat-icon class="input-icon" aria-hidden="true">receipt</mat-icon>
+              <input id="pos-reference" type="text" class="fintech-input pl-40" formControlName="reference" placeholder="e.g. ORDER-POS-1234"
+                     [attr.aria-invalid]="showError('reference')" aria-describedby="pos-reference-help" />
+            </div>
+            <span class="helper-text" id="pos-reference-help" *ngIf="!showError('reference')">Use a unique value per payment; it appears in your reports.</span>
+            <span class="helper-text error" *ngIf="showError('reference')">
+              {{ posForm.controls.reference.hasError('required') ? 'Enter a transaction reference.' : 'The reference must be 64 characters or fewer.' }}
+            </span>
+          </div>
+        </fieldset>
 
         <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit" [disabled]="posForm.invalid || isPaying()">
-          <span>Send to terminal</span>
+          <span>{{ isPaying() ? 'Waiting for terminal…' : 'Send to terminal' }}</span>
         </button>
+        <span class="submit-hint" *ngIf="posForm.invalid && !isPaying() && submitHint() as hint">{{ hint }}</span>
       </form>
     </mat-card>
 
-    <mat-card class="dropin-card" [class.active]="isPaying() || paymentResult()">
-      <div class="empty-dropin" *ngIf="!isPaying() && !paymentResult()">
-        <mat-icon>point_of_sale</mat-icon>
-        <p>Fill out the details and send the request to wake up the terminal.</p>
+    <mat-card class="dropin-card" [class.active]="isPaying() || outcome()" aria-live="polite">
+      <div class="empty-dropin" *ngIf="!isPaying() && !outcome()">
+        <mat-icon aria-hidden="true">point_of_sale</mat-icon>
+        <p>Fill in the details and select Send to terminal. The terminal then asks the customer to present their card.</p>
       </div>
 
-      <div class="empty-dropin pending" *ngIf="isPaying()">
-        <mat-spinner diameter="60" color="primary"></mat-spinner>
-        <h3 class="mt-16">Transaction in progress...</h3>
-        <p>Please present card on the terminal.</p>
+      <div class="empty-dropin pending" *ngIf="isPaying()" role="status">
+        <mat-spinner diameter="60" color="primary" aria-hidden="true"></mat-spinner>
+        <h2 class="mt-16">Waiting for the customer</h2>
+        <p>Ask the customer to present their card on the terminal.</p>
+        <p class="elapsed">{{ elapsedSeconds() }} s elapsed</p>
+        <p class="slow-hint" *ngIf="isSlow()">This is taking longer than usual. Check the terminal screen; the customer may need to enter a PIN.</p>
       </div>
 
-      <div class="result-wrapper" *ngIf="!isPaying() && paymentResult() as result">
-        <div class="result-content" [ngClass]="result.status.toLowerCase()">
-          <mat-icon class="status-icon" *ngIf="result.status === 'SUCCESS'">check_circle</mat-icon>
-          <mat-icon class="status-icon" *ngIf="result.status === 'FAILURE'">cancel</mat-icon>
-          <mat-icon class="status-icon" *ngIf="result.status === 'ERROR'">error</mat-icon>
+      <div class="result-wrapper" *ngIf="!isPaying() && outcome() as result">
+        <div class="result-content" [ngClass]="result.kind" role="status">
+          <mat-icon class="status-icon" aria-hidden="true">
+            {{ result.kind === 'success' ? 'check_circle' : result.kind === 'failure' ? 'cancel' : 'error' }}
+          </mat-icon>
 
-          <h2>{{ result.status }}</h2>
+          <h2>{{ result.title }}</h2>
+          <p class="result-message">{{ result.message }}</p>
 
-          <div class="result-details">
-            <p *ngIf="result.cardBrand"><strong>Brand:</strong> {{ result.cardBrand }}</p>
-            <p *ngIf="result.maskedPan"><strong>Card:</strong> {{ result.maskedPan }}</p>
-            <p *ngIf="result.pspReference"><strong>MyPlatform Ref:</strong> {{ result.pspReference }}</p>
-            <p *ngIf="result.refusalReason" class="error-text"><strong>Reason:</strong> {{ result.refusalReason }}</p>
-            <p *ngIf="result.errorCondition" class="error-text"><strong>Error:</strong> {{ result.errorCondition }}</p>
+          <dl class="result-details">
+            <div><dt>Amount</dt><dd>{{ formatAmount(result.amount, result.currency) }}</dd></div>
+            <div><dt>Reference</dt><dd class="mono">{{ result.reference }}</dd></div>
+            <div *ngIf="result.response?.cardBrand"><dt>Brand</dt><dd>{{ result.response?.cardBrand }}</dd></div>
+            <div *ngIf="result.response?.maskedPan"><dt>Card</dt><dd class="mono">{{ result.response?.maskedPan }}</dd></div>
+            <div *ngIf="result.response?.pspReference"><dt>PSP reference</dt><dd class="mono">{{ result.response?.pspReference }}</dd></div>
+            <div *ngIf="result.reason"><dt>Reason</dt><dd class="error-text">{{ result.reason }}</dd></div>
+          </dl>
+
+          <div class="result-actions">
+            <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="result.kind !== 'success'" (click)="retryPayment()">
+              Try again
+            </button>
+            <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="resetPayment()">New payment</button>
           </div>
-
-          <button mat-stroked-button class="mt-16" (click)="resetPayment()">New transaction</button>
         </div>
       </div>
     </mat-card>

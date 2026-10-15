@@ -77,6 +77,8 @@ function filterGroups(groups: CountryGroup[], query: string): CountryGroup[] {
 export class RecipientCountryPickerComponent implements ControlValueAccessor, OnChanges {
 
   @Input() countries: RecipientCountry[] = [];
+  // Lets the page tie its visible <label for> to the search input.
+  @Input() inputId: string | null = null;
   @Output() countryChange = new EventEmitter<string>();
 
   search = new FormControl<string | CountryOption | null>('');
@@ -131,6 +133,14 @@ export class RecipientCountryPickerComponent implements ControlValueAccessor, On
 
   registerOnTouched(fn: () => void) {
     this.onTouched = fn;
+  }
+
+  setDisabledState(disabled: boolean) {
+    if (disabled) {
+      this.search.disable({ emitEvent: false });
+    } else {
+      this.search.enable({ emitEvent: false });
+    }
   }
 
   private select(countryCode: string) {

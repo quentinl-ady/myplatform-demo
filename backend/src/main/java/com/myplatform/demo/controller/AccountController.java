@@ -57,6 +57,9 @@ public class AccountController {
     public ResponseEntity<BankAccountInformationResponse> getBankAccountInformation(@PathVariable String userId) throws Exception {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getBankAccountId() == null || user.getBankAccountId().isBlank()) {
+            throw new ResourceNotFoundException(TransferController.NO_BANK_ACCOUNT_MESSAGE);
+        }
         BankAccountInformationResponse response = balanceAccountService.getBankAccountInformation(user.getBankAccountId(), user.getCurrencyCode());
         response.setBankAccountNumber(user.getBankAccountNumber());
         return ResponseEntity.ok(response);

@@ -55,7 +55,7 @@ for (const variant of variants) {
       await page.goto('/');
 
       // The homepage defaults to "login" view. Switch to "signup".
-      const signupLink = page.locator('a.switch-link', { hasText: 'Sign up' });
+      const signupLink = page.locator('button.switch-link', { hasText: 'Sign up' });
       await signupLink.click();
 
       // Wait for the signup form to be visible
@@ -79,8 +79,8 @@ for (const variant of variants) {
       // Select country
       await selectMatOption(page, 'countryCode', variant.countryCode);
 
-      // Select currency
-      await selectMatOption(page, 'currencyCode', variant.currencyCode);
+      // Currency follows the country (read-only field)
+      await expect(page.locator('input[formcontrolname="currencyCode"]')).toHaveValue(variant.currencyCode);
 
       // Email
       const emailInput = page.locator('input[formcontrolname="email"]');
@@ -94,23 +94,22 @@ for (const variant of variants) {
       await passwordInput.fill('test1234');
 
       // Submit
-      const signUpButton = page.locator('button[color="accent"]', { hasText: 'Sign Up' });
+      const signUpButton = page.locator('button[type="submit"]', { hasText: 'Create account' });
       await signUpButton.scrollIntoViewIfNeeded();
       await expect(signUpButton).toBeEnabled();
       await signUpButton.click();
 
-      // After successful signup, the app navigates to /:id/dashboard
-      await page.waitForURL(/\/\d+\/dashboard/, { timeout: 30_000 });
+      // After successful signup, the app navigates to /:id/dashboard (alphanumeric account ID)
+      await page.waitForURL(/\/[^/]+\/dashboard/, { timeout: 30_000 });
 
       // Extract userId from the URL
-      const url = page.url();
-      const match = url.match(/\/(\d+)\/dashboard/);
+      const match = new URL(page.url()).pathname.match(/^\/([^/]+)\/dashboard$/);
       expect(match).toBeTruthy();
       userId = match![1];
       console.log(`✅ [${variant.countryCode}] Sub-merchant created with ID: ${userId}`);
 
       // Verify dashboard loaded
-      await expect(page.locator('h2', { hasText: 'Onboarding & Profile' })).toBeVisible();
+      await expect(page.locator('h1', { hasText: 'Onboarding' })).toBeVisible();
     });
 
     test(`2 — Validate KYC (${variant.countryLabel})`, async ({ page }) => {
@@ -118,7 +117,7 @@ for (const variant of variants) {
       await page.goto(`/${userId}/dashboard`);
 
       // Wait for the dashboard to load
-      await expect(page.locator('h2', { hasText: 'Onboarding & Profile' })).toBeVisible();
+      await expect(page.locator('h1', { hasText: 'Onboarding' })).toBeVisible();
 
       // Click "Validate KYC" developer tool button
       const validateKycButton = page.locator('button', { hasText: 'Validate KYC' });
@@ -136,17 +135,19 @@ for (const variant of variants) {
       expect(userId).toBeTruthy();
       await page.goto(`/${userId}/dashboard`);
 
-      await expect(page.locator('h2', { hasText: 'Onboarding & Profile' })).toBeVisible();
+      await expect(page.locator('h1', { hasText: 'Onboarding' })).toBeVisible();
 
-      // KYC validation is asynchronous — poll "Check Status" until Acquiring is validated.
+      // KYC validation is asynchronous — poll "Refresh" until Acquiring (shown as "Payments") is active.
       // Note: Payout is NOT auto-validated so we don't assert on it.
       //       Bank Account & Issuing statuses may not appear in the response.
-      const acquiringValidated = page.locator('.status-item', { hasText: 'Acquiring' }).locator('.status-value', { hasText: 'Validated' });
+      const acquiringValidated = page.locator('.status-item')
+        .filter({ has: page.locator('.status-label', { hasText: /^\s*Payments\s*$/ }) })
+        .locator('.status-chip', { hasText: 'Active' });
       const maxAttempts = 10;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const checkStatusButton = page.locator('button', { hasText: 'Check Status' });
-        await expect(checkStatusButton).toBeVisible();
+        const checkStatusButton = page.getByRole('button', { name: 'Refresh', exact: true });
+        await expect(checkStatusButton).toBeEnabled();
         await checkStatusButton.click();
 
         try {
@@ -170,8 +171,8 @@ for (const variant of variants) {
       const count = await statusItems.count();
       for (let i = 0; i < count; i++) {
         const label = await statusItems.nth(i).locator('.status-label').textContent();
-        const value = await statusItems.nth(i).locator('.status-value').textContent();
-        if (label?.trim() !== 'Acquiring') {
+        const value = await statusItems.nth(i).locator('.status-chip').textContent();
+        if (label?.trim() !== 'Payments') {
           console.log(`  ℹ️  [${variant.countryCode}] ${label?.trim()}: ${value?.trim()}`);
         }
       }
@@ -189,7 +190,7 @@ for (const variant of variants) {
 
       for (let attempt = 1; attempt <= maxReloads; attempt++) {
         await page.goto(`/${userId}/dashboard`);
-        await expect(page.locator('h2', { hasText: 'Onboarding & Profile' })).toBeVisible();
+        await expect(page.locator('h1', { hasText: 'Onboarding' })).toBeVisible();
 
         // Wait for the API call to complete and the component to render
         await page.waitForTimeout(3_000);
@@ -204,17 +205,16 @@ for (const variant of variants) {
         await page.waitForTimeout(5_000);
       }
 
-      // Click "Create Bank Account" button
-      const createBankBtn = bankingCard.locator('button.bank-create-btn', { hasText: 'Create Bank Account' });
+      // Click "Create business bank account" button
+      const createBankBtn = bankingCard.locator('button.bank-create-btn', { hasText: 'Create business bank account' });
 
-      // The button might be disabled if bankingAllowed is not yet true.
-      // Wait for it to be enabled (i.e. not have the "disabled" class)
-      await expect(createBankBtn).not.toHaveClass(/disabled/, { timeout: 15_000 });
+      // The button stays disabled until bankingAllowed is true.
+      await expect(createBankBtn).toBeEnabled({ timeout: 15_000 });
       await createBankBtn.click();
 
       // Wait for the snackbar confirmation
       await expect(page.locator('simple-snack-bar, mat-snack-bar-container').first())
-        .toContainText('Bank account created', { timeout: 30_000 });
+        .toContainText('Business bank account created', { timeout: 30_000 });
 
       // After creation the bank status polling should show "Account active"
       await expect(bankingCard.locator('.bank-status-badge', { hasText: 'Account active' }))
@@ -228,28 +228,28 @@ for (const variant of variants) {
       await page.goto(`/${userId}/card-create`);
 
       // Wait for the card creation form
-      await expect(page.locator('h1', { hasText: 'Create Virtual Card' })).toBeVisible({ timeout: 15_000 });
+      await expect(page.locator('h1', { hasText: 'Create a virtual card' })).toBeVisible({ timeout: 15_000 });
 
       // Fill cardholder name
       await page.locator('input[formcontrolname="cardholderName"]').fill('E2E Test Cardholder');
 
       // Brand: keep default "visa"
 
-      // Submit the card creation form
-      const createCardBtn = page.locator('button[type="submit"]', { hasText: 'Create Card' });
+      // Submit the card creation form (label: "Create Visa card")
+      const createCardBtn = page.locator('button[type="submit"]', { hasText: 'Create Visa card' });
       await expect(createCardBtn).toBeEnabled();
       await createCardBtn.click();
 
       // Wait for the success card to appear
-      await expect(page.locator('.success-card h2', { hasText: 'Card Created Successfully' }))
+      await expect(page.locator('.success-card h2', { hasText: 'Card created' }))
         .toBeVisible({ timeout: 30_000 });
 
       // Verify card details are displayed
       await expect(page.locator('.success-details .detail-row .value', { hasText: 'E2E Test Cardholder' }))
         .toBeVisible();
 
-      // Verify we can navigate to "View My Cards"
-      const viewCardsBtn = page.locator('button', { hasText: 'View My Cards' });
+      // Verify we can navigate to "View my cards"
+      const viewCardsBtn = page.locator('button', { hasText: 'View my cards' });
       await expect(viewCardsBtn).toBeVisible();
       await viewCardsBtn.click();
 

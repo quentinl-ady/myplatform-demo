@@ -3,160 +3,262 @@
   <!-- Panel Header -->
   <div class="panel-header">
     <div class="panel-header-left">
-      <mat-icon class="panel-header-icon">api</mat-icon>
+      <mat-icon class="panel-header-icon" aria-hidden="true">api</mat-icon>
       <h2>API Explorer</h2>
     </div>
     <div class="panel-header-right">
-      <button mat-icon-button (click)="loadLogs()" [disabled]="loading()" matTooltip="Refresh">
-        <mat-icon [class.spinning]="loading()">refresh</mat-icon>
+      <button
+        type="button"
+        mat-icon-button
+        (click)="loadLogs()"
+        [disabled]="loading() || refreshing()"
+        matTooltip="Refresh"
+        aria-label="Refresh API calls">
+        <mat-icon aria-hidden="true" [class.spinning]="refreshing()">refresh</mat-icon>
       </button>
-      <button mat-icon-button [class.auto-active]="autoRefresh" (click)="toggleAutoRefresh()" [matTooltip]="autoRefresh ? 'Stop live mode' : 'Live mode'">
-        <mat-icon>{{ autoRefresh ? 'sync' : 'sync_disabled' }}</mat-icon>
+      <button
+        type="button"
+        mat-icon-button
+        [class.auto-active]="autoRefresh"
+        (click)="toggleAutoRefresh()"
+        [matTooltip]="autoRefresh ? 'Live mode is on: refreshing every 5 seconds' : 'Live mode: refresh every 5 seconds'"
+        aria-label="Live mode"
+        [attr.aria-pressed]="autoRefresh">
+        <mat-icon aria-hidden="true">{{ autoRefresh ? 'sync' : 'sync_disabled' }}</mat-icon>
       </button>
-      <button mat-icon-button (click)="clearLogs()" [disabled]="logs.length === 0" matTooltip="Clear logs">
-        <mat-icon>delete_outline</mat-icon>
+      <button
+        type="button"
+        mat-icon-button
+        (click)="clearLogs()"
+        [disabled]="logs.length === 0 || clearing()"
+        matTooltip="Clear API calls"
+        aria-label="Clear API calls">
+        <mat-icon aria-hidden="true">delete_outline</mat-icon>
+      </button>
+      <button
+        type="button"
+        mat-icon-button
+        class="close-btn"
+        cdkFocusInitial
+        (click)="close()"
+        matTooltip="Close"
+        aria-label="Close API Explorer">
+        <mat-icon aria-hidden="true">close</mat-icon>
       </button>
     </div>
   </div>
 
   <!-- Compact Stats -->
   <div class="stats-row" *ngIf="logs.length > 0">
-    <span class="stat-chip">{{ logs.length }} calls</span>
-    <span class="stat-chip stat-post" *ngIf="getMethodCount('POST')">{{ getMethodCount('POST') }} POST</span>
-    <span class="stat-chip stat-patch" *ngIf="getMethodCount('PATCH')">{{ getMethodCount('PATCH') }} PATCH</span>
-    <span class="stat-chip stat-get" *ngIf="getMethodCount('GET')">{{ getMethodCount('GET') }} GET</span>
-    <span class="stat-chip stat-delete" *ngIf="getMethodCount('DELETE')">{{ getMethodCount('DELETE') }} DEL</span>
+    <span class="stat-chip">{{ logs.length }} {{ logs.length === 1 ? 'call' : 'calls' }}</span>
+    <ng-container *ngFor="let method of methods">
+      <span
+        class="stat-chip"
+        [attr.data-method]="method"
+        *ngIf="getMethodCount(method)">{{ getMethodCount(method) }} {{ methodLabel(method) }}</span>
+    </ng-container>
+    <span class="live-indicator" *ngIf="autoRefresh">
+      <span class="live-dot" aria-hidden="true"></span> Live
+    </span>
   </div>
 
   <!-- Filter Bar -->
   <div class="filter-bar">
-    <div class="method-filters">
-      <button class="method-pill" [class.active]="methodFilter === 'ALL'" (click)="setMethodFilter('ALL')">All</button>
-      <button class="method-pill pill-post" [class.active]="methodFilter === 'POST'" (click)="setMethodFilter('POST')">POST</button>
-      <button class="method-pill pill-patch" [class.active]="methodFilter === 'PATCH'" (click)="setMethodFilter('PATCH')">PATCH</button>
-      <button class="method-pill pill-get" [class.active]="methodFilter === 'GET'" (click)="setMethodFilter('GET')">GET</button>
-      <button class="method-pill pill-delete" [class.active]="methodFilter === 'DELETE'" (click)="setMethodFilter('DELETE')">DEL</button>
+    <div class="method-filters" role="group" aria-label="Filter by method">
+      <button
+        type="button"
+        class="method-pill"
+        [class.active]="methodFilter === 'ALL'"
+        [attr.aria-pressed]="methodFilter === 'ALL'"
+        (click)="setMethodFilter('ALL')">All</button>
+      <button
+        *ngFor="let method of methods"
+        type="button"
+        class="method-pill"
+        [attr.data-method]="method"
+        [class.active]="methodFilter === method"
+        [attr.aria-pressed]="methodFilter === method"
+        [attr.aria-label]="method === 'DELETE' ? 'DELETE' : null"
+        (click)="setMethodFilter(method)">{{ methodLabel(method) }}</button>
     </div>
     <div class="search-box">
-      <mat-icon class="search-icon">search</mat-icon>
-      <input type="text" placeholder="Filter..." [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" />
+      <mat-icon class="search-icon" aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        placeholder="Filter by endpoint"
+        aria-label="Filter by endpoint or API domain"
+        autocomplete="off"
+        [(ngModel)]="searchQuery"
+        (ngModelChange)="onSearchChange()" />
     </div>
   </div>
 
   <!-- Domain Filter -->
-  <div class="domain-filters" *ngIf="getUniqueDomains().length > 1">
-    <button class="domain-pill" [class.active]="domainFilter === 'ALL'" (click)="setDomainFilter('ALL')">All</button>
-    <button class="domain-pill" *ngFor="let domain of getUniqueDomains()"
-            [class.active]="domainFilter === domain"
-            (click)="setDomainFilter(domain)">
+  <div class="domain-filters" *ngIf="getUniqueDomains().length > 1" role="group" aria-label="Filter by API domain">
+    <button
+      type="button"
+      class="domain-pill"
+      [class.active]="domainFilter === 'ALL'"
+      [attr.aria-pressed]="domainFilter === 'ALL'"
+      (click)="setDomainFilter('ALL')">All</button>
+    <button
+      type="button"
+      class="domain-pill"
+      *ngFor="let domain of getUniqueDomains()"
+      [class.active]="domainFilter === domain"
+      [attr.aria-pressed]="domainFilter === domain"
+      (click)="setDomainFilter(domain)">
       {{ domain }} <span class="domain-count">{{ getDomainCount(domain) }}</span>
     </button>
+  </div>
+
+  <!-- Refresh error while a list is already shown -->
+  <div class="inline-error" *ngIf="loadError() && logs.length > 0" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    <span>{{ loadError() }}</span>
+    <button type="button" class="link-btn" (click)="loadLogs()">Retry</button>
   </div>
 
   <!-- Log List -->
   <mat-card class="logs-card">
 
-    <div *ngIf="loading()" class="loading-spinner">
-      <mat-spinner diameter="32"></mat-spinner>
+    <div *ngIf="loading()" class="loading-spinner" role="status">
+      <mat-spinner diameter="32" aria-label="Loading API calls"></mat-spinner>
     </div>
 
-    <div *ngIf="!loading() && filteredLogs.length === 0" class="empty-state">
-      <mat-icon class="empty-icon">api</mat-icon>
-      <p>No API calls recorded yet.</p>
-      <span class="empty-hint">API calls to Adyen will appear here as you use the platform.</span>
+    <div *ngIf="!loading() && loadError() && logs.length === 0" class="empty-state" role="alert">
+      <mat-icon class="empty-icon error" aria-hidden="true">cloud_off</mat-icon>
+      <p>{{ loadError() }}</p>
+      <button type="button" mat-stroked-button class="retry-btn" (click)="loadLogs()">Retry</button>
     </div>
 
-    <div class="log-list" *ngIf="!loading() && filteredLogs.length > 0">
-      <div
+    <ng-container *ngIf="!loading() && !(loadError() && logs.length === 0)">
+      <div *ngIf="logs.length === 0" class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">api</mat-icon>
+        <p>No API calls recorded yet</p>
+        <span class="empty-hint">Calls to Adyen APIs appear here as you use the platform. Turn on live mode to follow them as they happen.</span>
+      </div>
+
+      <div *ngIf="logs.length > 0 && filteredLogs.length === 0" class="empty-state">
+        <mat-icon class="empty-icon" aria-hidden="true">filter_alt_off</mat-icon>
+        <p>No API calls match these filters</p>
+        <button type="button" mat-stroked-button class="retry-btn" *ngIf="hasActiveFilters" (click)="clearFilters()">Clear filters</button>
+      </div>
+    </ng-container>
+
+    <ul class="log-list" *ngIf="!loading() && filteredLogs.length > 0">
+      <li
         *ngFor="let log of filteredLogs"
         class="log-item"
         [class.impactful]="isImpactful(log)"
         [class.error-row]="log.error"
         [class.expanded]="expandedLogId === log.id"
-        (click)="toggleExpand(log)"
       >
-        <div class="log-row">
-          <!-- Method Badge -->
+        <button
+          type="button"
+          class="log-row"
+          (click)="toggleExpand(log)"
+          [attr.aria-expanded]="expandedLogId === log.id"
+          [attr.aria-controls]="'api-log-detail-' + log.id">
           <span class="method-badge" [attr.data-method]="log.httpMethod">{{ log.httpMethod }}</span>
 
-          <!-- Endpoint -->
-          <div class="log-endpoint">
+          <span class="log-endpoint">
             <span class="endpoint-path">{{ getShortEndpoint(log.endpoint) }}</span>
             <span class="endpoint-domain">{{ log.apiDomain }}</span>
-          </div>
+          </span>
 
-          <!-- Status -->
           <span class="log-status" [class.status-ok]="!log.error" [class.status-err]="log.error">
             {{ log.statusCode || '—' }}
           </span>
 
-          <!-- Duration -->
-          <span class="log-duration">{{ log.durationMs }}ms</span>
+          <span class="log-duration">{{ formatDuration(log.durationMs) }}</span>
 
-          <!-- Time -->
-          <span class="log-time">{{ getTimeAgo(log.timestamp) }}</span>
+          <span class="log-time" [attr.title]="formatDateTime(log.timestamp)">{{ getTimeAgo(log.timestamp) }}</span>
 
-          <!-- Impactful indicator -->
           <span class="impactful-chip" *ngIf="isImpactful(log)">write</span>
 
-          <!-- Expand arrow -->
-          <mat-icon class="expand-arrow">{{ expandedLogId === log.id ? 'expand_less' : 'expand_more' }}</mat-icon>
-        </div>
+          <mat-icon class="expand-arrow" aria-hidden="true">{{ expandedLogId === log.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
 
         <!-- Expanded Detail -->
-        <div class="log-detail" *ngIf="expandedLogId === log.id" (click)="$event.stopPropagation()">
-          <div class="detail-meta">
-            <div class="detail-item">
-              <span class="detail-key">Full URL</span>
-              <span class="detail-value mono">{{ log.endpoint }}</span>
+        <div class="log-detail" *ngIf="expandedLogId === log.id" [id]="'api-log-detail-' + log.id">
+          <dl class="detail-meta">
+            <div class="detail-item detail-wide">
+              <dt class="detail-key">Full URL</dt>
+              <dd class="detail-value mono">{{ log.endpoint }}</dd>
             </div>
             <div class="detail-item">
-              <span class="detail-key">API Domain</span>
-              <span class="detail-value">{{ log.apiDomain }}</span>
+              <dt class="detail-key">API domain</dt>
+              <dd class="detail-value">{{ log.apiDomain || '—' }}</dd>
             </div>
             <div class="detail-item">
-              <span class="detail-key">Status</span>
-              <span class="detail-value" [class.text-ok]="!log.error" [class.text-err]="log.error">{{ log.statusCode || 'N/A' }} {{ log.error ? '(Error)' : '(OK)' }}</span>
+              <dt class="detail-key">Status</dt>
+              <dd class="detail-value" [class.text-ok]="!log.error" [class.text-err]="log.error">{{ log.statusCode || '—' }} {{ log.error ? '(error)' : '(OK)' }}</dd>
             </div>
             <div class="detail-item">
-              <span class="detail-key">Duration</span>
-              <span class="detail-value">{{ log.durationMs }}ms</span>
+              <dt class="detail-key">Duration</dt>
+              <dd class="detail-value">{{ formatDuration(log.durationMs) }}</dd>
             </div>
-          </div>
+            <div class="detail-item">
+              <dt class="detail-key">Time</dt>
+              <dd class="detail-value">{{ formatDateTime(log.timestamp) || '—' }}</dd>
+            </div>
+          </dl>
 
-          <!-- Doc link -->
-          <a *ngIf="getDocLink(log.endpoint)" [href]="getDocLink(log.endpoint)" target="_blank" class="doc-link">
-            <mat-icon>menu_book</mat-icon>
+          <a *ngIf="getDocLink(log.endpoint) as docLink" [href]="docLink" target="_blank" rel="noopener noreferrer" class="doc-link">
+            <mat-icon aria-hidden="true">menu_book</mat-icon>
             View API documentation
+            <span class="cdk-visually-hidden">(opens in a new tab)</span>
           </a>
 
-          <!-- Tabs for request/response -->
-          <div class="body-tabs">
-            <button class="body-tab" [class.active]="activeTab === 'request'" (click)="setActiveTab('request')">
-              <mat-icon>upload</mat-icon>
-              Request Body
+          <div class="body-tabs" role="group" aria-label="Body">
+            <button
+              type="button"
+              class="body-tab"
+              [class.active]="activeTab === 'request'"
+              [attr.aria-pressed]="activeTab === 'request'"
+              (click)="setActiveTab('request')">
+              <mat-icon aria-hidden="true">upload</mat-icon>
+              Request body
             </button>
-            <button class="body-tab" [class.active]="activeTab === 'response'" (click)="setActiveTab('response')">
-              <mat-icon>download</mat-icon>
-              Response Body
+            <button
+              type="button"
+              class="body-tab"
+              [class.active]="activeTab === 'response'"
+              [attr.aria-pressed]="activeTab === 'response'"
+              (click)="setActiveTab('response')">
+              <mat-icon aria-hidden="true">download</mat-icon>
+              Response body
             </button>
           </div>
 
           <div class="json-container" *ngIf="activeTab === 'request'">
-            <button class="copy-btn" (click)="copyBody(log.requestBody, 'req-' + log.id)" matTooltip="Copy">
-              <mat-icon>{{ copiedId === 'req-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
+            <button
+              type="button"
+              class="copy-btn"
+              *ngIf="log.requestBody"
+              (click)="copyBody(log.requestBody, 'req-' + log.id)"
+              [matTooltip]="copiedId === 'req-' + log.id ? 'Copied' : 'Copy'"
+              [attr.aria-label]="copiedId === 'req-' + log.id ? 'Request body copied' : 'Copy request body'">
+              <mat-icon aria-hidden="true">{{ copiedId === 'req-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
             </button>
-            <pre class="json-preview">{{ formatJson(log.requestBody) || '(empty)' }}</pre>
+            <pre class="json-preview" tabindex="0" aria-label="Request body">{{ formatJson(log.requestBody) || '(empty)' }}</pre>
           </div>
           <div class="json-container" *ngIf="activeTab === 'response'">
-            <button class="copy-btn" (click)="copyBody(log.responseBody, 'res-' + log.id)" matTooltip="Copy">
-              <mat-icon>{{ copiedId === 'res-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
+            <button
+              type="button"
+              class="copy-btn"
+              *ngIf="log.responseBody"
+              (click)="copyBody(log.responseBody, 'res-' + log.id)"
+              [matTooltip]="copiedId === 'res-' + log.id ? 'Copied' : 'Copy'"
+              [attr.aria-label]="copiedId === 'res-' + log.id ? 'Response body copied' : 'Copy response body'">
+              <mat-icon aria-hidden="true">{{ copiedId === 'res-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
             </button>
-            <pre class="json-preview">{{ formatJson(log.responseBody) || '(empty)' }}</pre>
+            <pre class="json-preview" tabindex="0" aria-label="Response body">{{ formatJson(log.responseBody) || '(empty)' }}</pre>
           </div>
         </div>
-      </div>
-    </div>
+      </li>
+    </ul>
   </mat-card>
 
 </div>

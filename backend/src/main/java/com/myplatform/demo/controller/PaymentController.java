@@ -15,6 +15,10 @@ import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.service.GpayJwtService;
 import com.myplatform.demo.service.PaymentCheckoutService;
+import com.myplatform.demo.util.PaymentResultRedirects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
@@ -27,16 +31,24 @@ import java.util.Map;
 @RequestMapping("/api/payments")
 public class PaymentController {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
+
     private final UserRepository userRepository;
     private final PaymentCheckoutService paymentCheckoutService;
     private final GpayJwtService gpayJwtService;
+    private final String frontendUrl;
+    private final String googlePayMerchantName;
 
     public PaymentController(UserRepository userRepository,
                              PaymentCheckoutService paymentCheckoutService,
-                             GpayJwtService gpayJwtService) {
+                             GpayJwtService gpayJwtService,
+                             @Value("${app.frontend.url}") String frontendUrl,
+                             @Value("${adyen.gpay.merchantName:My Platform}") String googlePayMerchantName) {
         this.userRepository = userRepository;
         this.paymentCheckoutService = paymentCheckoutService;
         this.gpayJwtService = gpayJwtService;
+        this.frontendUrl = frontendUrl;
+        this.googlePayMerchantName = googlePayMerchantName;
     }
 
     @PostMapping("/session")
@@ -63,7 +75,10 @@ public class PaymentController {
 
     @GetMapping("/redirect")
     public RedirectView handleShopperRedirect(@RequestParam(required = false) String payload,
-                                              @RequestParam(required = false) String redirectResult) {
+                                              @RequestParam(required = false) String redirectResult,
+                                              @RequestParam(required = false) String userId,
+                                              @RequestParam(required = false) String source) {
+        String resultSource = source != null ? source : PaymentResultRedirects.SOURCE_CHECKOUT;
         try {
             PaymentCompletionDetails completionDetails = new PaymentCompletionDetails();
             if (redirectResult != null && !redirectResult.isEmpty()) {
@@ -77,26 +92,11 @@ public class PaymentController {
 
             PaymentDetailsResponse paymentDetailsResponse = paymentCheckoutService.getPaymentsApi().paymentsDetails(detailsRequest);
 
-            String redirectURL = "/result/";
-            switch (paymentDetailsResponse.getResultCode()) {
-                case AUTHORISED:
-                    redirectURL += "success";
-                    break;
-                case PENDING:
-                case RECEIVED:
-                    redirectURL += "pending";
-                    break;
-                case REFUSED:
-                    redirectURL += "failed";
-                    break;
-                default:
-                    redirectURL += "error";
-                    break;
-            }
-
-            return new RedirectView(redirectURL + "?reason=" + paymentDetailsResponse.getResultCode());
+            return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, paymentDetailsResponse, userId, resultSource));
         } catch (Exception e) {
-            return new RedirectView("/result/error?reason=" + e.getMessage());
+            log.warn("Could not complete the shopper redirect: {}", e.getMessage());
+            return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, "error",
+                    "We couldn't confirm the payment result.", userId, resultSource));
         }
     }
 
@@ -110,6 +110,9 @@ public class PaymentController {
         String authJwt = gpayJwtService.generateAuthJwt(hostname);
         Map<String, String> response = new HashMap<>();
         response.put("googlePayJwtToken", authJwt);
+        response.put("merchantId", GpayJwtService.MERCHANT_ID);
+        response.put("gatewayMerchantId", paymentCheckoutService.getMerchantAccount());
+        response.put("merchantName", googlePayMerchantName);
         return ResponseEntity.ok(response);
     }
 

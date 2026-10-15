@@ -1,0 +1,67 @@
+@use '@angular/material' as mat;
+
+// Monochrome palette so Material components (buttons, inputs, tabs, toggles,
+// checkboxes, spinners...) follow the black and white brand instead of the
+// previous deep purple / amber prebuilt theme.
+$fintech-black-palette: (
+  50: #f5f5f5,
+  100: #e5e5e5,
+  200: #d4d4d4,
+  300: #a3a3a3,
+  400: #737373,
+  500: #000000,
+  600: #000000,
+  700: #000000,
+  800: #000000,
+  900: #000000,
+  A100: #f5f5f5,
+  A200: #737373,
+  A400: #262626,
+  A700: #000000,
+  contrast: (
+    50: rgba(0, 0, 0, 0.87),
+    100: rgba(0, 0, 0, 0.87),
+    200: rgba(0, 0, 0, 0.87),
+    300: rgba(0, 0, 0, 0.87),
+    400: #ffffff,
+    500: #ffffff,
+    600: #ffffff,
+    700: #ffffff,
+    800: #ffffff,
+    900: #ffffff,
+    A100: rgba(0, 0, 0, 0.87),
+    A200: #ffffff,
+    A400: #ffffff,
+    A700: #ffffff,
+  ),
+);
+
+$fintech-primary: mat.define-palette($fintech-black-palette, 500, 100, 900);
+$fintech-accent: mat.define-palette($fintech-black-palette, 500, 100, 900);
+$fintech-warn: mat.define-palette(mat.$red-palette, 700);
+
+$fintech-typography: mat.define-typography-config(
+  $font-family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  // The M2 default button tracking (1.25px) looks spaced out with the system font.
+  $button: mat.define-typography-level(14px, 36px, 500, $letter-spacing: normal),
+);
+
+$fintech-theme: mat.define-light-theme((
+  color: (
+    primary: $fintech-primary,
+    accent: $fintech-accent,
+    warn: $fintech-warn,
+  ),
+  typography: $fintech-typography,
+  density: 0,
+));
+
+@include mat.core();
+@include mat.all-component-themes($fintech-theme);
+@include mat.typography-hierarchy($fintech-theme);
+
+// The M2 snack bar paints its action with the accent colour, which would be
+// black on the dark snack bar background with a monochrome accent.
+.mat-mdc-snack-bar-container {
+  --mat-snack-bar-button-color: #ffffff;
+}

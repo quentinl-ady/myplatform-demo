@@ -1,11 +1,5 @@
 :host {
-  --fintech-primary: #000000;
-  --fintech-bg: #f5f6f8;
-  --fintech-surface: #ffffff;
-  --fintech-text: #1a1a1a;
-  --fintech-text-secondary: #737373;
   --fintech-radius: 12px;
-  --fintech-accent: #0abf53;
   --method-post: #e65100;
   --method-post-bg: #fff3e0;
   --method-patch: #f57f17;
@@ -14,7 +8,6 @@
   --method-get-bg: #e3f2fd;
   --method-delete: #c62828;
   --method-delete-bg: #ffebee;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -85,10 +78,27 @@
   background: #f0f0f0;
   color: var(--fintech-text-secondary);
 }
-.stat-chip.stat-post { background: var(--method-post-bg); color: var(--method-post); }
-.stat-chip.stat-patch { background: var(--method-patch-bg); color: var(--method-patch); }
-.stat-chip.stat-get { background: var(--method-get-bg); color: var(--method-get); }
-.stat-chip.stat-delete { background: var(--method-delete-bg); color: var(--method-delete); }
+.stat-chip[data-method="POST"] { background: var(--method-post-bg); color: var(--method-post); }
+.stat-chip[data-method="PATCH"] { background: var(--method-patch-bg); color: var(--method-patch); }
+.stat-chip[data-method="GET"] { background: var(--method-get-bg); color: var(--method-get); }
+.stat-chip[data-method="DELETE"] { background: var(--method-delete-bg); color: var(--method-delete); }
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2e7d32;
+}
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2e7d32;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse { 50% { opacity: 0.3; } }
 
 /* ── Filter Bar ── */
 .filter-bar {
@@ -106,7 +116,7 @@
   flex-shrink: 0;
 }
 .method-pill {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 3px 10px;
   border-radius: 14px;
@@ -125,10 +135,10 @@
   color: #fff;
   border-color: var(--fintech-text);
 }
-.pill-post.active { background: var(--method-post); border-color: var(--method-post); }
-.pill-patch.active { background: var(--method-patch); border-color: var(--method-patch); }
-.pill-get.active { background: var(--method-get); border-color: var(--method-get); }
-.pill-delete.active { background: var(--method-delete); border-color: var(--method-delete); }
+.method-pill[data-method="POST"].active { background: var(--method-post); border-color: var(--method-post); }
+.method-pill[data-method="PATCH"].active { background: var(--method-patch); border-color: var(--method-patch); }
+.method-pill[data-method="GET"].active { background: var(--method-get); border-color: var(--method-get); }
+.method-pill[data-method="DELETE"].active { background: var(--method-delete); border-color: var(--method-delete); }
 
 /* ── Domain Filter ── */
 .domain-filters {
@@ -143,7 +153,7 @@
 }
 .domain-filters::-webkit-scrollbar { display: none; }
 .domain-pill {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 14px;
@@ -186,14 +196,13 @@
   padding: 5px 10px 5px 30px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 12px;
-  outline: none;
+  font-size: 13px;
   transition: border-color 0.2s;
   background: var(--fintech-bg);
   color: var(--fintech-text);
 }
 .search-box input:focus {
-  border-color: var(--fintech-accent);
+  border-color: var(--fintech-primary);
 }
 
 /* ── Card ── */
@@ -227,11 +236,48 @@ mat-card {
   margin-bottom: 12px;
   opacity: 0.25;
 }
+.empty-icon.error {
+  color: var(--fintech-danger);
+  opacity: 0.6;
+}
+.retry-btn {
+  margin-top: 12px;
+  border-radius: 24px;
+}
+
+/* ── Inline error (refresh failed) ── */
+.inline-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--fintech-danger);
+  background: var(--fintech-danger-bg);
+  flex-shrink: 0;
+}
+.inline-error mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+.link-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .empty-state p {
   font-size: 14px;
   font-weight: 500;
   margin: 0 0 4px 0;
   color: var(--fintech-text);
+  text-align: center;
 }
 .empty-hint {
   font-size: 12px;
@@ -241,6 +287,9 @@ mat-card {
 
 /* ── Log List ── */
 .log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -249,7 +298,6 @@ mat-card {
 
 .log-item {
   padding: 10px 16px;
-  cursor: pointer;
   transition: background 0.12s;
   border-bottom: 1px solid #f0f0f0;
   border-left: 3px solid transparent;
@@ -270,6 +318,15 @@ mat-card {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 /* ── Method Badge ── */
@@ -285,7 +342,7 @@ mat-card {
   letter-spacing: 0.4px;
   text-transform: uppercase;
   flex-shrink: 0;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
 }
 .method-badge[data-method="POST"]   { background: var(--method-post-bg); color: var(--method-post); }
 .method-badge[data-method="PATCH"]  { background: var(--method-patch-bg); color: var(--method-patch); }
@@ -304,7 +361,7 @@ mat-card {
   font-size: 12px;
   font-weight: 500;
   color: var(--fintech-text);
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -318,7 +375,7 @@ mat-card {
 .log-status {
   font-size: 11px;
   font-weight: 600;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   flex-shrink: 0;
 }
 .status-ok { color: #2e7d32; }
@@ -328,14 +385,14 @@ mat-card {
 .log-duration {
   font-size: 10px;
   color: var(--fintech-text-secondary);
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   flex-shrink: 0;
 }
 
 /* ── Time ── */
 .log-time {
   font-size: 10px;
-  color: #999;
+  color: var(--fintech-text-secondary);
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -375,7 +432,13 @@ mat-card {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px 16px;
-  margin-bottom: 10px;
+  margin: 0 0 10px;
+}
+.detail-wide {
+  grid-column: 1 / -1;
+}
+.detail-item dd {
+  margin: 0;
 }
 .detail-item {
   display: flex;
@@ -386,7 +449,7 @@ mat-card {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  color: #999;
+  color: var(--fintech-text-secondary);
   font-weight: 500;
 }
 .detail-value {
@@ -394,7 +457,7 @@ mat-card {
   color: var(--fintech-text);
 }
 .detail-value.mono {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 11px;
   word-break: break-all;
 }
@@ -475,6 +538,10 @@ mat-card {
   transition: background 0.15s, color 0.15s;
   padding: 0;
 }
+.copy-btn:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -2px;
+}
 .copy-btn:hover {
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
@@ -491,7 +558,7 @@ mat-card {
   color: #d4d4d4;
   padding: 12px;
   border-radius: 0 0 8px 8px;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 11px;
   line-height: 1.5;
   overflow-x: auto;
@@ -503,5 +570,27 @@ mat-card {
 }
 
 /* ── Utilities ── */
+@media (max-width: 599.98px) {
+  .log-duration,
+  .impactful-chip {
+    display: none;
+  }
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  .search-box {
+    flex-basis: 100%;
+  }
+  .detail-meta {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinning,
+  .live-dot {
+    animation: none;
+  }
+}
+
 .spinning { animation: spin 1s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }

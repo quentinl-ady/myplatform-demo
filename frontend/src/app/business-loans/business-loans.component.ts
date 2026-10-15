@@ -1,59 +1,32 @@
-import {Component} from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import {MatSnackBar} from '@angular/material/snack-bar';
-import {MaterialModule} from '../material.module';
-import {CommonModule} from "@angular/common";
-import {
-    AdyenPlatformExperience,
-    CapitalOverview
-} from '@adyen/adyen-platform-experience-web';
-import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
-import {SessionService} from "../services";
+import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { CapitalOverview } from '@adyen/adyen-platform-experience-web';
+import '@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css';
+import { MaterialModule } from '../material.module';
+import { SessionService } from '../services';
+import { MountableComponent, PlatformExperienceCore, PlatformExperiencePage } from '../report/platform-experience';
 
 @Component({
-    selector: 'app-businessLoans',
-    standalone: true,
-    template: `
-    <div id="adyen-component" class="main-container">
-      <div id="capital-overview-container"></div>
-    </div>
-  `,
-    imports: [CommonModule, MaterialModule]
+  selector: 'app-business-loans',
+  standalone: true,
+  imports: [CommonModule, MaterialModule],
+  templateUrl: '../report/platform-page.html',
+  styleUrl: '../report/platform-page.css'
 })
-export class BusinessLoansComponent {
+export class BusinessLoansComponent extends PlatformExperiencePage {
+  private sessionService = inject(SessionService);
 
-    userId = '';
+  readonly pageTitle = 'Loans';
+  readonly pageDescription = 'See your business financing offers and follow your active loans.';
+  readonly itemLabel = 'loans';
+  readonly containerId = 'capital-overview-container';
+  protected readonly errorFallback = 'We could not open a loans session with Adyen. Please try again.';
 
-    constructor(private route: ActivatedRoute,
-                private sessionService: SessionService,
-                private matSnackBar: MatSnackBar) {
-    }
+  protected requestSession(userId: string) {
+    return this.sessionService.getBusinessLoans(userId);
+  }
 
-    ngOnInit() {
-        this.route.parent?.paramMap.subscribe(params => {
-            this.userId = params.get('id') || '';
-            if (this.userId) {
-                this.initAdyenComponents();
-            }
-        });
-    }
-
-    private async initAdyenComponents() {
-        const core = await AdyenPlatformExperience({
-            onSessionCreate: async () => {
-                const sessionToken = await this.sessionService.getBusinessLoans(this.userId).toPromise();
-                if (!sessionToken) {
-                    throw new Error('Impossible to get business loans information');
-                }
-                return {
-                    token: sessionToken.token,
-                    id: sessionToken.id
-                };
-            }
-        });
-        const capitalOverview = new CapitalOverview({core});
-        (capitalOverview as any).mount('#capital-overview-container');
-    }
-
-
+  protected createComponent(core: PlatformExperienceCore): MountableComponent {
+    return new CapitalOverview({ core }) as unknown as MountableComponent;
+  }
 }

@@ -1,412 +1,385 @@
 <div class="fintech-wrapper">
 
+  <div class="page-header">
+    <h1>Bank transfers</h1>
+    <p>Send money from your business account, now or on a schedule.</p>
+  </div>
+
+  <!-- ==================== LOADING / NOT SET UP / ERROR ==================== -->
+  <app-account-setup-state *ngIf="setupState !== 'ready'"
+                           [state]="setupState" [userId]="userId" [message]="loadErrorMessage"
+                           purpose="make bank transfers" (retry)="retryPage()"></app-account-setup-state>
+
   <!-- ==================== NO DEVICE WARNING ==================== -->
-  <mat-card class="no-device-warning" *ngIf="hasDevices() === false">
+  <mat-card class="no-device-warning" *ngIf="pageState === 'no-device'">
     <div class="warning-banner">
-      <div class="warning-icon-wrapper">
+      <div class="warning-icon-wrapper" aria-hidden="true">
         <mat-icon>warning_amber</mat-icon>
       </div>
       <div class="warning-text">
-        <h3>No trusted device registered</h3>
-        <p>You need to register a device before you can make transfers. This device will be used for Strong Customer Authentication (SCA) to secure your transactions.</p>
+        <h2>No trusted device registered</h2>
+        <p>Register this device before you make transfers. You will use it to approve each transfer with strong customer authentication (SCA).</p>
       </div>
     </div>
     <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
   </mat-card>
 
-  <!-- ==================== BALANCE CARD ==================== -->
-  <mat-card class="account-card" *ngIf="accountInfo && hasDevices()">
-    <div class="account-header">
-      <p class="account-label">Available Balance</p>
-      <h1 class="account-balance">
-        {{ (accountInfo.amount / 100) | number:'1.2-2' }} <span class="currency">{{ accountInfo.currency }}</span>
-      </h1>
-      <p class="account-details">{{ accountInfo.description }} &bull; {{ accountInfo.bankAccountNumber }}</p>
+  <ng-container *ngIf="pageState === 'ready' && accountInfo">
+
+    <!-- ==================== BALANCE CARD ==================== -->
+    <mat-card class="account-card">
+      <div class="account-header">
+        <p class="account-label">Available balance</p>
+        <p class="account-balance">{{ accountInfo.amount | money:accountInfo.currency }}</p>
+        <p class="account-details">{{ accountInfo.description }} &bull; <span class="mono">{{ accountInfo.bankAccountNumber }}</span></p>
+      </div>
+    </mat-card>
+
+    <div class="inline-alert error" *ngIf="countriesError" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ countriesError }}</span>
+      <button type="button" class="link-btn" (click)="loadRecipientCountries()">Retry</button>
     </div>
-  </mat-card>
 
-  <!-- ==================== TABS ==================== -->
-  <ng-container *ngIf="hasDevices()">
-
-    <mat-tab-group class="transfer-tabs" (selectedIndexChange)="onTabChange($event)" animationDuration="200ms">
+    <!-- ==================== TABS ==================== -->
+    <mat-tab-group class="transfer-tabs" [preserveContent]="true" (selectedIndexChange)="onTabChange($event)" animationDuration="200ms">
 
       <!-- ────────── TAB 1: ONE-TIME TRANSFER ────────── -->
-      <mat-tab label="One-time Transfer">
+      <mat-tab label="One-time transfer">
 
         <!-- Success state -->
-        <mat-card class="transfer-card success-state" *ngIf="isOneshotSuccess">
-          <div class="success-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
+        <mat-card class="transfer-card success-state" *ngIf="oneshotRecap as recap">
+          <div class="success-icon" aria-hidden="true">
+            <mat-icon>check_circle</mat-icon>
           </div>
-          <h2>Transfer Successful</h2>
-          <p>Your money is on its way to the recipient.</p>
-          <button mat-flat-button class="fintech-btn primary" (click)="resetOneshotForm()">Send another transfer</button>
+          <h2>Transfer sent</h2>
+          <p class="success-lead">{{ recap.amount | money:recap.currency }} is on its way to {{ recap.beneficiary }}.</p>
+
+          <dl class="recap-list">
+            <div class="recap-row"><dt>Amount</dt><dd>{{ recap.amount | money:recap.currency }}</dd></div>
+            <div class="recap-row"><dt>Beneficiary</dt><dd>{{ recap.beneficiary }}</dd></div>
+            <div class="recap-row"><dt>Country</dt><dd>{{ recap.country }}</dd></div>
+            <div class="recap-row" *ngFor="let row of recap.accountRows"><dt>{{ row.label }}</dt><dd class="mono">{{ row.value }}</dd></div>
+            <div class="recap-row"><dt>Speed</dt><dd>{{ recap.speed }}</dd></div>
+            <div class="recap-row" *ngIf="recap.reference"><dt>Reference</dt><dd>{{ recap.reference }}</dd></div>
+            <div class="recap-row" *ngIf="recap.description"><dt>Description</dt><dd>{{ recap.description }}</dd></div>
+            <div class="recap-row"><dt>Date</dt><dd>{{ recap.date }}</dd></div>
+          </dl>
+
+          <button mat-flat-button type="button" class="fintech-btn primary" (click)="resetOneshotForm()">Make another transfer</button>
         </mat-card>
 
         <!-- Transfer form -->
-        <mat-card class="transfer-card" *ngIf="!isOneshotSuccess">
-          <h2>Send Money</h2>
+        <mat-card class="transfer-card" *ngIf="!oneshotRecap">
+          <h2>Send money</h2>
 
-          <form [formGroup]="oneshotForm" (ngSubmit)="submitOneshot()">
+          <form [formGroup]="oneshotForm" (ngSubmit)="submitOneshot()" novalidate>
 
-            <div class="amount-wrapper">
-              <span class="currency-symbol">{{ userCurrency }}</span>
-              <input type="number" class="amount-input" formControlName="amount" placeholder="0.00" step="0.01" />
+            <label class="field-label" for="oneshot-amount">Amount</label>
+            <div class="amount-wrapper" [class.invalid]="oneshotExceedsBalance || amountError('oneshot')">
+              <span class="currency-symbol" aria-hidden="true">{{ userCurrency }}</span>
+              <input id="oneshot-amount" type="number" class="amount-input" formControlName="amount" placeholder="0.00"
+                     step="0.01" min="0.01" inputmode="decimal" [attr.aria-describedby]="'oneshot-amount-hint'"
+                     [attr.aria-invalid]="oneshotExceedsBalance || !!amountError('oneshot')" />
             </div>
+            <p class="amount-hint" id="oneshot-amount-hint" [class.error-text]="oneshotExceedsBalance || amountError('oneshot')">
+              <ng-container *ngIf="oneshotExceedsBalance; else oneshotAmountHint">
+                This is more than your available balance of {{ accountInfo.amount | money:accountInfo.currency }}.
+              </ng-container>
+              <ng-template #oneshotAmountHint>{{ amountError('oneshot') || ('In ' + userCurrency + '. Available: ' + (accountInfo.amount | money:accountInfo.currency)) }}</ng-template>
+            </p>
 
             <div class="form-grid">
 
               <div class="form-group">
-                <label>Beneficiary Name</label>
-                <input type="text" class="fintech-input" formControlName="accountHolderName" placeholder="e.g. John Doe / Acme Corp" />
+                <label for="oneshot-name">Beneficiary name</label>
+                <input id="oneshot-name" type="text" class="fintech-input" formControlName="accountHolderName"
+                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" />
+                <span class="hint-text">The name of the account holder, as known by their bank.</span>
               </div>
 
               <div class="form-group">
-                <label>Recipient Country</label>
-                <app-recipient-country-picker formControlName="counterpartyCountry" [countries]="recipientCountries"
-                                              (countryChange)="onCountryChange($event)"></app-recipient-country-picker>
+                <label for="oneshot-country">Recipient country</label>
+                <app-recipient-country-picker formControlName="counterpartyCountry" inputId="oneshot-country" [countries]="recipientCountries"
+                                              (countryChange)="onCountryChange('oneshot', $event)"></app-recipient-country-picker>
               </div>
 
-              <ng-container *ngIf="bankAccountFormat">
-
-                <button type="button" mat-stroked-button class="fintech-btn secondary test-account-btn" *ngIf="testAccount" (click)="fillTestAccount()">
-                  <mat-icon>science</mat-icon>
-                  Use test account
-                </button>
-
-                <div class="form-group" *ngIf="bankAccountFormat === 'iban'">
-                  <label>Recipient IBAN</label>
-                  <input type="text" class="fintech-input" formControlName="iban" placeholder="FR76 1234..." />
-                </div>
-
-                <ng-container *ngIf="bankAccountFormat === 'accountNumberRoutingNumber'">
-                  <div class="form-group">
-                    <label>Account Number</label>
-                    <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 123456789" />
-                  </div>
-                  <div class="form-group">
-                    <label>Routing Number</label>
-                    <input type="text" class="fintech-input" formControlName="routingNumber" placeholder="e.g. 122105278" />
-                  </div>
-                </ng-container>
-
-                <ng-container *ngIf="bankAccountFormat === 'accountNumberSortCode'">
-                  <div class="form-group">
-                    <label>Account Number</label>
-                    <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 12345678" />
-                  </div>
-                  <div class="form-group">
-                    <label>Sort Code</label>
-                    <input type="text" class="fintech-input" formControlName="sortCode" placeholder="e.g. 20-00-00" />
-                  </div>
-                </ng-container>
-
-                <div class="validation-status" *ngIf="isCheckingAccountFormat || isAccountFormatValid || accountFormatError">
-                  <mat-spinner *ngIf="isCheckingAccountFormat" diameter="16"></mat-spinner>
-                  <mat-icon *ngIf="isAccountFormatValid && !isCheckingAccountFormat" class="success-icon-small">check_circle</mat-icon>
-                  <mat-icon *ngIf="accountFormatError && !isCheckingAccountFormat" class="error-icon-small">error</mat-icon>
-                  <span [ngClass]="{'success-text': isAccountFormatValid, 'error-text': accountFormatError, 'pending-text': isCheckingAccountFormat}">
-                    {{ isCheckingAccountFormat ? 'Verifying account format...' : (isAccountFormatValid ? 'Valid account format' : accountFormatError) }}
-                  </span>
-                </div>
-
-              </ng-container>
+              <app-bank-details-fields [form]="oneshotForm" [check]="oneshotBank" [testAccount]="testAccountOf('oneshot')"
+                                       idPrefix="oneshot"></app-bank-details-fields>
 
               <div class="form-group">
-                <label>Transfer Speed</label>
+                <span class="field-label" id="oneshot-speed-label">Transfer speed</span>
                 <app-transfer-speed-picker formControlName="transferType" [userId]="userId" [currency]="userCurrency"
-                                           [beneficiary]="activeTab === 'oneshot' ? routeBeneficiary : null"
+                                           labelledBy="oneshot-speed-label"
+                                           [beneficiary]="oneshotBank.routeBeneficiary"
                                            [amount]="oneshotForm.value.amount ?? null"></app-transfer-speed-picker>
               </div>
 
               <div class="form-group">
-                <label>Reference (internal)</label>
-                <input type="text" class="fintech-input" formControlName="reference" placeholder="Internal reference" />
-                <span class="hint-text">Note: You can use "noNameMatch" or "partialNameMatch" here to test different verification use-cases.</span>
+                <label for="oneshot-reference">Internal reference (optional)</label>
+                <input id="oneshot-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. INV-2026-001" />
+                <span class="hint-text">Only visible to you. Demo: enter "noNameMatch" or "partialNameMatch" to test the name check results.</span>
               </div>
 
               <div class="form-group">
-                <label>Description (external)</label>
-                <input type="text" class="fintech-input" formControlName="description" placeholder="Visible to beneficiary" />
+                <label for="oneshot-description">Description (optional)</label>
+                <input id="oneshot-description" type="text" class="fintech-input" formControlName="description" placeholder="e.g. Invoice 001" />
+                <span class="hint-text">Visible to the beneficiary.</span>
               </div>
             </div>
 
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                    [disabled]="oneshotForm.invalid || isOneshotProcessing || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
-              <span *ngIf="!isOneshotProcessing">Review Transfer</span>
-              <mat-spinner *ngIf="isOneshotProcessing" diameter="24" color="accent"></mat-spinner>
+                    [disabled]="!!oneshotBlockReason || isOneshotProcessing" aria-describedby="oneshot-submit-hint">
+              <span *ngIf="!isOneshotProcessing">Review transfer</span>
+              <mat-spinner *ngIf="isOneshotProcessing" diameter="24" color="accent" aria-label="Processing"></mat-spinner>
             </button>
+            <p class="submit-hint" id="oneshot-submit-hint">{{ isOneshotProcessing ? '' : oneshotBlockReason }}</p>
           </form>
         </mat-card>
 
       </mat-tab>
 
       <!-- ────────── TAB 2: SCHEDULED TRANSFERS ────────── -->
-      <mat-tab label="Scheduled Transfers">
+      <mat-tab label="Scheduled transfers">
 
         <!-- ── LIST VIEW ── -->
-        <ng-container *ngIf="soView === 'list'">
-          <mat-card class="so-card">
-            <div class="card-header">
-              <div>
-                <h2>Scheduled Transfers</h2>
-                <p class="subtitle">Manage your recurring transfers</p>
-              </div>
-              <button mat-flat-button class="fintech-btn primary" (click)="showSoCreate()">
-                <mat-icon>add</mat-icon>
-                New Scheduled Transfer
-              </button>
+        <mat-card class="so-card" *ngIf="soView === 'list'">
+          <div class="card-header">
+            <div>
+              <h2>Scheduled transfers</h2>
+              <p class="subtitle">Manage your recurring transfers</p>
             </div>
+            <button mat-flat-button type="button" class="fintech-btn primary" (click)="showSoCreate()">
+              <mat-icon aria-hidden="true">add</mat-icon>
+              New scheduled transfer
+            </button>
+          </div>
 
-            <div class="loading-state" *ngIf="soLoading">
-              <mat-spinner diameter="32"></mat-spinner>
-              <span>Loading scheduled transfers...</span>
+          <div class="loading-state" *ngIf="soLoading" role="status">
+            <mat-spinner diameter="32" aria-hidden="true"></mat-spinner>
+            <span>Loading scheduled transfers...</span>
+          </div>
+
+          <div class="error-state" *ngIf="soError && !soLoading" role="alert">
+            <mat-icon aria-hidden="true">error_outline</mat-icon>
+            <span>{{ soError }}</span>
+            <button type="button" class="link-btn" (click)="loadStandingOrders()">Retry</button>
+          </div>
+
+          <div class="empty-state" *ngIf="!soLoading && !soError && standingOrders.length === 0">
+            <div class="empty-icon-wrapper" aria-hidden="true">
+              <mat-icon>schedule_send</mat-icon>
             </div>
+            <h3>No scheduled transfers yet</h3>
+            <p>Create a recurring transfer to pay suppliers or move money automatically.</p>
+          </div>
 
-            <div class="error-state" *ngIf="soError && !soLoading">
-              <mat-icon>error_outline</mat-icon>
-              <span>{{ soError }}</span>
-            </div>
-
-            <div class="empty-state" *ngIf="!soLoading && !soError && standingOrders.length === 0">
-              <div class="empty-icon-wrapper">
-                <mat-icon>schedule_send</mat-icon>
-              </div>
-              <h3>No scheduled transfers yet</h3>
-              <p>Create your first recurring transfer to automate payments.</p>
-            </div>
-
-            <div class="so-list" *ngIf="!soLoading && standingOrders.length > 0">
-              <div class="so-item" *ngFor="let so of standingOrders">
-                <div class="so-item-left">
-                  <div class="so-icon-wrapper">
-                    <mat-icon>repeat</mat-icon>
-                  </div>
-                  <div class="so-item-info">
-                    <span class="so-counterparty">{{ so.counterparty?.bankAccount?.accountHolder?.fullName || 'Unknown' }}</span>
-                    <span class="so-schedule">{{ getScheduleLabel(so.schedule) }} &bull; {{ so.counterparty?.bankAccount?.accountIdentification?.iban }}</span>
-                    <span class="so-ref" *ngIf="so.description">{{ so.description }}</span>
-                  </div>
+          <ul class="so-list" *ngIf="!soLoading && standingOrders.length > 0">
+            <li class="so-item" *ngFor="let so of standingOrders">
+              <div class="so-item-left">
+                <div class="so-icon-wrapper" aria-hidden="true">
+                  <mat-icon>repeat</mat-icon>
                 </div>
-                <div class="so-item-right">
-                  <span class="so-amount">{{ (so.amount?.value || 0) / 100 | number:'1.2-2' }} {{ so.amount?.currency }}</span>
-                  <span class="so-status" [class.active]="so.status === 'active'" [class.inactive]="so.status !== 'active'">
-                    {{ so.status }}
-                  </span>
-                  <div class="so-actions">
-                    <button mat-icon-button matTooltip="Edit" (click)="showSoEdit(so)">
-                      <mat-icon>edit</mat-icon>
-                    </button>
-                    <button mat-icon-button matTooltip="Delete" (click)="onDeleteSo(so)">
-                      <mat-icon>delete_outline</mat-icon>
-                    </button>
-                  </div>
+                <div class="so-item-info">
+                  <span class="so-counterparty">{{ soBeneficiary(so) }}</span>
+                  <span class="so-schedule">{{ getScheduleLabel(so.schedule) }}</span>
+                  <span class="so-account mono">{{ soAccountSummary(so) }}</span>
+                  <span class="so-ref" *ngIf="so.description">{{ so.description }}</span>
                 </div>
               </div>
-            </div>
-          </mat-card>
-        </ng-container>
+              <div class="so-item-right">
+                <span class="so-amount">{{ soAmountValue(so) | money:soCurrency(so) }}</span>
+                <span class="so-status" [class.active]="so.status === 'active'" [class.inactive]="so.status !== 'active'">
+                  {{ soStatusLabel(so) }}
+                </span>
+                <div class="so-actions">
+                  <button mat-icon-button type="button" matTooltip="Edit" [attr.aria-label]="'Edit the scheduled transfer to ' + soBeneficiary(so)"
+                          (click)="showSoEdit(so)" [disabled]="deletingSoId === so.id">
+                    <mat-icon aria-hidden="true">edit</mat-icon>
+                  </button>
+                  <button mat-icon-button type="button" matTooltip="Delete" [attr.aria-label]="'Delete the scheduled transfer to ' + soBeneficiary(so)"
+                          (click)="onDeleteSo(so)" [disabled]="!!deletingSoId">
+                    <mat-icon *ngIf="deletingSoId !== so.id" aria-hidden="true">delete_outline</mat-icon>
+                    <mat-spinner *ngIf="deletingSoId === so.id" diameter="18"></mat-spinner>
+                  </button>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </mat-card>
 
         <!-- ── CREATE VIEW ── -->
-        <ng-container *ngIf="soView === 'create'">
-          <mat-card class="so-card">
-            <div class="card-header">
-              <div>
-                <h2>New Scheduled Transfer</h2>
-                <p class="subtitle">Set up a new recurring transfer</p>
+        <mat-card class="so-card" *ngIf="soView === 'create'">
+          <div class="card-header">
+            <div>
+              <h2>New scheduled transfer</h2>
+              <p class="subtitle">Set up a recurring transfer</p>
+            </div>
+            <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="showSoList()" [disabled]="isCreating">
+              <mat-icon aria-hidden="true">arrow_back</mat-icon>
+              Back
+            </button>
+          </div>
+
+          <div class="sca-banner" *ngIf="scaStatus && !showSoScaModal" role="status">
+            <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+            <span>{{ scaStatus }}</span>
+          </div>
+
+          <form [formGroup]="createForm" (ngSubmit)="onCreateSo()" novalidate>
+
+            <label class="field-label" for="so-amount">Amount per transfer</label>
+            <div class="amount-wrapper" [class.invalid]="amountError('standing')">
+              <span class="currency-symbol" aria-hidden="true">{{ userCurrency }}</span>
+              <input id="so-amount" type="number" class="amount-input" formControlName="amount" placeholder="0.00"
+                     step="0.01" min="0.01" inputmode="decimal" aria-describedby="so-amount-hint"
+                     [attr.aria-invalid]="!!amountError('standing')" />
+            </div>
+            <p class="amount-hint" id="so-amount-hint" [class.error-text]="amountError('standing')">
+              {{ amountError('standing') || ('In ' + userCurrency + '. Each transfer needs enough balance on the day it is sent.') }}
+            </p>
+
+            <div class="form-grid">
+
+              <div class="form-group">
+                <label for="so-name">Beneficiary name</label>
+                <input id="so-name" type="text" class="fintech-input" formControlName="counterpartyName"
+                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" />
+                <span class="hint-text">The name of the account holder, as known by their bank.</span>
               </div>
-              <button mat-stroked-button class="fintech-btn secondary" (click)="showSoList()">
-                <mat-icon>arrow_back</mat-icon>
-                Back
-              </button>
+
+              <div class="form-group">
+                <label for="so-country">Recipient country</label>
+                <app-recipient-country-picker formControlName="counterpartyCountry" inputId="so-country" [countries]="recipientCountries"
+                                              (countryChange)="onCountryChange('standing', $event)"></app-recipient-country-picker>
+              </div>
+
+              <app-bank-details-fields [form]="createForm" [check]="standingBank" [testAccount]="testAccountOf('standing')"
+                                       idPrefix="so"></app-bank-details-fields>
+
+              <div class="form-group">
+                <label for="so-schedule">Schedule</label>
+                <select id="so-schedule" class="fintech-input" formControlName="schedule">
+                  <option value="daily">Every day</option>
+                  <option value="weekdays">Every weekday</option>
+                  <option value="weekly">Every week, on the first business day</option>
+                  <option value="monthly">Every month, on the first business day</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <span class="field-label" id="so-speed-label">Transfer speed</span>
+                <app-transfer-speed-picker formControlName="priority" [userId]="userId" [currency]="userCurrency"
+                                           labelledBy="so-speed-label"
+                                           [beneficiary]="standingBank.routeBeneficiary"
+                                           [amount]="createForm.value.amount ?? null"></app-transfer-speed-picker>
+              </div>
+
+              <div class="form-group">
+                <label for="so-reference">Internal reference (optional)</label>
+                <input id="so-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Rent office" />
+                <span class="hint-text">Only visible to you. Demo: enter "noNameMatch" or "partialNameMatch" to test the name check results.</span>
+              </div>
+
+              <div class="form-group">
+                <label for="so-description">Description (optional)</label>
+                <input id="so-description" type="text" class="fintech-input" formControlName="description" placeholder="e.g. Monthly rent" />
+                <span class="hint-text">Visible to the beneficiary.</span>
+              </div>
+
             </div>
 
-            <div class="sca-banner" *ngIf="scaStatus">
-              <mat-spinner diameter="18"></mat-spinner>
-              <span>{{ scaStatus }}</span>
-            </div>
+            <button mat-flat-button class="fintech-btn primary full-width" type="submit"
+                    [disabled]="!!createBlockReason || isCreating" aria-describedby="so-submit-hint">
+              <span *ngIf="!isCreating">Create scheduled transfer</span>
+              <mat-spinner *ngIf="isCreating" diameter="24" color="accent" aria-label="Processing"></mat-spinner>
+            </button>
+            <p class="submit-hint" id="so-submit-hint">{{ isCreating ? '' : createBlockReason }}</p>
 
-            <form [formGroup]="createForm" (ngSubmit)="onCreateSo()">
-
-              <div class="amount-wrapper">
-                <span class="currency-symbol">{{ userCurrency }}</span>
-                <input type="number" class="amount-input" formControlName="amount" placeholder="0.00" step="0.01" />
-              </div>
-
-              <div class="form-grid">
-
-                <div class="form-group">
-                  <label>Beneficiary Name</label>
-                  <input type="text" class="fintech-input" formControlName="counterpartyName" placeholder="e.g. John Doe" />
-                </div>
-
-                <div class="form-group">
-                  <label>Recipient Country</label>
-                  <app-recipient-country-picker formControlName="counterpartyCountry" [countries]="recipientCountries"
-                                                (countryChange)="onCountryChange($event)"></app-recipient-country-picker>
-                </div>
-
-                <ng-container *ngIf="bankAccountFormat">
-
-                  <button type="button" mat-stroked-button class="fintech-btn secondary test-account-btn" *ngIf="testAccount" (click)="fillTestAccount()">
-                    <mat-icon>science</mat-icon>
-                    Use test account
-                  </button>
-
-                  <div class="form-group" *ngIf="bankAccountFormat === 'iban'">
-                    <label>Recipient IBAN</label>
-                    <input type="text" class="fintech-input" formControlName="iban" placeholder="FR76 1234..." />
-                  </div>
-
-                  <ng-container *ngIf="bankAccountFormat === 'accountNumberRoutingNumber'">
-                    <div class="form-group">
-                      <label>Account Number</label>
-                      <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 123456789" />
-                    </div>
-                    <div class="form-group">
-                      <label>Routing Number</label>
-                      <input type="text" class="fintech-input" formControlName="routingNumber" placeholder="e.g. 122105278" />
-                    </div>
-                  </ng-container>
-
-                  <ng-container *ngIf="bankAccountFormat === 'accountNumberSortCode'">
-                    <div class="form-group">
-                      <label>Account Number</label>
-                      <input type="text" class="fintech-input" formControlName="accountNumber" placeholder="e.g. 12345678" />
-                    </div>
-                    <div class="form-group">
-                      <label>Sort Code</label>
-                      <input type="text" class="fintech-input" formControlName="sortCode" placeholder="e.g. 20-00-00" />
-                    </div>
-                  </ng-container>
-
-                  <div class="validation-status" *ngIf="isCheckingAccountFormat || isAccountFormatValid || accountFormatError">
-                    <mat-spinner *ngIf="isCheckingAccountFormat" diameter="16"></mat-spinner>
-                    <mat-icon *ngIf="isAccountFormatValid && !isCheckingAccountFormat" class="success-icon-small">check_circle</mat-icon>
-                    <mat-icon *ngIf="accountFormatError && !isCheckingAccountFormat" class="error-icon-small">error</mat-icon>
-                    <span [ngClass]="{'success-text': isAccountFormatValid, 'error-text': accountFormatError, 'pending-text': isCheckingAccountFormat}">
-                      {{ isCheckingAccountFormat ? 'Verifying account format...' : (isAccountFormatValid ? 'Valid account format' : accountFormatError) }}
-                    </span>
-                  </div>
-
-                </ng-container>
-
-                <div class="form-group">
-                  <label>Schedule</label>
-                  <select class="fintech-input" formControlName="schedule">
-                    <option value="daily">Daily</option>
-                    <option value="weekdays">Weekdays</option>
-                    <option value="weekly">Weekly (first business day)</option>
-                    <option value="monthly">Monthly (first business day)</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label>Transfer Speed</label>
-                  <app-transfer-speed-picker formControlName="priority" [userId]="userId" [currency]="userCurrency"
-                                             [beneficiary]="activeTab === 'standing' ? routeBeneficiary : null"
-                                             [amount]="createForm.value.amount ?? null"></app-transfer-speed-picker>
-                </div>
-
-                <div class="form-group">
-                  <label>Reference (internal)</label>
-                  <input type="text" class="fintech-input" formControlName="reference" placeholder="Internal reference" />
-                </div>
-
-                <div class="form-group">
-                  <label>Description (external)</label>
-                  <input type="text" class="fintech-input" formControlName="description" placeholder="Visible to beneficiary" />
-                </div>
-
-              </div>
-
-              <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-                      [disabled]="createForm.invalid || isCreating || !bankAccountFormat || !isAccountFormatValid || isCheckingAccountFormat">
-                <span *ngIf="!isCreating">Create Scheduled Transfer</span>
-                <mat-spinner *ngIf="isCreating" diameter="24" color="accent"></mat-spinner>
-              </button>
-
-            </form>
-          </mat-card>
-        </ng-container>
+          </form>
+        </mat-card>
 
         <!-- ── EDIT VIEW ── -->
-        <ng-container *ngIf="soView === 'edit' && editingOrder">
-          <mat-card class="so-card">
-            <div class="card-header">
-              <div>
-                <h2>Edit Scheduled Transfer</h2>
-                <p class="subtitle">Update editable fields</p>
-              </div>
-              <button mat-stroked-button class="fintech-btn secondary" (click)="showSoList()">
-                <mat-icon>arrow_back</mat-icon>
-                Back
-              </button>
+        <mat-card class="so-card" *ngIf="soView === 'edit' && editingOrder">
+          <div class="card-header">
+            <div>
+              <h2>Edit scheduled transfer</h2>
+              <p class="subtitle">You can change the references and the transfer speed</p>
             </div>
+            <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="showSoList()" [disabled]="isSaving">
+              <mat-icon aria-hidden="true">arrow_back</mat-icon>
+              Back
+            </button>
+          </div>
 
-            <div class="detail-section">
-              <h3>Details (read-only)</h3>
-              <div class="detail-grid">
-                <div class="detail-item">
-                  <span class="detail-label">ID</span>
-                  <span class="detail-value mono">{{ editingOrder.id }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Amount</span>
-                  <span class="detail-value">{{ (editingOrder.amount?.value || 0) / 100 | number:'1.2-2' }} {{ editingOrder.amount?.currency }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Beneficiary</span>
-                  <span class="detail-value">{{ editingOrder.counterparty?.bankAccount?.accountHolder?.fullName }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">IBAN</span>
-                  <span class="detail-value mono">{{ editingOrder.counterparty?.bankAccount?.accountIdentification?.iban }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Schedule</span>
-                  <span class="detail-value">{{ getScheduleLabel(editingOrder.schedule) }}</span>
-                </div>
-                <div class="detail-item">
-                  <span class="detail-label">Status</span>
+          <section class="detail-section" aria-labelledby="so-details-title">
+            <h3 id="so-details-title">Details</h3>
+            <dl class="detail-grid">
+              <div class="detail-item">
+                <dt class="detail-label">Amount</dt>
+                <dd class="detail-value">{{ soAmountValue(editingOrder) | money:soCurrency(editingOrder) }}</dd>
+              </div>
+              <div class="detail-item">
+                <dt class="detail-label">Beneficiary</dt>
+                <dd class="detail-value">{{ soBeneficiary(editingOrder) }}</dd>
+              </div>
+              <div class="detail-item" *ngFor="let row of soAccountRows(editingOrder)">
+                <dt class="detail-label">{{ row.label }}</dt>
+                <dd class="detail-value mono">{{ row.value }}</dd>
+              </div>
+              <div class="detail-item">
+                <dt class="detail-label">Schedule</dt>
+                <dd class="detail-value">{{ getScheduleLabel(editingOrder.schedule) }}</dd>
+              </div>
+              <div class="detail-item">
+                <dt class="detail-label">Status</dt>
+                <dd class="detail-value">
                   <span class="so-status" [class.active]="editingOrder.status === 'active'" [class.inactive]="editingOrder.status !== 'active'">
-                    {{ editingOrder.status }}
+                    {{ soStatusLabel(editingOrder) }}
                   </span>
-                </div>
+                </dd>
+              </div>
+              <div class="detail-item">
+                <dt class="detail-label">ID</dt>
+                <dd class="detail-value mono">{{ editingOrder.id }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <form [formGroup]="editForm" (ngSubmit)="onSaveEdit()" novalidate>
+            <h3>Editable fields</h3>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="edit-reference">Internal reference</label>
+                <input id="edit-reference" type="text" class="fintech-input" formControlName="reference" />
+                <span class="hint-text">Only visible to you.</span>
+              </div>
+              <div class="form-group">
+                <label for="edit-description">Description</label>
+                <input id="edit-description" type="text" class="fintech-input" formControlName="description" />
+                <span class="hint-text">Visible to the beneficiary.</span>
+              </div>
+              <div class="form-group">
+                <span class="field-label" id="edit-speed-label">Transfer speed</span>
+                <app-transfer-speed-picker formControlName="priority" [userId]="userId"
+                                           labelledBy="edit-speed-label"
+                                           [currency]="soCurrency(editingOrder)"
+                                           [beneficiary]="editRouteBeneficiary"
+                                           [amount]="soAmountMajor(editingOrder)"></app-transfer-speed-picker>
               </div>
             </div>
 
-            <form [formGroup]="editForm" (ngSubmit)="onSaveEdit()">
-              <h3>Editable Fields</h3>
-
-              <div class="form-grid">
-                <div class="form-group">
-                  <label>Reference (internal)</label>
-                  <input type="text" class="fintech-input" formControlName="reference" />
-                </div>
-                <div class="form-group">
-                  <label>Description (external)</label>
-                  <input type="text" class="fintech-input" formControlName="description" />
-                </div>
-                <div class="form-group">
-                  <label>Transfer Speed</label>
-                  <app-transfer-speed-picker formControlName="priority" [userId]="userId"
-                                             [currency]="editingOrder.amount.currency || userCurrency"
-                                             [beneficiary]="editRouteBeneficiary"
-                                             [amount]="editingOrder.amount.value / 100"></app-transfer-speed-picker>
-                </div>
-              </div>
-
-              <button mat-flat-button class="fintech-btn primary full-width" type="submit" [disabled]="isSaving || editForm.invalid">
-                <span *ngIf="!isSaving">Save Changes</span>
-                <mat-spinner *ngIf="isSaving" diameter="24" color="accent"></mat-spinner>
-              </button>
-            </form>
-          </mat-card>
-        </ng-container>
+            <button mat-flat-button class="fintech-btn primary full-width" type="submit"
+                    [disabled]="isSaving || editForm.invalid || editForm.pristine" aria-describedby="edit-submit-hint">
+              <span *ngIf="!isSaving">Save changes</span>
+              <mat-spinner *ngIf="isSaving" diameter="24" color="accent" aria-label="Saving"></mat-spinner>
+            </button>
+            <p class="submit-hint" id="edit-submit-hint">
+              {{ isSaving ? '' : (editForm.invalid ? 'Choose an available transfer speed to save.' : (editForm.pristine ? 'Change a field to save.' : '')) }}
+            </p>
+          </form>
+        </mat-card>
 
       </mat-tab>
 
@@ -415,135 +388,124 @@
   </ng-container>
 
   <!-- ==================== VoP MODALS (shared) ==================== -->
-  <div class="modal-overlay" *ngIf="showExactMatchModal">
-    <div class="modal-content">
+  <div class="modal-overlay" *ngIf="showExactMatchModal" (keydown.escape)="modifyInfo()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="vop-match-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3 style="color: #4caf50;">Name Verified Successfully</h3>
+        <h3 id="vop-match-title" class="title-success">
+          <mat-icon aria-hidden="true">check_circle</mat-icon>
+          Name verified
+        </h3>
       </div>
-      <div class="modal-body" style="margin-bottom: 24px;">
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-          <mat-icon style="color: #4caf50;">check_circle</mat-icon>
-          <span>The beneficiary name perfectly matches the account details.</span>
-        </div>
+      <div class="modal-body">
+        <p>The beneficiary name matches the account details.</p>
         <p>Name confirmed: <strong>{{ vopBeneficiaryName }}</strong></p>
       </div>
       <div class="actions">
-        <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
-        <button mat-flat-button class="fintech-btn primary" (click)="proceedAfterExactMatch()">Continue</button>
+        <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()">Edit details</button>
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="proceedAfterExactMatch()" cdkFocusInitial>Continue</button>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" *ngIf="showPartialMatchModal">
-    <div class="modal-content">
+  <div class="modal-overlay" *ngIf="showPartialMatchModal" (keydown.escape)="modifyInfo()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="vop-partial-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3 style="color: var(--fintech-warning);">Name Mismatch Warning</h3>
+        <h3 id="vop-partial-title" class="title-warning">
+          <mat-icon aria-hidden="true">warning_amber</mat-icon>
+          Name close match
+        </h3>
       </div>
-      <div class="modal-body" style="margin-bottom: 24px;">
-        <p>The account name is slightly different from what you entered.</p>
+      <div class="modal-body">
+        <p>The name on the account is slightly different from the one you entered.</p>
         <p>You entered: <br><strong>{{ vopBeneficiaryName }}</strong></p>
-        <p>Bank verification found: <br><strong style="color: var(--fintech-primary);">{{ suggestedName }}</strong></p>
-        <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Would you like to use the name provided by the bank, modify your transfer, or cancel?</p>
+        <p>Name on the account: <br><strong>{{ suggestedName }}</strong></p>
+        <p class="modal-note">Use the name on the account, edit your details, or cancel.</p>
       </div>
-      <div class="actions" style="flex-direction: column; gap: 8px;">
-        <button mat-flat-button class="fintech-btn primary" (click)="acceptSuggestedName()">Use Found Name & Continue</button>
-        <div style="display: flex; gap: 8px; width: 100%;">
-          <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
-          <button mat-stroked-button class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
+      <div class="actions stacked">
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="acceptSuggestedName()" cdkFocusInitial>Use the name on the account</button>
+        <div class="actions">
+          <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()">Edit details</button>
+          <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="modal-overlay" *ngIf="showNoMatchModal">
-    <div class="modal-content">
+  <div class="modal-overlay" *ngIf="showNoMatchModal" (keydown.escape)="modifyInfo()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="vop-nomatch-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3 style="color: #f44336;">Warning: Invalid Name</h3>
+        <h3 id="vop-nomatch-title" class="title-danger">
+          <mat-icon aria-hidden="true">error</mat-icon>
+          Name doesn't match
+        </h3>
       </div>
-      <div class="modal-body" style="margin-bottom: 24px;">
-        <p>The name on the destination account <strong>does not match</strong> the beneficiary name you provided.</p>
-        <p style="font-size: 13px; color: var(--fintech-text-secondary); margin-top: 16px;">Sending money to an incorrect beneficiary can result in loss of funds. Do you still want to proceed at your own risk?</p>
+      <div class="modal-body">
+        <p>The name on the destination account <strong>does not match</strong> the beneficiary name you entered.</p>
+        <p class="modal-note">Sending money to the wrong account can result in loss of funds. Only continue if you are sure the details are correct.</p>
       </div>
-      <div class="actions" style="flex-direction: column; gap: 8px;">
-        <button mat-flat-button style="background-color: #f44336; color: white;" class="fintech-btn" (click)="proceedWithRisk()">Continue at my own risk</button>
-        <div style="display: flex; gap: 8px; width: 100%;">
-          <button mat-stroked-button class="fintech-btn secondary" (click)="modifyInfo()">Modify</button>
-          <button mat-stroked-button class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
+      <div class="actions stacked">
+        <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Continue at my own risk</button>
+        <div class="actions">
+          <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()" cdkFocusInitial>Edit details</button>
+          <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- ==================== ONE-SHOT SCA MODAL ==================== -->
-  <div class="modal-overlay" *ngIf="showOneshotScaModal">
-    <div class="modal-content">
+  <div class="modal-overlay" *ngIf="showOneshotScaModal && oneshotDraft as draft" (keydown.escape)="declineOneshot()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="oneshot-sca-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3>Confirm transfer</h3>
+        <h3 id="oneshot-sca-title">Confirm transfer</h3>
       </div>
 
       <div class="modal-body">
-        <div class="summary-row">
-          <span>Amount</span>
-          <strong>{{ (transferResponse?.amount || 0) / 100 | number:'1.2-2' }} {{ accountInfo?.currency }}</strong>
-        </div>
-        <div class="summary-row">
-          <span>Recipient Name</span>
-          <strong>{{ oneshotForm.value.accountHolderName }}</strong>
-        </div>
-        <div class="summary-row">
-          <span>Country</span>
-          <strong>{{ transferResponse?.counterpartyCountry }}</strong>
-        </div>
-        <div class="summary-row" *ngIf="transferResponse?.iban">
-          <span>IBAN</span>
-          <strong>{{ transferResponse?.iban }}</strong>
-        </div>
-        <div class="summary-row" *ngIf="transferResponse?.accountNumber">
-          <span>Account No.</span>
-          <strong>{{ transferResponse?.accountNumber }}</strong>
-        </div>
-        <div class="summary-row" *ngIf="transferResponse?.sortCode">
-          <span>Sort Code</span>
-          <strong>{{ transferResponse?.sortCode }}</strong>
-        </div>
-        <div class="summary-row" *ngIf="transferResponse?.routingNumber">
-          <span>Routing No.</span>
-          <strong>{{ transferResponse?.routingNumber }}</strong>
-        </div>
-        <div class="summary-row">
-          <span>Speed</span>
-          <strong style="text-transform: capitalize;">{{ oneshotForm.value.transferType }}</strong>
-        </div>
+        <dl class="recap-list">
+          <div class="recap-row"><dt>Amount</dt><dd>{{ draft.amount | money:draft.currency }}</dd></div>
+          <div class="recap-row"><dt>Beneficiary</dt><dd>{{ draft.beneficiary }}</dd></div>
+          <div class="recap-row"><dt>Country</dt><dd>{{ draft.country }}</dd></div>
+          <div class="recap-row" *ngFor="let row of draft.accountRows"><dt>{{ row.label }}</dt><dd class="mono">{{ row.value }}</dd></div>
+          <div class="recap-row"><dt>Speed</dt><dd>{{ draft.speed }}</dd></div>
+          <div class="recap-row" *ngIf="draft.reference"><dt>Reference</dt><dd>{{ draft.reference }}</dd></div>
+          <div class="recap-row" *ngIf="draft.description"><dt>Description</dt><dd>{{ draft.description }}</dd></div>
+        </dl>
+        <p class="modal-note">Approve with the passkey of your trusted device to send the money.</p>
       </div>
 
       <div class="actions">
-        <button mat-stroked-button class="fintech-btn secondary" (click)="declineOneshot()" [disabled]="isOneshotProcessing">Cancel</button>
-        <button mat-flat-button class="fintech-btn primary" (click)="approveOneshot()" [disabled]="isOneshotProcessing">
+        <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="declineOneshot()" [disabled]="isOneshotProcessing">Cancel</button>
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="approveOneshot()" [disabled]="isOneshotProcessing" cdkFocusInitial>
           <span *ngIf="!isOneshotProcessing">Approve</span>
-          <mat-spinner *ngIf="isOneshotProcessing" diameter="20" color="accent"></mat-spinner>
+          <mat-spinner *ngIf="isOneshotProcessing" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
         </button>
       </div>
     </div>
   </div>
 
   <!-- ==================== SCHEDULED TRANSFER SCA MODAL ==================== -->
-  <div class="modal-overlay" *ngIf="showSoScaModal">
-    <div class="modal-content">
+  <div class="modal-overlay" *ngIf="showSoScaModal" (keydown.escape)="cancelSoSca()">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="so-sca-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3>Authenticate to confirm</h3>
+        <h3 id="so-sca-title">Approve the scheduled transfer</h3>
       </div>
       <div class="modal-body">
-        <p>Strong Customer Authentication (SCA) is required to create this scheduled transfer. Please authenticate using your registered device.</p>
-        <div class="sca-banner" *ngIf="scaStatus" style="margin-top: 16px;">
-          <mat-spinner diameter="18"></mat-spinner>
+        <dl class="recap-list" *ngIf="pendingStandingOrder as order">
+          <div class="recap-row"><dt>Amount</dt><dd>{{ order.amount.value | money:order.amount.currency }}</dd></div>
+          <div class="recap-row"><dt>Beneficiary</dt><dd>{{ order.counterparty.bankAccount.accountHolder.fullName }}</dd></div>
+          <div class="recap-row"><dt>Schedule</dt><dd>{{ getScheduleLabel(order.schedule) }}</dd></div>
+        </dl>
+        <p>Strong customer authentication (SCA) is required to create this scheduled transfer. Approve it with the passkey of your trusted device.</p>
+        <div class="sca-banner" *ngIf="scaStatus" role="status">
+          <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
           <span>{{ scaStatus }}</span>
         </div>
       </div>
       <div class="actions">
-        <button mat-stroked-button class="fintech-btn secondary" (click)="cancelSoSca()" [disabled]="isCreating">Cancel</button>
-        <button mat-flat-button class="fintech-btn primary" (click)="approveSoScaChallenge()" [disabled]="isCreating">
-          <span *ngIf="!isCreating">Authenticate</span>
-          <mat-spinner *ngIf="isCreating" diameter="20" color="accent"></mat-spinner>
+        <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelSoSca()" [disabled]="isCreating">Cancel</button>
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="approveSoScaChallenge()" [disabled]="isCreating" cdkFocusInitial>
+          <span *ngIf="!isCreating">Approve</span>
+          <mat-spinner *ngIf="isCreating" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
         </button>
       </div>
     </div>

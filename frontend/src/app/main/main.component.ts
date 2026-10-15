@@ -1,8 +1,9 @@
-import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject } from '@angular/core';
 import { LoginComponent } from '../login/login.component';
 import { SignupComponent } from '../signup/signup.component';
 import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../material.module';
+import { PageTitleStrategy } from '../layout/page-title.strategy';
 
 @Component({
   selector: 'app-main',
@@ -10,8 +11,8 @@ import { MaterialModule } from '../material.module';
   standalone: true,
   imports: [CommonModule, MaterialModule, LoginComponent, SignupComponent],
   template: `
-    <div class="fintech-auth-container">
-      <mat-card class="fintech-auth-card">
+    <main class="fintech-auth-container">
+      <mat-card class="fintech-auth-card" [class.wide]="view() === 'signup'">
 
         <div class="brand-header">
           <div class="logo-mark">
@@ -21,39 +22,31 @@ import { MaterialModule } from '../material.module';
 
         <mat-card-header class="auth-header">
           <mat-card-title class="auth-title">
-            {{ view() === 'login' ? 'Welcome back' : 'Create an account' }}
+            <h1>{{ view() === 'login' ? 'Welcome back' : 'Create an account' }}</h1>
           </mat-card-title>
           <mat-card-subtitle class="auth-subtitle">
-            {{ view() === 'login' ? 'Log in to your account to continue' : 'Sign up to get started' }}
+            {{ view() === 'login' ? 'Log in to your account to continue' : 'Set up a test platform account in a few steps' }}
           </mat-card-subtitle>
         </mat-card-header>
 
         <mat-card-content class="auth-content">
-          <app-login *ngIf="view() === 'login'" (loginSuccess)="onAuthSuccess($event)"></app-login>
-          <app-signup *ngIf="view() === 'signup'" (signupSuccess)="onAuthSuccess($event)"></app-signup>
+          <app-login *ngIf="view() === 'login'"></app-login>
+          <app-signup *ngIf="view() === 'signup'"></app-signup>
         </mat-card-content>
 
         <mat-card-actions class="auth-actions">
           <span class="switch-text">
             {{ view() === 'login' ? "Don't have an account?" : "Already have an account?" }}
           </span>
-          <a class="switch-link" (click)="toggleView()">
+          <button type="button" class="switch-link" (click)="toggleView()">
             {{ view() === 'login' ? "Sign up" : "Log in" }}
-          </a>
+          </button>
         </mat-card-actions>
       </mat-card>
-    </div>
+    </main>
   `,
   styles: [`
     :host {
-      --fintech-primary: #000000;
-      --fintech-bg: #f5f6f8;
-      --fintech-surface: #ffffff;
-      --fintech-text: #1a1a1a;
-      --fintech-text-secondary: #737373;
-      --fintech-border: #e5e5e5;
-      --fintech-radius: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       display: block;
     }
 
@@ -62,6 +55,8 @@ import { MaterialModule } from '../material.module';
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      min-height: 100dvh;
+      box-sizing: border-box;
       background-color: var(--fintech-bg);
       padding: 24px;
     }
@@ -69,6 +64,7 @@ import { MaterialModule } from '../material.module';
     .fintech-auth-card {
       width: 100%;
       max-width: 420px;
+      box-sizing: border-box;
       padding: 32px 24px;
       background: var(--fintech-surface);
       border-radius: var(--fintech-radius);
@@ -77,13 +73,14 @@ import { MaterialModule } from '../material.module';
       flex-direction: column;
       align-items: center;
     }
+    .fintech-auth-card.wide {
+      max-width: 560px;
+    }
 
-    /* --- BRAND LOGO --- */
     .brand-header {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
       margin-bottom: 32px;
     }
     .logo-mark {
@@ -97,14 +94,7 @@ import { MaterialModule } from '../material.module';
       width: auto;
       object-fit: contain;
     }
-    .brand-name {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--fintech-text);
-      letter-spacing: -0.5px;
-    }
 
-    /* --- HEADERS --- */
     .auth-header {
       text-align: center;
       margin-bottom: 24px;
@@ -114,11 +104,15 @@ import { MaterialModule } from '../material.module';
       align-items: center;
     }
     .auth-title {
-      font-size: 24px !important;
-      font-weight: 700 !important;
-      color: var(--fintech-text);
       margin-bottom: 8px !important;
+    }
+    .auth-title h1 {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--fintech-text);
       letter-spacing: -0.5px;
+      margin: 0;
     }
     .auth-subtitle {
       font-size: 14px !important;
@@ -131,12 +125,13 @@ import { MaterialModule } from '../material.module';
       padding: 0 !important;
     }
 
-    /* --- FOOTER / SWITCH --- */
     .auth-actions {
       margin-top: 24px;
       padding: 0 !important;
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
+      align-items: center;
       gap: 6px;
       font-size: 14px;
     }
@@ -146,22 +141,39 @@ import { MaterialModule } from '../material.module';
     .switch-link {
       cursor: pointer;
       color: var(--fintech-primary);
+      font: inherit;
       font-weight: 600;
-      text-decoration: none;
-      transition: opacity 0.2s;
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 4px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
     .switch-link:hover {
       opacity: 0.7;
     }
+
+    @media (max-width: 599.98px) {
+      .fintech-auth-container {
+        padding: 16px;
+        align-items: flex-start;
+      }
+      .fintech-auth-card {
+        padding: 24px 16px;
+      }
+      .brand-header {
+        margin-bottom: 24px;
+      }
+    }
   `]
 })
 export class MainComponent {
+  private titleStrategy = inject(PageTitleStrategy);
   readonly view = signal<'login' | 'signup'>('login');
-
-  onAuthSuccess(data: unknown) {
-  }
 
   toggleView() {
     this.view.set(this.view() === 'login' ? 'signup' : 'login');
+    this.titleStrategy.setPageTitle(this.view() === 'login' ? 'Log in' : 'Sign up');
   }
 }

@@ -4,6 +4,8 @@ export interface SendPaymentPayload {
   storeReference: string;
   userId: string;
   reference: string;
+  /** Platform user the result page links back to when the payment uses a redirect. */
+  returnUserId?: string;
 }
 
 export interface SendPaymentResponse {
@@ -54,4 +56,13 @@ export interface TokenPaymentResponse {
   pspReference: string;
   resultCode: string;
   refusalReason: string;
+}
+
+export interface GooglePayJwtResponse {
+  googlePayJwtToken: string;
+  /** Google merchant ID. */
+  merchantId?: string;
+  /** Adyen merchant account used as the Google Pay gateway merchant. */
+  gatewayMerchantId?: string;
+  merchantName?: string;
 }

@@ -17,6 +17,7 @@ import com.myplatform.demo.dto.TokenPaymentResponse;
 import com.myplatform.demo.model.PaymentSessionResponse;
 import com.myplatform.demo.model.StoreCustomer;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import com.myplatform.demo.util.PaymentResultRedirects;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -56,9 +57,13 @@ public class IssuingPaymentCheckoutService {
         this.storeCustomerRepository = storeCustomerRepository;
     }
 
+    public PaymentDetailsResponse paymentDetails(PaymentDetailsRequest request) throws IOException, ApiException {
+        return paymentsApi.paymentsDetails(request);
+    }
+
     public PaymentSessionResponse createPaymentSession(String currencyCode, Long amount, String reference,
                                                        String storeRef, String activityReason,
-                                                       String balanceAccountId) throws IOException, ApiException {
+                                                       String balanceAccountId, String returnUserId) throws IOException, ApiException {
 
         ThreeDSRequestData threeDSRequestData = new ThreeDSRequestData()
                 .nativeThreeDS(ThreeDSRequestData.NativeThreeDSEnum.PREFERRED);
@@ -99,7 +104,7 @@ public class IssuingPaymentCheckoutService {
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .captureDelayHours(0)
                 .telephoneNumber("+33610101010")
-                .returnUrl(backendUrl + "/api/issuing-payments/redirect")
+                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/issuing-payments/redirect", returnUserId, PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT))
                 .addAllowedPaymentMethodsItem("scheme");
 
         if ("embeddedPayment".equals(activityReason)) {
@@ -145,7 +150,8 @@ public class IssuingPaymentCheckoutService {
     }
 
     public PaymentSessionResponse createTokenizationSession(String currencyCode, String reference,
-                                                             String storeRef, String activityReason)
+                                                             String storeRef, String activityReason,
+                                                             String returnUserId)
             throws IOException, ApiException {
 
         String shopperReference = "issuing_test@adyen.com_" + storeRef;
@@ -181,7 +187,7 @@ public class IssuingPaymentCheckoutService {
                 .shopperName(new ShopperName().firstName("Issuing").lastName("Test"))
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
                 .telephoneNumber("+33610101010")
-                .returnUrl(backendUrl + "/api/issuing-payments/redirect")
+                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/issuing-payments/redirect", returnUserId, PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT))
                 .addAllowedPaymentMethodsItem("scheme");
 
         if ("embeddedPayment".equals(activityReason)) {

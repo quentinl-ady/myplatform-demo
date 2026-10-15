@@ -20,7 +20,8 @@ import {
   VerifyCounterpartyNameRequest,
   BatchTransferRequest,
   BatchTransferResponse,
-  BatchApproveResponse
+  BatchApproveResponse,
+  BatchCancelResponse
 } from '../models';
 
 interface TransactionCache {
@@ -147,5 +148,9 @@ export class TransferService {
 
   finalizeApproval(userId: string, transferIds: string[], sdkOutput: string): Observable<BatchApproveResponse> {
     return this.http.post<BatchApproveResponse>(`${this.baseUrl}/api/transfers/batch/approve/finalize`, { userId, transferIds, sdkOutput });
+  }
+
+  cancelBatchTransfers(userId: string, transferIds: string[]): Observable<BatchCancelResponse> {
+    return this.http.post<BatchCancelResponse>(`${this.baseUrl}/api/transfers/batch/cancel`, { userId, transferIds });
   }
 }

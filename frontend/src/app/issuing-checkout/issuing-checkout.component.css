@@ -1,19 +1,6 @@
-:host {
-  --fintech-primary: #000000;
-  --fintech-bg: #f5f6f8;
-  --fintech-surface: #ffffff;
-  --fintech-text: #1a1a1a;
-  --fintech-text-secondary: #737373;
-  --fintech-border: #e5e5e5;
-  --fintech-radius: 16px;
-  --fintech-danger: #d32f2f;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
 .fintech-wrapper {
-  max-width: 900px;
-  margin: 40px auto;
-  padding: 0 16px;
+  max-width: 960px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -23,7 +10,7 @@
 .header-section {
   text-align: left;
 }
-.header-section h2 {
+.header-section h1 {
   font-size: 28px;
   font-weight: 700;
   color: var(--fintech-text);
@@ -34,24 +21,6 @@
   color: var(--fintech-text-secondary);
   font-size: 15px;
   margin: 0;
-}
-
-.issuing-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 8px 16px;
-  background: #e3f2fd;
-  border: 1px solid #90caf9;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #1565c0;
-}
-.issuing-badge mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
 }
 
 .loading-state {
@@ -67,9 +36,32 @@
 /* Layout grid */
 .checkout-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
+}
+.checkout-layout[hidden],
+.dropin-wrapper[hidden] {
+  display: none;
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 40px 24px;
+}
+.error-state mat-icon {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+  color: var(--fintech-danger);
+}
+.error-state p {
+  margin: 0;
+  color: var(--fintech-text);
 }
 
 mat-card {
@@ -156,7 +148,18 @@ select.fintech-input {
 .helper-text.error {
   color: var(--fintech-danger);
 }
+.helper-text a {
+  color: inherit;
+  font-weight: 600;
+}
+.submit-hint {
+  margin-top: -8px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
+}
 
+.mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
 
 /* Buttons */
@@ -177,6 +180,10 @@ select.fintech-input {
 .fintech-btn.full-width {
   width: 100%;
   font-size: 15px !important;
+}
+.fintech-btn.secondary {
+  border-color: var(--fintech-border) !important;
+  color: var(--fintech-text) !important;
 }
 
 /* Adyen Dropin Area */
@@ -215,12 +222,6 @@ select.fintech-input {
   line-height: 1.5;
 }
 
-.dropin-wrapper {
-  display: none;
-}
-.dropin-wrapper.visible {
-  display: block;
-}
 
 /* Adyen overrides to make it fit the theme */
 ::ng-deep .adyen-checkout__payment-method {
@@ -292,7 +293,7 @@ select.fintech-input {
   justify-content: space-between;
   margin-bottom: 12px;
 }
-.stored-methods-header h4 {
+.stored-methods-header h3 {
   font-size: 15px;
   font-weight: 600;
   margin: 0;
@@ -323,6 +324,10 @@ select.fintech-input {
 .empty-stored p {
   font-size: 13px;
   margin: 0;
+}
+.empty-stored.error mat-icon {
+  color: var(--fintech-danger);
+  opacity: 1;
 }
 
 .stored-card-list {
@@ -369,7 +374,7 @@ select.fintech-input {
   font-size: 14px;
   font-weight: 500;
   color: var(--fintech-text);
-  font-family: monospace;
+  font-family: var(--fintech-font-mono);
 }
 .card-expiry {
   font-size: 11px;
@@ -381,10 +386,11 @@ select.fintech-input {
 }
 .delete-token-btn {
   color: var(--fintech-text-secondary);
-  opacity: 0;
+  opacity: 0.6;
   transition: opacity 0.2s, color 0.2s;
 }
-.stored-card-item:hover .delete-token-btn {
+.stored-card-item:hover .delete-token-btn,
+.stored-card-item:focus-within .delete-token-btn {
   opacity: 1;
 }
 .delete-token-btn:hover {
@@ -423,53 +429,6 @@ select.fintech-input {
   color: var(--fintech-text-secondary);
 }
 
-/* Token payment result */
-.token-result {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 10px;
-  margin-top: 16px;
-}
-.token-result.success {
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
-}
-.token-result.failure {
-  background: #ffebee;
-  border: 1px solid #ef9a9a;
-}
-.token-result.success mat-icon {
-  color: #2e7d32;
-  font-size: 28px;
-  width: 28px;
-  height: 28px;
-}
-.token-result.failure mat-icon {
-  color: #c62828;
-  font-size: 28px;
-  width: 28px;
-  height: 28px;
-}
-.result-details {
-  display: flex;
-  flex-direction: column;
-}
-.result-code {
-  font-size: 15px;
-  font-weight: 600;
-}
-.result-psp {
-  font-size: 12px;
-  color: var(--fintech-text-secondary);
-  font-family: monospace;
-}
-.result-reason {
-  font-size: 12px;
-  color: var(--fintech-danger);
-}
-
 @media (max-width: 768px) {
   .checkout-layout {
     grid-template-columns: 1fr;
@@ -480,4 +439,29 @@ select.fintech-input {
   .tab-bar {
     flex-direction: column;
   }
+  .form-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .stored-card-item {
+    flex-wrap: wrap;
+  }
+}
+
+.issuing-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: var(--fintech-info-bg);
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--fintech-info);
+}
+.issuing-badge mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
 }

@@ -11,6 +11,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -136,7 +137,7 @@ public class AdyenSessionService {
             log.setStatusCode(statusCode);
             log.setDurationMs(durationMs);
             log.setError(statusCode >= 400);
-            log.setTimestamp(LocalDateTime.now());
+            log.setTimestamp(LocalDateTime.now(ZoneOffset.UTC));
             apiLogService.save(log);
         } catch (Exception ex) {
             // Never let logging break the actual API call

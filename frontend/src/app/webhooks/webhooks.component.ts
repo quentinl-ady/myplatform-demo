@@ -1,12 +1,14 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MaterialModule } from '../material.module';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { WebhookService } from '../services';
 import { WebhookEvent } from '../models';
+import { formatDateTime, formatTimeAgo, httpErrorMessage } from '../shared';
 
 @Component({
   selector: 'app-webhooks',
@@ -16,17 +18,28 @@ import { WebhookEvent } from '../models';
   styleUrl: './webhooks.component.css'
 })
 export class WebhooksComponent implements OnInit, OnDestroy {
+  private static readonly POLL_INTERVAL_MS = 15000;
+
+  private route = inject(ActivatedRoute);
+  private webhookService = inject(WebhookService);
+  private snackBar = inject(MatSnackBar);
+  private liveAnnouncer = inject(LiveAnnouncer);
 
   userId = '';
   events: WebhookEvent[] = [];
-  loading = signal(false);
-  pushing = signal(false);
+  readonly loading = signal(false);
+  readonly loadError = signal<string | null>(null);
+  readonly pushing = signal(false);
+  readonly acknowledgingAll = signal(false);
+  readonly acknowledgingIds = signal<ReadonlySet<number>>(new Set());
   expandedEventId: number | null = null;
   showRawJsonId: number | null = null;
   filter: 'all' | 'unread' = 'all';
   devToolsOpen = false;
-  private pollInterval?: any;
-  private webhookSub?: Subscription;
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private subscriptions = new Subscription();
+  private fetchSub?: Subscription;
+  private initialLoadDone = false;
 
   jsonInput = `{
   "type": "balancePlatform.transfer.updated",
@@ -40,46 +53,48 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   }
 }`;
 
-  constructor(
-    private route: ActivatedRoute,
-    private webhookService: WebhookService,
-    private snackBar: MatSnackBar
-  ) {}
-
   ngOnInit() {
-    this.route.parent?.paramMap.subscribe(params => {
+    const params$ = this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       if (this.userId) {
         this.loadEvents();
         this.startPolling();
       }
     });
+    if (params$) this.subscriptions.add(params$);
 
-    this.webhookSub = this.webhookService.onWebhookReceived$.subscribe(() => {
-      this.refreshEvents();
-    });
+    this.subscriptions.add(
+      this.webhookService.onWebhookReceived$.subscribe(() => this.refreshEvents())
+    );
   }
 
   ngOnDestroy() {
-    this.webhookSub?.unsubscribe();
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval);
-    }
+    this.subscriptions.unsubscribe();
+    this.fetchSub?.unsubscribe();
+    this.stopPolling();
   }
 
-  private initialLoadDone = false;
-
   private startPolling() {
-    this.pollInterval = setInterval(() => this.refreshEvents(), 15000);
+    this.stopPolling();
+    this.pollInterval = setInterval(() => this.refreshEvents(), WebhooksComponent.POLL_INTERVAL_MS);
+  }
+
+  private stopPolling() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
   }
 
   loadEvents() {
     this.loading.set(true);
+    this.loadError.set(null);
     this.initialLoadDone = false;
     this.fetchEvents(true);
   }
 
   private refreshEvents() {
+    if (this.loading() || !this.userId) return;
     this.fetchEvents(false);
   }
 
@@ -88,7 +103,8 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       ? this.webhookService.getUnreadEvents(this.userId)
       : this.webhookService.getEvents(this.userId);
 
-    obs.subscribe({
+    this.fetchSub?.unsubscribe();
+    this.fetchSub = obs.subscribe({
       next: incoming => {
         if (!this.initialLoadDone || isFullLoad) {
           this.events = incoming;
@@ -96,11 +112,12 @@ export class WebhooksComponent implements OnInit, OnDestroy {
         } else {
           this.mergeEvents(incoming);
         }
+        this.loadError.set(null);
         this.loading.set(false);
       },
-      error: () => {
-        if (isFullLoad) {
-          this.snackBar.open('Failed to load notifications', 'Close', { duration: 3000 });
+      error: err => {
+        if (isFullLoad || !this.initialLoadDone) {
+          this.loadError.set(httpErrorMessage(err, 'We could not load your notifications.'));
         }
         this.loading.set(false);
       }
@@ -124,7 +141,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     }
 
     if (this.filter === 'unread') {
-      this.events = this.events.filter(e => !e.acknowledged);
+      this.events = this.events.filter(e => !e.acknowledged || e.id === this.expandedEventId);
     }
   }
 
@@ -132,7 +149,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     try {
       JSON.parse(this.jsonInput);
     } catch {
-      this.snackBar.open('Invalid JSON format', 'Close', { duration: 3000 });
+      this.snackBar.open('The payload is not valid JSON.', 'Close', { duration: 4000, panelClass: 'fintech-snack-error' });
       return;
     }
 
@@ -141,37 +158,71 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       next: event => {
         this.snackBar.open(
           event.userId
-            ? `Notification created — matched to user ${event.userId}`
-            : 'Notification created — no user matched',
-          'Close', { duration: 4000 }
+            ? `Test event received and matched to user ${event.userId}.`
+            : 'Test event received, but it did not match any user.',
+          'Close', { duration: 4000, panelClass: 'fintech-snack-success' }
         );
         this.pushing.set(false);
         this.webhookService.notifyWebhookReceived();
         this.loadEvents();
       },
-      error: () => {
-        this.snackBar.open('Failed to push event', 'Close', { duration: 3000 });
+      error: err => {
+        this.snackBar.open(httpErrorMessage(err, 'The test event could not be sent.'), 'Close', {
+          duration: 5000, panelClass: 'fintech-snack-error'
+        });
         this.pushing.set(false);
       }
     });
   }
 
-  acknowledgeEvent(event: WebhookEvent, e: MouseEvent) {
-    e.stopPropagation();
+  isAcknowledging(event: WebhookEvent): boolean {
+    return this.acknowledgingIds().has(event.id);
+  }
+
+  private setAcknowledging(id: number, busy: boolean) {
+    const next = new Set(this.acknowledgingIds());
+    if (busy) next.add(id); else next.delete(id);
+    this.acknowledgingIds.set(next);
+  }
+
+  acknowledgeEvent(event: WebhookEvent) {
+    if (this.isAcknowledging(event)) return;
+    this.setAcknowledging(event.id, true);
     this.webhookService.acknowledgeEvent(event.id).subscribe({
       next: () => {
         event.acknowledged = true;
+        this.setAcknowledging(event.id, false);
         this.webhookService.notifyWebhookReceived();
+        this.liveAnnouncer.announce(`"${event.title || 'Notification'}" marked as read`);
+      },
+      error: err => {
+        this.setAcknowledging(event.id, false);
+        this.snackBar.open(httpErrorMessage(err, 'The notification could not be marked as read.'), 'Close', {
+          duration: 5000, panelClass: 'fintech-snack-error'
+        });
       }
     });
   }
 
   acknowledgeAll() {
+    const count = this.unreadCount;
+    if (!count || this.acknowledgingAll()) return;
+    this.acknowledgingAll.set(true);
     this.webhookService.acknowledgeAll(this.userId).subscribe({
       next: () => {
         this.events.forEach(ev => ev.acknowledged = true);
+        this.acknowledgingAll.set(false);
         this.webhookService.notifyWebhookReceived();
-        this.snackBar.open('All notifications marked as read', 'Close', { duration: 2000 });
+        this.snackBar.open(
+          count === 1 ? '1 notification marked as read.' : `${count} notifications marked as read.`,
+          'Close', { duration: 3000, panelClass: 'fintech-snack-success' }
+        );
+      },
+      error: err => {
+        this.acknowledgingAll.set(false);
+        this.snackBar.open(httpErrorMessage(err, 'Notifications could not be marked as read.'), 'Close', {
+          duration: 5000, panelClass: 'fintech-snack-error'
+        });
       }
     });
   }
@@ -184,14 +235,23 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     this.toggleExpand(event);
   }
 
+  onRowKeydown(event: WebhookEvent, e: Event) {
+    e.preventDefault();
+    this.toggleExpand(event);
+  }
+
   toggleExpand(event: WebhookEvent) {
     this.expandedEventId = this.expandedEventId === event.id ? null : event.id;
     this.showRawJsonId = null;
   }
 
-  toggleRawJson(event: WebhookEvent, e: MouseEvent) {
-    e.stopPropagation();
+  toggleRawJson(event: WebhookEvent) {
     this.showRawJsonId = this.showRawJsonId === event.id ? null : event.id;
+  }
+
+  openSimulator() {
+    this.devToolsOpen = true;
+    setTimeout(() => document.getElementById('webhook-json')?.focus());
   }
 
   formatJson(raw: string): string {
@@ -203,6 +263,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   }
 
   getEventIcon(webhookType: string, eventType: string): string {
+    eventType = eventType || '';
     if (eventType.includes('verification') || eventType.includes('accountHolder')) return 'verified_user';
     if (eventType.includes('transfer')) return 'swap_horiz';
     if (eventType.includes('paymentInstrument')) return 'credit_card';
@@ -233,28 +294,26 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   }
 
   getTimeAgo(dateStr: string): string {
-    const normalized = dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.includes('-', 10)
-      ? dateStr
-      : dateStr + 'Z';
-    const date = new Date(normalized);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHrs = Math.floor(diffMin / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
-    const diffDays = Math.floor(diffHrs / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return formatTimeAgo(dateStr);
+  }
+
+  getDateTime(dateStr: string): string {
+    return formatDateTime(dateStr);
   }
 
   setFilter(filter: 'all' | 'unread') {
+    if (this.filter === filter) return;
     this.filter = filter;
+    this.expandedEventId = null;
+    this.showRawJsonId = null;
     this.loadEvents();
   }
 
   get unreadCount(): number {
     return this.events.filter(e => !e.acknowledged).length;
+  }
+
+  trackById(_: number, event: WebhookEvent) {
+    return event.id;
   }
 }

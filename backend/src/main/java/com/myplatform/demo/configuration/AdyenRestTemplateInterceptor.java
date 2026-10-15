@@ -10,6 +10,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 public class AdyenRestTemplateInterceptor implements ClientHttpRequestInterceptor {
 
@@ -62,7 +63,7 @@ public class AdyenRestTemplateInterceptor implements ClientHttpRequestIntercepto
             log.setStatusCode(statusCode);
             log.setDurationMs(durationMs);
             log.setError(isError);
-            log.setTimestamp(LocalDateTime.now());
+            log.setTimestamp(LocalDateTime.now(ZoneOffset.UTC));
             apiLogService.save(log);
         } catch (Exception ex) {
             // Never let logging break the actual API call

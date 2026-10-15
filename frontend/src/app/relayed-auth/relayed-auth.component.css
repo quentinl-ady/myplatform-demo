@@ -1,15 +1,4 @@
-:host {
-  --fintech-primary: #000000;
-  --fintech-bg: #f5f6f8;
-  --fintech-surface: #ffffff;
-  --fintech-text: #1a1a1a;
-  --fintech-text-secondary: #737373;
-  --fintech-border: #e5e5e5;
-  --fintech-radius: 16px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
-.fintech-wrapper { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+.fintech-wrapper { max-width: 960px; margin: 0 auto; padding: 0 16px; }
 
 .page-header { margin-bottom: 28px; }
 .page-header h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px 0; color: var(--fintech-text); }
@@ -23,6 +12,10 @@
 }
 .loading-state mat-spinner { margin: 0 auto 16px; }
 .loading-state p { color: var(--fintech-text-secondary); }
+.error-state { display: flex; flex-direction: column; align-items: center; gap: 12px; border: 1px solid var(--fintech-border); }
+.error-state h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.error-state p { margin: 0; }
+.error-state .state-icon { font-size: 40px; width: 40px; height: 40px; color: var(--fintech-danger); }
 
 .fintech-btn {
   border-radius: 24px !important;
@@ -33,6 +26,7 @@
   gap: 8px;
 }
 .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
+.fintech-btn.secondary { border-color: var(--fintech-border) !important; color: var(--fintech-text) !important; }
 .fintech-btn:disabled { opacity: 0.5 !important; }
 
 /* Config Card */
@@ -48,15 +42,16 @@
 .gauge-section {
   display: flex;
   justify-content: center;
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 .gauge-ring {
+  --gauge-color: #1b7f3b;
   width: 160px;
   height: 160px;
   border-radius: 50%;
   background: conic-gradient(
-    #4caf50 0deg,
-    #4caf50 calc(var(--pct, 100) * 3.6deg),
+    var(--gauge-color) 0deg,
+    var(--gauge-color) calc(var(--pct, 100) * 3.6deg),
     #e5e5e5 calc(var(--pct, 100) * 3.6deg),
     #e5e5e5 360deg
   );
@@ -65,6 +60,8 @@
   justify-content: center;
   transition: background 0.3s;
 }
+.gauge-ring.medium { --gauge-color: #b26a00; }
+.gauge-ring.low { --gauge-color: #c62828; }
 .gauge-inner {
   width: 130px;
   height: 130px;
@@ -83,10 +80,24 @@
   line-height: 1;
 }
 .gauge-label {
+  color: var(--gauge-color);
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.gauge-summary {
+  text-align: center;
+  font-size: 14px;
+  color: var(--fintech-text-secondary);
+  margin: 0 0 28px;
+}
+.gauge-summary .unsaved {
+  display: block;
+  margin-top: 4px;
+  font-weight: 600;
+  color: #b26a00;
 }
 
 /* Slider */
@@ -146,7 +157,12 @@
 .save-section {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
+.submit-hint { font-size: 12px; color: var(--fintech-text-secondary); }
+.fintech-btn.centered { margin: 8px auto 0; }
 
 /* Info Card */
 .info-card {
@@ -165,7 +181,7 @@
 .info-header mat-icon {
   color: var(--fintech-text-secondary);
 }
-.info-header h3 {
+.info-header h2 {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
@@ -189,13 +205,13 @@
 }
 .url-value {
   flex: 1;
-  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 13px;
   color: var(--fintech-text);
   word-break: break-all;
 }
 
-.info-steps h4 {
+.info-steps h3 {
   font-size: 14px;
   font-weight: 600;
   color: var(--fintech-text);
@@ -215,5 +231,12 @@
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 12px;
-  font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+  font-family: var(--fintech-font-mono);
+}
+
+@media (max-width: 600px) {
+  .config-card { padding: 24px 20px; }
+  .info-card { padding: 20px; }
+  .save-section { justify-content: stretch; }
+  .save-section .fintech-btn { flex: 1; justify-content: center; }
 }

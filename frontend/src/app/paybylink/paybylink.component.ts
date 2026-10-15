@@ -1,14 +1,16 @@
-import {Component, OnInit, OnDestroy, signal} from '@angular/core';
+import {Component, OnInit, OnDestroy, signal, inject, DestroyRef} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import {MatSnackBar} from '@angular/material/snack-bar';
 import {MaterialModule} from '../material.module';
 import {CommonModule} from "@angular/common";
+import { firstValueFrom } from 'rxjs';
 import {
     AdyenPlatformExperience,
     PaymentLinksOverview
 } from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
 import {SessionService} from "../services";
+import {httpErrorMessage} from '../shared';
 
 @Component({
     selector: 'app-paybylink',
@@ -19,38 +21,42 @@ import {SessionService} from "../services";
       <div class="header-section">
         <div class="header-row">
           <div>
-            <h2>Pay by Link</h2>
+            <h1>Pay by Link</h1>
             <p>Create and manage payment links for your customers.</p>
           </div>
-          <button mat-icon-button class="refresh-btn" (click)="refresh()" [disabled]="refreshing()" matTooltip="Refresh payment links">
-            <mat-icon [class.spinning]="refreshing()">refresh</mat-icon>
+          <button mat-icon-button type="button" class="refresh-btn" (click)="refresh()" [disabled]="refreshing()"
+                  matTooltip="Refresh payment links" aria-label="Refresh payment links">
+            <mat-icon [class.spinning]="refreshing()" aria-hidden="true">refresh</mat-icon>
           </button>
         </div>
       </div>
-      <mat-card class="component-card">
+
+      <mat-card class="state-card" *ngIf="loadError() as error" role="alert">
+        <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
+        <h2>Could not load payment links</h2>
+        <p>{{ error }}</p>
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="refreshing()">Retry</button>
+      </mat-card>
+
+      <mat-card class="component-card" [hidden]="!!loadError()" [attr.aria-busy]="refreshing()">
+        <div class="loading-state" *ngIf="refreshing()" role="status">
+          <mat-spinner diameter="32"></mat-spinner>
+          <span>Loading payment links…</span>
+        </div>
         <div id="payment-links-overview-container"></div>
       </mat-card>
     </div>
   `,
     styles: [`
-      :host {
-        --fintech-primary: #000000;
-        --fintech-bg: #f5f6f8;
-        --fintech-surface: #ffffff;
-        --fintech-text: #1a1a1a;
-        --fintech-text-secondary: #737373;
-        --fintech-radius: 16px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      }
       .fintech-wrapper {
         max-width: 1200px;
-        margin: 40px 0 40px 40px;
+        margin: 0 auto;
         padding: 0 16px;
         display: flex;
         flex-direction: column;
         gap: 24px;
       }
-      .header-section h2 {
+      .header-section h1 {
         font-size: 28px;
         font-weight: 700;
         color: var(--fintech-text);
@@ -66,6 +72,7 @@ import {SessionService} from "../services";
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
+        gap: 16px;
       }
       .refresh-btn {
         color: var(--fintech-text-secondary);
@@ -78,56 +85,80 @@ import {SessionService} from "../services";
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
         padding: 24px;
       }
+      .component-card[hidden] { display: none !important; }
+      .state-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 48px 24px; }
+      .state-card h2 { margin: 0; font-size: 18px; font-weight: 600; }
+      .state-card p { margin: 0; font-size: 14px; color: var(--fintech-text-secondary); max-width: 480px; }
+      .state-icon { font-size: 40px; width: 40px; height: 40px; color: var(--fintech-danger); }
+      .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; color: var(--fintech-text-secondary); font-size: 14px; }
+      .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; }
+      .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
       .spinning { animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
     `]
 })
 export class PayByLinkComponent implements OnInit, OnDestroy {
 
     userId = '';
     readonly refreshing = signal(false);
+    readonly loadError = signal<string | null>(null);
     private paymentLinksOverview: PaymentLinksOverview | null = null;
 
-    constructor(private route: ActivatedRoute,
-                private sessionService: SessionService,
-                private matSnackBar: MatSnackBar) {
-    }
+    private route = inject(ActivatedRoute);
+    private sessionService = inject(SessionService);
+    private destroyRef = inject(DestroyRef);
 
     ngOnInit() {
-        this.route.parent?.paramMap.subscribe(params => {
+        this.route.parent?.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
             this.userId = params.get('id') || '';
             if (this.userId) {
-                this.initAdyenComponents();
+                this.refresh();
             }
         });
     }
 
     ngOnDestroy() {
-        this.paymentLinksOverview?.unmount();
-        this.paymentLinksOverview = null;
+        this.unmount();
     }
 
     async refresh() {
         this.refreshing.set(true);
+        this.loadError.set(null);
+        this.unmount();
+        try {
+            await this.initAdyenComponents();
+        } catch (err) {
+            this.loadError.set(httpErrorMessage(err, 'The payment links component could not be started.'));
+        } finally {
+            this.refreshing.set(false);
+        }
+    }
+
+    private unmount() {
         this.paymentLinksOverview?.unmount();
         this.paymentLinksOverview = null;
         const container = document.getElementById('payment-links-overview-container');
         if (container) container.innerHTML = '';
-        await this.initAdyenComponents();
-        this.refreshing.set(false);
     }
 
     private async initAdyenComponents() {
         const core = await AdyenPlatformExperience({
             onSessionCreate: async () => {
-                const sessionToken = await this.sessionService.getPayByLinkInformation(this.userId).toPromise();
-                if (!sessionToken) {
-                    throw new Error('Impossible to get paybylink information');
+                try {
+                    const sessionToken = await firstValueFrom(this.sessionService.getPayByLinkInformation(this.userId));
+                    if (!sessionToken) {
+                        throw new Error('No session was returned for payment links.');
+                    }
+                    return {
+                        token: sessionToken.token,
+                        id: sessionToken.id
+                    };
+                } catch (err) {
+                    // The component requests sessions lazily, after refresh() has returned.
+                    this.loadError.set(httpErrorMessage(err, 'Could not start a payment links session.'));
+                    throw err;
                 }
-                return {
-                    token: sessionToken.token,
-                    id: sessionToken.id
-                };
             }
         });
         this.paymentLinksOverview = new PaymentLinksOverview({core});

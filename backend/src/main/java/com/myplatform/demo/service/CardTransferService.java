@@ -94,6 +94,7 @@ public class CardTransferService {
         CardTransferDTO dto = new CardTransferDTO();
         dto.setId(getText(node, "id"));
         dto.setStatus(getText(node, "status"));
+        dto.setDirection(getText(node, "direction"));
         dto.setType(getText(node, "type"));
         dto.setReason(getText(node, "reason"));
         dto.setReference(getText(node, "reference"));

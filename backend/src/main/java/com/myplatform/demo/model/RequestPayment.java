@@ -12,4 +12,6 @@ public class RequestPayment {
     String storeReference;
     String userId;
     String reference;
+    /** Platform user to send back to after a redirect payment, when it differs from userId (issuing tests). */
+    String returnUserId;
 }

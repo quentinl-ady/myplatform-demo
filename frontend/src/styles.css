@@ -1,274 +1,57 @@
-/*@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');*/
+/* Design tokens shared by every page. Components may still override them on
+   :host, but overlays (dialogs, menus, snack bars) render outside component
+   hosts and rely on these global values. */
+:root {
+  --fintech-primary: #000000;
+  --fintech-bg: #f5f6f8;
+  --fintech-surface: #ffffff;
+  --fintech-text: #1a1a1a;
+  --fintech-text-secondary: #737373;
+  --fintech-border: #e5e5e5;
+  --fintech-radius: 16px;
+  --fintech-accent: #0abf53;
+  --fintech-success: #0abf53;
+  --fintech-success-bg: #e7f8ee;
+  --fintech-warning: #f57c00;
+  --fintech-warning-bg: #fff3e0;
+  --fintech-danger: #d32f2f;
+  --fintech-danger-bg: #fdecea;
+  --fintech-info: #2563eb;
+  --fintech-info-bg: #eff6ff;
+  --fintech-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --fintech-font-mono: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+}
 
-/*body {*/
-/*  font-family: 'Inter', Arial, sans-serif;*/
-/*  background: #fff;*/
-/*  color: #00112C;*/
-/*  margin: 0;*/
-/*  padding: 0;*/
-/*}*/
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
 
-/*.main-container {*/
-/*  max-width: 400px;*/
-/*  margin: 48px auto;*/
-/*  padding: 32px;*/
-/*  background: #fff;*/
-/*  border-radius: 16px;*/
-/*  box-shadow: 0 8px 32px rgba(0,17,44,0.08);*/
-/*}*/
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--fintech-bg);
+  color: var(--fintech-text);
+  font-family: var(--fintech-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-/*#adyen-component.main-container {*/
-/*  max-width: 1000px;*/
-/*}*/
+/* Visible focus for keyboard users. :where() keeps specificity at zero so
+   component styles can still refine it. */
+:where(a, button, input, select, textarea, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--fintech-primary);
+  outline-offset: 2px;
+}
 
-/*h1 {*/
-/*  font-size: 2rem;*/
-/*  font-weight: 700;*/
-/*  margin-bottom: 32px;*/
-/*}*/
+.mat-mdc-dialog-container {
+  --mdc-dialog-container-shape: var(--fintech-radius);
+}
 
-/*nav {*/
-/*  display: flex;*/
-/*  gap: 12px;*/
-/*  margin-bottom: 32px;*/
-/*}*/
+.mat-mdc-snack-bar-container.fintech-snack-error {
+  --mdc-snackbar-container-color: #b71c1c;
+}
 
-/*button {*/
-/*  font-family: inherit;*/
-/*  font-size: 1rem;*/
-/*  font-weight: 500;*/
-/*  background: #0A6EFF;*/
-/*  color: #fff;*/
-/*  padding: 12px 32px;*/
-/*  border: none;*/
-/*  border-radius: 8px;*/
-/*  cursor: pointer;*/
-/*  transition: background 0.2s;*/
-/*  box-shadow: none;*/
-/*  outline: none;*/
-/*}*/
-
-/*button.active, button:focus, button:hover {*/
-/*  background: #0057C1;*/
-/*}*/
-
-/*button:disabled {*/
-/*  background: #e0e7ef;*/
-/*  color: #b5bac6;*/
-/*  cursor: not-allowed;*/
-/*}*/
-
-/*button.check-status {*/
-/*  font-family: inherit;*/
-/*  font-size: 1rem;*/
-/*  font-weight: 500;*/
-/*  background: #FF9800;*/
-/*  color: #fff;*/
-/*  padding: 12px 32px;*/
-/*  border: none;*/
-/*  border-radius: 8px;*/
-/*  cursor: pointer;*/
-/*  transition: background 0.2s;*/
-/*}*/
-
-/*button.check-status:hover,*/
-/*button.check-status:focus {*/
-/*  background: #e68900;*/
-/*}*/
-
-/*.button-group {*/
-/*  display: flex;*/
-/*  flex-direction: column;*/
-/*  gap: 12px;*/
-/*}*/
-
-/*.auth-form {*/
-/*  display: flex;*/
-/*  flex-direction: column;*/
-/*  gap: 24px;*/
-/*}*/
-
-/*.form-group {*/
-/*  display: flex;*/
-/*  flex-direction: column;*/
-/*  gap: 8px;*/
-/*}*/
-
-/*label {*/
-/*  font-size: 1rem;*/
-/*  font-weight: 500;*/
-/*  margin-bottom: 4px;*/
-/*}*/
-
-/*input[type="text"],*/
-/*input[type="email"],*/
-/*input[type="password"] {*/
-/*  font-family: inherit;*/
-/*  font-size: 1rem;*/
-/*  padding: 12px;*/
-/*  border-radius: 8px;*/
-/*  border: 1px solid #d3d6dd;*/
-/*  background: #f8fafc;*/
-/*  color: #00112C;*/
-/*  outline: none;*/
-/*  transition: border 0.2s;*/
-/*}*/
-
-/*input:focus {*/
-/*  border-color: #0A6EFF;*/
-/*  background: #fff;*/
-/*}*/
-
-/*.error {*/
-/*  color: #D32F2F;*/
-/*  font-size: 0.95rem;*/
-/*  margin-top: -12px;*/
-/*  margin-bottom: 12px;*/
-/*  font-weight: 500;*/
-/*}*/
-
-/*.auth-root {*/
-/*  width: 100%;*/
-/*}*/
-
-/*@media (max-width: 600px) {*/
-/*  .main-container {*/
-/*    padding: 16px;*/
-/*    max-width: 100vw;*/
-/*    border-radius: 0;*/
-/*    box-shadow: none;*/
-/*  }*/
-/*}*/
-
-/*html, body { height: 100%; }*/
-/*body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }*/
-
-
-/*h2 {*/
-/*  font-size: 1.5rem;*/
-/*  font-weight: 600;*/
-/*  color: #00112C;*/
-/*  margin-bottom: 24px;*/
-/*}*/
-
-/*select {*/
-/*  font-family: inherit;*/
-/*  font-size: 1rem;*/
-/*  padding: 12px;*/
-/*  border-radius: 8px;*/
-/*  border: 1px solid #d3d6dd;*/
-/*  background: #f8fafc;*/
-/*  color: #00112C;*/
-/*  outline: none;*/
-/*  transition: border 0.2s, background 0.2s;*/
-/*  cursor: pointer;*/
-/*}*/
-
-/*select:focus {*/
-/*  border-color: #0A6EFF;*/
-/*  background: #fff;*/
-/*}*/
-
-/*option {*/
-/*  padding: 8px;*/
-/*}*/
-
-
-/*!**/
-/*Layout Menu*/
-/* *!*/
-
-/*.mat-sidenav-container {*/
-/*  height: 100vh;*/
-/*  background: #fff !important;*/
-/*  color: #00112C !important;*/
-/*}*/
-
-/*.mat-drawer {*/
-/*  background: #fff !important;*/
-/*  color: #00112C !important;*/
-/*  border-right: 1px solid #e0e7ef;*/
-/*  width: 240px;*/
-/*}*/
-
-/*.mat-toolbar {*/
-/*  background: #fff !important;*/
-/*  color: #00112C !important;*/
-/*  font-family: 'Inter', Arial, sans-serif;*/
-/*  font-weight: 600;*/
-/*  font-size: 1.2rem;*/
-/*  box-shadow: none;*/
-/*  border-bottom: 1px solid #e0e7ef;*/
-/*}*/
-
-/*.menu-link {*/
-/*  display: block;*/
-/*  font-size: 1rem;*/
-/*  font-weight: 500;*/
-/*  color: #00112C !important;*/
-/*  border-radius: 8px;*/
-/*  margin: 4px 8px;*/
-/*  padding: 10px 16px;*/
-/*  transition: background 0.2s, color 0.2s;*/
-/*  text-decoration: none;*/
-/*}*/
-
-/*.menu-link:hover {*/
-/*  background: #f0f4f8;*/
-/*}*/
-
-/*.menu-link.active {*/
-/*  background: #0A6EFF !important;*/
-/*  color: #fff !important;*/
-/*}*/
-
-/*.mat-sidenav-content {*/
-/*  background: #fff !important;*/
-/*  padding: 24px;*/
-/*  color: #00112C !important;*/
-/*}*/
-
-/*.mat-mdc-list-item,*/
-/*.mat-mdc-list-item .mdc-list-item__primary-text {*/
-/*  color: #00112C !important;*/
-/*  font-family: 'Inter', Arial, sans-serif;*/
-/*  font-size: 1rem;*/
-/*  font-weight: 500;*/
-/*}*/
-
-
-/*.main-container {*/
-/*    display: flex;*/
-/*    justify-content: center;*/
-/*    align-items: center;*/
-/*    min-height: 100vh;*/
-/*    background: linear-gradient(135deg, #e0f7fa, #80deea);*/
-/*    padding: 1rem;*/
-/*}*/
-
-/*.auth-wrapper {*/
-/*    width: 100%;*/
-/*    max-width: 450px;*/
-/*}*/
-
-/*.auth-card {*/
-/*    border-radius: 16px;*/
-/*    padding: 2rem;*/
-/*    box-shadow: 0 10px 30px rgba(0,0,0,0.1);*/
-/*    background: white;*/
-/*}*/
-
-/*mat-card-header {*/
-/*    text-align: center;*/
-/*    margin-bottom: 1rem;*/
-/*}*/
-
-/*.link-button {*/
-/*    cursor: pointer;*/
-/*    color: #1976d2;*/
-/*    text-decoration: underline;*/
-/*    font-weight: 500;*/
-/*}*/
-
-/*html, body { height: 100%; }*/
-/*body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }*/
+.mat-mdc-snack-bar-container.fintech-snack-success {
+  --mdc-snackbar-container-color: #1b5e20;
+}

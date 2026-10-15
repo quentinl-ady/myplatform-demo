@@ -1,11 +1,11 @@
 import { ChangeDetectorRef, Component, Input, OnChanges, OnDestroy, SimpleChanges, forwardRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALIDATORS, NG_VALUE_ACCESSOR, ValidationErrors, Validator } from '@angular/forms';
-import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { TransferPriority, TransferRouteOption, TransferRouteRequest } from '../models';
 import { TransferService } from '../services';
+import { currencyExponent, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 
 interface SpeedOption {
   priority: TransferPriority;
@@ -41,6 +41,8 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
   // In major units, as typed in the form.
   @Input() amount: number | null = null;
   @Input() currency = '';
+  // Id of the visible label of the group, for screen readers.
+  @Input() labelledBy: string | null = null;
 
   readonly radioName = `transfer-speed-${nextPickerId++}`;
   status: 'idle' | 'loading' | 'loaded' | 'error' = 'idle';
@@ -59,7 +61,7 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
   ngOnChanges(changes: SimpleChanges) {
     if (changes['beneficiary'] || changes['userId']) {
       this.loadRoutes();
-    } else if (changes['amount']) {
+    } else if (changes['amount'] || changes['currency']) {
       this.onValidatorChange();
     }
   }
@@ -92,8 +94,7 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
     if (route.maxAmount !== null && amount > route.maxAmount) {
       return `The maximum amount for ${speed} transfers to this beneficiary is ${this.formatAmount(route.maxAmount)}.`;
     }
-    // Every recipient currency (EUR, GBP, USD) has two decimals.
-    if (route.wholeAmountsOnly && amount % 100 !== 0) {
+    if (route.wholeAmountsOnly && amount % Math.pow(10, currencyExponent(this.currency)) !== 0) {
       return `${this.selectedLabel} transfers to this beneficiary only accept whole amounts.`;
     }
     return '';
@@ -167,11 +168,9 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
         this.onValidatorChange();
         this.cdr.markForCheck();
       },
-      error: (err: HttpErrorResponse) => {
+      error: (err: unknown) => {
         this.status = 'error';
-        this.errorMessage = err.status === 400 && err.error?.error
-          ? err.error.error
-          : 'Could not check the available transfer speeds.';
+        this.errorMessage = httpErrorMessage(err, "Couldn't check the available transfer speeds. Try again.");
         this.onValidatorChange();
         this.cdr.markForCheck();
       }
@@ -179,11 +178,10 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
   }
 
   private get amountInMinorUnits(): number | null {
-    return typeof this.amount === 'number' && Number.isFinite(this.amount) ? Math.round(this.amount * 100) : null;
+    return typeof this.amount === 'number' && Number.isFinite(this.amount) ? toMinorUnits(this.amount, this.currency) : null;
   }
 
   private formatAmount(minorUnits: number): string {
-    const major = (minorUnits / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return `${major} ${this.currency}`;
+    return formatMoney(minorUnits, this.currency);
   }
 }

@@ -1,19 +1,7 @@
-:host {
-  --fintech-primary: #000000;
-  --fintech-bg: #f5f6f8;
-  --fintech-surface: #ffffff;
-  --fintech-text: #1a1a1a;
-  --fintech-text-secondary: #737373;
-  --fintech-radius: 16px;
-  --fintech-accent: #0abf53;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
 /* ── Layout ── */
 .notif-wrapper {
-  max-width: 800px;
-  margin: 40px 0 40px 40px;
-  padding: 0 16px;
+  max-width: 960px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -27,7 +15,7 @@
   flex-wrap: wrap;
   gap: 16px;
 }
-.notif-header h2 {
+.notif-header h1 {
   font-size: 28px;
   font-weight: 700;
   color: var(--fintech-text);
@@ -42,9 +30,30 @@
 .notif-header-right {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.mark-all-btn mat-icon { margin-right: 6px; }
+.mark-all-btn mat-spinner {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.fintech-btn {
+  background-color: var(--fintech-primary) !important;
+  color: #fff !important;
+  border-radius: 24px !important;
+  padding: 0 20px !important;
+  font-weight: 600 !important;
+}
+.fintech-btn:disabled {
+  opacity: 0.5;
+}
+.fintech-btn mat-spinner {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
 
 /* ── Card ── */
 mat-card {
@@ -65,8 +74,16 @@ mat-card {
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
   padding: 56px 24px;
   color: var(--fintech-text-secondary);
+}
+.empty-state button {
+  margin-top: 20px;
+}
+.empty-icon.error-icon {
+  color: var(--fintech-danger);
+  opacity: 1;
 }
 .empty-icon {
   font-size: 56px;
@@ -84,12 +101,17 @@ mat-card {
 .empty-hint {
   font-size: 13px;
   color: var(--fintech-text-secondary);
+  max-width: 420px;
+  line-height: 1.5;
 }
 
 /* ── Notification List ── */
 .notif-list {
   display: flex;
   flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .notif-item {
@@ -113,8 +135,21 @@ mat-card {
 .notif-row {
   display: flex;
   align-items: flex-start;
+  gap: 8px;
+}
+.notif-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
   gap: 14px;
   cursor: pointer;
+  border-radius: 10px;
+}
+.notif-chevron {
+  flex-shrink: 0;
+  color: #9e9e9e;
+  margin-top: 10px;
 }
 
 /* ── Icon ── */
@@ -164,13 +199,15 @@ mat-card {
   color: var(--fintech-text-secondary);
   line-height: 1.4;
   margin-bottom: 6px;
+  overflow-wrap: anywhere;
 }
 .notif-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  font-size: 11px;
-  color: #999;
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
 }
 .notif-category {
   display: inline-block;
@@ -199,13 +236,23 @@ mat-card {
   margin-top: 2px;
 }
 .notif-ack-btn {
-  color: #bbb;
+  color: var(--fintech-text-secondary);
   transition: color 0.15s;
 }
 .notif-ack-btn:hover { color: var(--fintech-accent); }
-.notif-read-icon {
-  color: #ccc;
-  font-size: 20px;
+.notif-ack-btn mat-spinner { margin: auto; }
+.notif-read-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fintech-text-secondary);
+  padding: 10px 8px;
+}
+.notif-read-label mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* ── Expanded Detail ── */
@@ -219,7 +266,11 @@ mat-card {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 24px;
-  margin-bottom: 14px;
+  margin: 0 0 14px 0;
+}
+.detail-item dt,
+.detail-item dd {
+  margin: 0;
 }
 .detail-item {
   display: flex;
@@ -230,7 +281,7 @@ mat-card {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  color: #999;
+  color: var(--fintech-text-secondary);
   font-weight: 500;
 }
 .detail-value {
@@ -238,7 +289,7 @@ mat-card {
   color: var(--fintech-text);
 }
 .detail-value.mono {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 12px;
   word-break: break-all;
 }
@@ -257,15 +308,15 @@ mat-card {
   color: #d4d4d4;
   padding: 16px;
   border-radius: 10px;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 12px;
   line-height: 1.5;
-  overflow-x: auto;
+  overflow: auto;
   max-height: 400px;
-  overflow-y: auto;
   margin: 0;
   white-space: pre-wrap;
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  tab-size: 2;
   user-select: text;
   cursor: text;
 }
@@ -289,6 +340,13 @@ mat-card {
   padding: 20px !important;
   margin-top: 8px;
 }
+.devtools-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fintech-text);
+  margin-bottom: 4px;
+}
 .devtools-hint {
   font-size: 13px;
   color: var(--fintech-text-secondary);
@@ -298,7 +356,7 @@ mat-card {
   width: 100%;
   min-height: 180px;
   padding: 14px;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--fintech-font-mono);
   font-size: 12px;
   line-height: 1.5;
   background: #f8f9fa;
@@ -310,13 +368,36 @@ mat-card {
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
-.json-editor:focus { border-color: var(--fintech-accent); }
+.json-editor:focus { border-color: var(--fintech-primary); }
 .devtools-actions {
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
 }
 .devtools-actions button mat-icon { margin-right: 6px; }
+
+@media (max-width: 600px) {
+  .notif-header-right {
+    width: 100%;
+  }
+  .notif-item {
+    padding: 14px 12px;
+  }
+  .notif-row-main {
+    gap: 10px;
+  }
+  .notif-chevron {
+    display: none;
+  }
+  .notif-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .json-preview {
+    font-size: 11px;
+    padding: 12px;
+    max-height: 60vh;
+  }
+}
 
 /* ── Utilities ── */
 .spinning { animation: spin 1s linear infinite; }

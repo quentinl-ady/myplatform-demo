@@ -6,15 +6,16 @@
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--fintech-text-secondary, #737373);
+  color: var(--fintech-text-secondary);
   font-size: 20px;
   width: 20px;
   height: 20px;
   pointer-events: none;
 }
-.fintech-input { width: 100%; padding: 14px 16px 14px 44px; border: 1px solid var(--fintech-border, #e5e5e5); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface, #ffffff); transition: border-color 0.2s; }
-.fintech-input:focus { outline: none; border-color: var(--fintech-primary, #000000); }
+.fintech-input { width: 100%; padding: 14px 16px 14px 44px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface); transition: border-color 0.2s; }
+.fintech-input:focus { outline: none; border-color: var(--fintech-primary); }
 
-/* The options render in an overlay outside the page, so the page's color variables are not inherited there. */
+.fintech-input:disabled { background: var(--fintech-bg); color: var(--fintech-text-secondary); cursor: not-allowed; }
+
 .country-option { display: flex; align-items: center; gap: 12px; }
-.country-code { font-family: monospace; font-weight: 600; background: #f5f6f8; padding: 2px 8px; border-radius: 4px; font-size: 13px; }
+.country-code { font-family: var(--fintech-font-mono); font-weight: 600; background: var(--fintech-bg); padding: 2px 8px; border-radius: 4px; font-size: 13px; }

@@ -85,6 +85,8 @@ export interface CardTransfer {
   id: string;
   status: string;
   amount: number;
+  /** 'incoming' or 'outgoing': the amount itself is unsigned. */
+  direction?: string;
   currency: string;
   description: string;
   type: string;

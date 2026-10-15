@@ -1,20 +1,27 @@
-import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormArray, FormControl, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
+import { forkJoin } from 'rxjs';
 import { MaterialModule } from '../material.module';
 
 import {
   User,
   BalanceAccount,
+  CardResponse,
   CreateCardRequest,
   TransactionRuleRequest,
   PhonePrefix
 } from '../models';
 import { AccountService, IssuingService } from '../services';
+import { formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 import { MCC_CODES } from '../industry-codes';
+
+type Mcc = { code: string; label: string; risky?: boolean };
+
+const MAX_SPENDING_RULES = 3;
 
 @Component({
   selector: 'app-card-create',
@@ -37,43 +44,50 @@ export class CardCreateComponent implements OnInit {
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
 
+  @ViewChild('successTitle') private successTitle?: ElementRef<HTMLElement>;
+
+  readonly maxSpendingRules = MAX_SPENDING_RULES;
+
   userId = '';
   user?: User;
+  isLoading = true;
+  loadError: string | null = null;
   isProcessing = false;
   isSuccess = false;
-  createdCard?: any;
+  createdCard?: CardResponse;
+  createdRules: TransactionRuleRequest[] = [];
 
   balanceAccounts: BalanceAccount[] = [];
   phonePrefixes: PhonePrefix[] = [];
-  allMccs = MCC_CODES;
-  selectedMccs: { code: string; label: string; risky?: boolean }[] = [];
-  filteredMccs: { code: string; label: string; risky?: boolean }[] = [];
+  allMccs: Mcc[] = MCC_CODES;
+  selectedMccs: Mcc[] = [];
+  filteredMccs: Mcc[] = [];
   mccSearchControl = new FormControl('');
 
   form = this.fb.group({
     balanceAccountId: ['', Validators.required],
-    cardholderName: ['', [Validators.required, Validators.minLength(2)]],
+    cardholderName: ['', [Validators.required, Validators.minLength(2), Validators.pattern(/\S/)]],
     brand: ['visa', Validators.required],
     email: ['', [Validators.email]],
     phonePrefix: ['+31'],
     phoneNumber: ['', [Validators.pattern(/^[\d\s\-()]+$/)]],
-    rules: this.fb.array([])
+    rules: this.fb.array<FormGroup>([])
   });
 
   get rulesArray() {
-    return this.form.get('rules') as FormArray;
+    return this.form.get('rules') as FormArray<FormGroup>;
   }
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       if (this.userId) {
-        this.loadUser();
+        this.loadData();
       }
     });
 
     this.mccSearchControl.valueChanges.subscribe(value => {
-      this.filterMccs(value || '');
+      this.filterMccs(typeof value === 'string' ? value : '');
     });
     this.filteredMccs = this.allMccs;
 
@@ -83,65 +97,63 @@ export class CardCreateComponent implements OnInit {
     });
   }
 
+  loadData() {
+    this.isLoading = true;
+    this.loadError = null;
+    forkJoin({
+      user: this.accountService.getUserById(this.userId),
+      accounts: this.accountService.getBalanceAccounts(this.userId)
+    }).subscribe({
+      next: ({ user, accounts }) => {
+        this.user = user;
+        this.balanceAccounts = accounts || [];
+        if (user.email && !this.form.value.email) {
+          this.form.patchValue({ email: user.email });
+        }
+        if (this.balanceAccounts.length === 1) {
+          this.form.patchValue({ balanceAccountId: this.balanceAccounts[0].balanceAccountId });
+        }
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.isLoading = false;
+        this.loadError = httpErrorMessage(err, "Couldn't load your account details. Try again.");
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  get currency(): string {
+    return this.user?.currencyCode || '';
+  }
+
+  get brandLabel(): string {
+    return this.form.value.brand === 'mc' ? 'Mastercard' : 'Visa';
+  }
+
   filterMccs(searchTerm: string) {
-    if (!searchTerm) {
-      this.filteredMccs = this.allMccs.filter(
-        mcc => !this.selectedMccs.some(s => s.code === mcc.code)
-      );
-      return;
-    }
     const term = searchTerm.toLowerCase();
     this.filteredMccs = this.allMccs.filter(
       mcc => !this.selectedMccs.some(s => s.code === mcc.code) &&
-        (mcc.code.toLowerCase().includes(term) || mcc.label.toLowerCase().includes(term))
+        (!term || mcc.code.toLowerCase().includes(term) || mcc.label.toLowerCase().includes(term))
     );
   }
 
-  addMcc(event: any) {
-    const mcc = event.option.value;
+  addMcc(event: MatAutocompleteSelectedEvent) {
+    const mcc: Mcc = event.option.value;
     if (!this.selectedMccs.some(s => s.code === mcc.code)) {
-      this.selectedMccs.push(mcc);
+      this.selectedMccs = [...this.selectedMccs, mcc];
     }
     this.mccSearchControl.setValue('');
     this.filterMccs('');
     this.cdr.detectChanges();
   }
 
-  removeMcc(mcc: { code: string; label: string; risky?: boolean }) {
+  removeMcc(mcc: Mcc) {
     this.selectedMccs = this.selectedMccs.filter(s => s.code !== mcc.code);
     this.filterMccs(this.mccSearchControl.value || '');
     this.cdr.detectChanges();
-  }
-
-  loadUser() {
-    this.accountService.getUserById(this.userId).subscribe({
-      next: (user) => {
-        this.user = user;
-        if (user.email) {
-          this.form.patchValue({ email: user.email });
-        }
-        this.loadBalanceAccounts();
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.snack.open('Failed to load user information', 'Close', { duration: 3000 });
-      }
-    });
-  }
-
-  loadBalanceAccounts() {
-    this.accountService.getBalanceAccounts(this.userId).subscribe({
-      next: (accounts) => {
-        this.balanceAccounts = accounts;
-        if (accounts.length === 1) {
-          this.form.patchValue({ balanceAccountId: accounts[0].balanceAccountId });
-        }
-        this.cdr.detectChanges();
-      },
-      error: () => {
-        this.snack.open('Failed to load balance accounts', 'Close', { duration: 3000 });
-      }
-    });
   }
 
   selectBrand(brand: string) {
@@ -149,32 +161,82 @@ export class CardCreateComponent implements OnInit {
   }
 
   addRule() {
+    if (this.rulesArray.length >= MAX_SPENDING_RULES) return;
     const ruleGroup = this.fb.group({
       type: ['maxAmountPerTransaction', Validators.required],
-      value: [null as number | null, [Validators.required, Validators.min(0.01)]]
+      value: [null as number | null, this.ruleValidators('maxAmountPerTransaction')]
+    });
+    ruleGroup.get('type')!.valueChanges.subscribe(type => {
+      const value = ruleGroup.get('value')!;
+      value.setValidators(this.ruleValidators(type || ''));
+      value.updateValueAndValidity();
     });
     this.rulesArray.push(ruleGroup);
+  }
+
+  private ruleValidators(type: string) {
+    return type === 'maxTransactions'
+      ? [Validators.required, Validators.min(1), Validators.pattern(/^\d+$/)]
+      : [Validators.required, Validators.min(0.01)];
   }
 
   removeRule(index: number) {
     this.rulesArray.removeAt(index);
   }
 
+  ruleTypeLabel(type: string): string {
+    switch (type) {
+      case 'maxTransactions': return 'Transaction limit';
+      case 'maxAmountPerTransaction': return 'Maximum amount per transaction';
+      case 'maxTotalAmount': return 'Total spending limit';
+      case 'blockedMccs': return 'Blocked merchant categories';
+      default: return type;
+    }
+  }
+
+  ruleValueLabel(rule: TransactionRuleRequest): string {
+    if (rule.type === 'maxTransactions') return `${rule.value} transactions`;
+    if (rule.type === 'blockedMccs') return (rule.blockedMccs || []).join(', ');
+    return formatMoney(rule.value ?? 0, rule.currencyCode);
+  }
+
+  ruleError(rule: FormGroup): string | null {
+    const value = rule.get('value');
+    if (!value || !value.invalid || !value.touched) return null;
+    if (rule.value.type === 'maxTransactions') {
+      return value.hasError('required') ? 'Enter a number of transactions.' : 'Enter a whole number of at least 1.';
+    }
+    return value.hasError('required') ? 'Enter an amount.' : 'The amount must be at least 0.01.';
+  }
+
+  /** Explains why the submit button is disabled. */
+  get submitHint(): string | null {
+    const f = this.form;
+    if (!this.balanceAccounts.length) return 'You need a balance account to issue a card.';
+    if (f.get('balanceAccountId')?.invalid) return 'Select a balance account.';
+    if (f.get('cardholderName')?.invalid) return 'Enter the cardholder name (at least 2 characters).';
+    if (f.get('email')?.invalid) return 'Enter a valid email address or leave it empty.';
+    if (f.get('phoneNumber')?.invalid) return 'Enter a valid phone number or leave it empty.';
+    if (this.rulesArray.invalid) return 'Complete or remove the spending limits.';
+    return null;
+  }
+
   submit() {
-    if (this.form.invalid || !this.user) return;
+    if (this.form.invalid || !this.user || this.isProcessing) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
-    this.isProcessing = true;
+    const rules: TransactionRuleRequest[] = this.rulesArray.controls.map(group => {
+      const type: string = group.value.type;
+      const raw = Number(group.value.value);
+      return {
+        type,
+        value: type === 'maxTransactions' ? Math.round(raw) : toMinorUnits(raw, this.currency),
+        currencyCode: this.currency
+      };
+    });
 
-    const rules: TransactionRuleRequest[] = this.rulesArray.value
-      .filter((r: any) => r.value)
-      .map((r: any) => ({
-        type: r.type,
-        // Convert to minor units for amount-based rules (multiply by 100)
-        value: r.type === 'maxTransactions' ? r.value : Math.round(r.value * 100),
-        currencyCode: this.user!.currencyCode
-      }));
-
-    // Add MCC block rule if any MCCs are selected
     if (this.selectedMccs.length > 0) {
       rules.push({
         type: 'blockedMccs',
@@ -189,23 +251,29 @@ export class CardCreateComponent implements OnInit {
     const request: CreateCardRequest = {
       userId: this.userId,
       balanceAccountId: this.form.value.balanceAccountId!,
-      cardholderName: this.form.value.cardholderName!,
+      cardholderName: this.form.value.cardholderName!.trim(),
       brand: this.form.value.brand!,
       email,
       phone,
       transactionRules: rules.length > 0 ? rules : undefined
     };
 
+    this.isProcessing = true;
     this.issuingService.createCard(request).subscribe({
       next: (card) => {
         this.createdCard = card;
+        this.createdRules = rules;
         this.isSuccess = true;
         this.isProcessing = false;
         this.cdr.detectChanges();
+        this.successTitle?.nativeElement.focus();
       },
       error: (err) => {
         this.isProcessing = false;
-        this.snack.open('Failed to create card', 'Close', { duration: 3000 });
+        this.snack.open(httpErrorMessage(err, "Couldn't create the card. Try again."), 'Close', {
+          duration: 5000,
+          panelClass: 'fintech-snack-error'
+        });
         this.cdr.detectChanges();
       }
     });
@@ -213,14 +281,26 @@ export class CardCreateComponent implements OnInit {
 
   createAnother() {
     this.isSuccess = false;
-    this.createdCard = null;
-    this.form.reset({ balanceAccountId: this.balanceAccounts.length === 1 ? this.balanceAccounts[0].balanceAccountId : '', brand: 'visa', cardholderName: '', email: this.user?.email || '', phonePrefix: '+31', phoneNumber: '' });
+    this.createdCard = undefined;
+    this.createdRules = [];
     this.rulesArray.clear();
+    this.form.reset({
+      balanceAccountId: this.balanceAccounts.length === 1 ? this.balanceAccounts[0].balanceAccountId : '',
+      brand: 'visa',
+      cardholderName: '',
+      email: this.user?.email || '',
+      phonePrefix: '+31',
+      phoneNumber: ''
+    });
     this.selectedMccs = [];
     this.filterMccs('');
   }
 
   viewCards() {
     this.router.navigate(['/', this.userId, 'cards']);
+  }
+
+  viewCardTransactions() {
+    this.router.navigate(['/', this.userId, 'card-transactions']);
   }
 }

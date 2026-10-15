@@ -1,122 +1,142 @@
 <div class="fintech-wrapper">
 
-  <!-- ==================== NO DEVICE WARNING ==================== -->
-  <mat-card class="no-device-warning" *ngIf="hasDevices() === false">
-    <div class="warning-banner">
-      <div class="warning-icon-wrapper">
-        <mat-icon>warning_amber</mat-icon>
-      </div>
-      <div class="warning-text">
-        <h3>No trusted device registered</h3>
-        <p>You need to register a device before you can view bank transactions. This device will be used for Strong Customer Authentication (SCA) to secure access to your account data.</p>
-      </div>
-    </div>
-    <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
-  </mat-card>
+  <div class="page-title">
+    <h1>Business account</h1>
+    <p>Your balance, bank details and bank transactions.</p>
+  </div>
 
-  <!-- ==================== BALANCE CARD ==================== -->
-  <mat-card class="account-card" *ngIf="accountInfo">
-    <div class="account-header">
-      <p class="account-label">Available Balance</p>
-      <h1 class="account-balance">
-        {{ (accountInfo.amount / 100) | number:'1.2-2' }} <span class="currency">{{ accountInfo.currency }}</span>
-      </h1>
-      <p class="account-details">{{ accountInfo.description }} &bull; {{ accountInfo.bankAccountNumber }}</p>
-    </div>
-    <div class="account-actions">
-      <button mat-flat-button class="fintech-btn secondary" (click)="downloadRib()" [disabled]="isDownloadingRib">
-        <mat-icon *ngIf="!isDownloadingRib">download</mat-icon>
-        <mat-spinner *ngIf="isDownloadingRib" diameter="20"></mat-spinner>
-        Download RIB
-      </button>
-    </div>
-  </mat-card>
+  <!-- ==================== LOADING / NOT SET UP / ERROR ==================== -->
+  <app-account-setup-state *ngIf="setupState !== 'ready'"
+                           [state]="setupState" [userId]="userId" [message]="loadErrorMessage"
+                           purpose="see your balance and transactions" (retry)="retryPage()"></app-account-setup-state>
 
-  <!-- ==================== BANK TRANSACTIONS ==================== -->
-  <ng-container *ngIf="hasDevices()">
+  <ng-container *ngIf="setupState === 'ready'">
 
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-content">
-        <h1>Bank Transactions</h1>
-        <p class="subtitle">Transfers, incoming payments and more</p>
+    <!-- ==================== BALANCE CARD ==================== -->
+    <mat-card class="account-card" *ngIf="accountInfo">
+      <div class="account-header">
+        <p class="account-label">Available balance</p>
+        <p class="account-balance">{{ accountInfo.amount | money:accountInfo.currency }}</p>
+        <p class="account-details">{{ accountInfo.description }} &bull; <span class="mono">{{ accountInfo.bankAccountNumber }}</span></p>
       </div>
-      <div class="header-actions">
-        <span class="last-updated-label" *ngIf="lastUpdated && !isLoadingTransactions">{{ getLastUpdatedLabel() }}</span>
-        <button mat-flat-button class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
-          <mat-icon>refresh</mat-icon>
-          Refresh
+      <div class="account-actions">
+        <button mat-flat-button type="button" class="fintech-btn secondary" (click)="downloadRib()" [disabled]="isDownloadingRib">
+          <mat-icon *ngIf="!isDownloadingRib" aria-hidden="true">download</mat-icon>
+          <mat-spinner *ngIf="isDownloadingRib" diameter="20" aria-hidden="true"></mat-spinner>
+          {{ isDownloadingRib ? 'Downloading...' : 'Download RIB' }}
         </button>
       </div>
-    </div>
+    </mat-card>
 
-    <!-- Loading -->
-    <div class="loading-state" *ngIf="isLoadingTransactions">
-      <mat-spinner diameter="40"></mat-spinner>
-      <p>Loading transactions...</p>
-    </div>
-
-    <!-- Error -->
-    <div class="error-state" *ngIf="transactionsError && !isLoadingTransactions">
-      <mat-icon>error_outline</mat-icon>
-      <span>{{ transactionsError }}</span>
-    </div>
-
-    <!-- Empty State -->
-    <div class="empty-state" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length === 0">
-      <mat-icon>receipt_long</mat-icon>
-      <h3>No transactions found</h3>
-      <p>No bank transactions available for this account</p>
-    </div>
-
-    <!-- Transactions List -->
-    <div class="tx-list" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length > 0">
-      <div class="tx-list-header">
-        <span class="col-date">Date</span>
-        <span class="col-description">Description</span>
-        <span class="col-reference">Reference</span>
-        <span class="col-status">Status</span>
-        <span class="col-amount">Amount</span>
-      </div>
-      <div class="tx-row" *ngFor="let t of transactions" (click)="openDetail(t)">
-        <span class="col-date">{{ formatDate(t.creationDate) }}</span>
-        <div class="col-description">
-          <span class="description-text">{{ t.description || '-' }}</span>
+    <!-- ==================== NO DEVICE WARNING ==================== -->
+    <mat-card class="no-device-warning" *ngIf="!hasDevices">
+      <div class="warning-banner">
+        <div class="warning-icon-wrapper" aria-hidden="true">
+          <mat-icon>warning_amber</mat-icon>
         </div>
-        <span class="col-reference">
-          <span class="reference-text">{{ t.transferReference || t.referenceForBeneficiary || '-' }}</span>
-        </span>
-        <span class="col-status">
-          <span class="status-badge" [ngClass]="'st-' + t.status">{{ t.status }}</span>
-        </span>
-        <span class="col-amount" [class.incoming-amount]="isIncoming(t)">
-          {{ isIncoming(t) ? '+' : '-' }}{{ formatAmount(t.amount) }} {{ t.currency }}
-        </span>
+        <div class="warning-text">
+          <h2>No trusted device registered</h2>
+          <p>Register this device to view your bank transactions. You will use it to securely access your account data with strong customer authentication (SCA).</p>
+        </div>
       </div>
-    </div>
+      <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
+    </mat-card>
+
+    <!-- ==================== BANK TRANSACTIONS ==================== -->
+    <section *ngIf="hasDevices" class="tx-section" aria-labelledby="tx-title">
+
+      <div class="page-header">
+        <div class="header-content">
+          <h2 id="tx-title">Bank transactions</h2>
+          <p class="subtitle">Transfers, incoming payments and more</p>
+        </div>
+        <div class="header-actions">
+          <span class="last-updated-label" *ngIf="lastUpdated && !isLoadingTransactions">{{ getLastUpdatedLabel() }}</span>
+          <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
+            <mat-icon *ngIf="!isLoadingTransactions" aria-hidden="true">refresh</mat-icon>
+            <mat-spinner *ngIf="isLoadingTransactions" diameter="18" aria-hidden="true"></mat-spinner>
+            {{ isLoadingTransactions ? 'Refreshing...' : 'Refresh' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="loading-state" *ngIf="isLoadingTransactions" role="status">
+        <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
+        <p>Loading transactions... Approve the request with your passkey if your browser asks.</p>
+      </div>
+
+      <!-- Error -->
+      <div class="error-state" *ngIf="transactionsError && !isLoadingTransactions" role="alert">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <span>{{ transactionsError }}</span>
+        <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()">Retry</button>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length === 0">
+        <mat-icon aria-hidden="true">receipt_long</mat-icon>
+        <h3>No transactions yet</h3>
+        <p>Incoming payments and transfers will appear here.</p>
+        <a mat-flat-button class="fintech-btn primary empty-action" [routerLink]="['/', userId, 'banktransfer']">Make a transfer</a>
+      </div>
+
+      <!-- Transactions List -->
+      <div class="tx-scroll" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length > 0">
+        <div class="tx-list" role="table" aria-label="Bank transactions">
+          <div class="tx-list-header" role="row">
+            <span class="col-date" role="columnheader">Date</span>
+            <span class="col-description" role="columnheader">Description</span>
+            <span class="col-reference" role="columnheader">Reference</span>
+            <span class="col-status" role="columnheader">Status</span>
+            <span class="col-amount" role="columnheader">Amount</span>
+          </div>
+          <div class="tx-row" role="row" *ngFor="let t of transactions" tabindex="0"
+               [attr.aria-label]="'View details: ' + (t.description || 'transaction') + ', ' + (t.amount | money:t.currency:'exceptZero')"
+               (click)="openDetail(t)" (keydown.enter)="openDetail(t)" (keydown.space)="$event.preventDefault(); openDetail(t)">
+            <span class="col-date" role="cell">{{ formatDate(t.creationDate) }}</span>
+            <div class="col-description" role="cell">
+              <span class="description-text">{{ t.description || '—' }}</span>
+            </div>
+            <span class="col-reference" role="cell">
+              <span class="reference-text">{{ t.transferReference || t.referenceForBeneficiary || '—' }}</span>
+            </span>
+            <span class="col-status" role="cell">
+              <span class="status-badge" [ngClass]="'st-' + t.status">{{ t.status }}</span>
+            </span>
+            <span class="col-amount" role="cell" [class.incoming-amount]="isIncoming(t)">
+              <span class="amount-value">{{ t.amount | money:t.currency:'exceptZero' }}</span>
+              <span class="amount-direction">{{ isIncoming(t) ? 'Credit' : 'Debit' }}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </section>
 
   </ng-container>
 
   <!-- ==================== DETAIL MODAL ==================== -->
-  <div class="detail-overlay" *ngIf="isDetailOpen()" (click)="closeDetail()">
-    <div class="detail-modal" (click)="$event.stopPropagation()">
+  <div class="detail-overlay" *ngIf="isDetailOpen()" (click)="closeDetail()" (keydown.escape)="closeDetail()">
+    <div class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"
+         cdkTrapFocus cdkTrapFocusAutoCapture (click)="$event.stopPropagation()">
 
       <div class="modal-header">
-        <h2>Transfer Details</h2>
-        <button mat-icon-button (click)="closeDetail()">
-          <mat-icon>close</mat-icon>
+        <h2 id="detail-title">Transfer details</h2>
+        <button mat-icon-button type="button" (click)="closeDetail()" aria-label="Close transfer details">
+          <mat-icon aria-hidden="true">close</mat-icon>
         </button>
       </div>
 
       <!-- Loading -->
-      <div class="modal-loading" *ngIf="isLoadingDetail">
-        <mat-spinner diameter="36"></mat-spinner>
+      <div class="modal-loading" *ngIf="isLoadingDetail" role="status">
+        <mat-spinner diameter="36" aria-hidden="true"></mat-spinner>
         <p>Loading transfer details...</p>
       </div>
 
       <!-- Error -->
-      <div class="modal-error" *ngIf="detailError && !isLoadingDetail">
-        <mat-icon>error_outline</mat-icon>
+      <div class="modal-error" *ngIf="detailError && !isLoadingDetail" role="alert">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
         <span>{{ detailError }}</span>
       </div>
 
@@ -124,90 +144,84 @@
       <div class="modal-body" *ngIf="transferDetail && !isLoadingDetail">
 
         <!-- Overview -->
-        <div class="detail-section">
+        <section class="detail-section">
           <h3>Overview</h3>
-          <div class="detail-grid">
+          <dl class="detail-grid">
             <div class="detail-item">
-              <span class="label">Status</span>
-              <span class="status-badge" [ngClass]="'st-' + transferDetail.status">{{ transferDetail.status }}</span>
+              <dt class="label">Status</dt>
+              <dd><span class="status-badge" [ngClass]="'st-' + transferDetail.status">{{ transferDetail.status }}</span></dd>
             </div>
             <div class="detail-item">
-              <span class="label">Amount</span>
-              <span class="value" [class.incoming-amount]="transferDetail.direction === 'incoming'">
-                {{ transferDetail.direction === 'incoming' ? '+' : '-' }}{{ formatAmount(transferDetail.amount) }} {{ transferDetail.currency }}
-              </span>
+              <dt class="label">Amount</dt>
+              <dd class="value" [class.incoming-amount]="transferDetail.direction === 'incoming'">
+                {{ detailSignedAmount(transferDetail) | money:transferDetail.currency:'exceptZero' }}
+              </dd>
             </div>
             <div class="detail-item">
-              <span class="label">Direction</span>
-              <span class="direction-badge" [class.incoming]="transferDetail.direction === 'incoming'" [class.outgoing]="transferDetail.direction === 'outgoing'">
-                <mat-icon class="direction-icon">{{ transferDetail.direction === 'incoming' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
-                {{ getDirectionLabel(transferDetail.direction) }}
-              </span>
+              <dt class="label">Direction</dt>
+              <dd>
+                <span class="direction-badge" [class.incoming]="transferDetail.direction === 'incoming'" [class.outgoing]="transferDetail.direction === 'outgoing'">
+                  <mat-icon class="direction-icon" aria-hidden="true">{{ transferDetail.direction === 'incoming' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+                  {{ getDirectionLabel(transferDetail.direction) }}
+                </span>
+              </dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.description">
-              <span class="label">Description</span>
-              <span class="value">{{ transferDetail.description }}</span>
+              <dt class="label">Description</dt>
+              <dd class="value">{{ transferDetail.description }}</dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.reason">
-              <span class="label">Reason</span>
-              <span class="value reason-text">{{ transferDetail.reason }}</span>
+              <dt class="label">Reason</dt>
+              <dd class="value reason-text">{{ transferDetail.reason }}</dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.reference">
-              <span class="label">Reference</span>
-              <span class="value mono">{{ transferDetail.reference }}</span>
+              <dt class="label">Reference</dt>
+              <dd class="value mono">{{ transferDetail.reference }}</dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.priority">
-              <span class="label">Priority</span>
-              <span class="value">{{ transferDetail.priority }}</span>
+              <dt class="label">Speed</dt>
+              <dd class="value">{{ speedLabel(transferDetail.priority) }}</dd>
             </div>
             <div class="detail-item">
-              <span class="label">Created</span>
-              <span class="value">{{ formatDateTime(transferDetail.createdAt) }}</span>
+              <dt class="label">Created</dt>
+              <dd class="value">{{ formatDateTime(transferDetail.createdAt) }}</dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.updatedAt">
-              <span class="label">Updated</span>
-              <span class="value">{{ formatDateTime(transferDetail.updatedAt) }}</span>
+              <dt class="label">Updated</dt>
+              <dd class="value">{{ formatDateTime(transferDetail.updatedAt) }}</dd>
             </div>
-          </div>
-        </div>
+            <div class="detail-item">
+              <dt class="label">Transfer ID</dt>
+              <dd class="value mono">{{ transferDetail.id }}</dd>
+            </div>
+          </dl>
+        </section>
 
         <!-- Counterparty -->
-        <div class="detail-section" *ngIf="transferDetail.counterpartyName">
+        <section class="detail-section" *ngIf="transferDetail.counterpartyName">
           <h3>Counterparty</h3>
-          <div class="detail-grid">
+          <dl class="detail-grid">
             <div class="detail-item">
-              <span class="label">Name</span>
-              <span class="value">{{ transferDetail.counterpartyName }}</span>
+              <dt class="label">Name</dt>
+              <dd class="value">{{ transferDetail.counterpartyName }}</dd>
             </div>
-            <div class="detail-item" *ngIf="transferDetail.counterpartyIban">
-              <span class="label">IBAN</span>
-              <span class="value mono">{{ transferDetail.counterpartyIban }}</span>
-            </div>
-            <div class="detail-item" *ngIf="transferDetail.counterpartyAccountNumber">
-              <span class="label">Account Number</span>
-              <span class="value mono">{{ transferDetail.counterpartyAccountNumber }}</span>
-            </div>
-            <div class="detail-item" *ngIf="transferDetail.counterpartySortCode">
-              <span class="label">Sort Code</span>
-              <span class="value mono">{{ transferDetail.counterpartySortCode }}</span>
-            </div>
-            <div class="detail-item" *ngIf="transferDetail.counterpartyRoutingNumber">
-              <span class="label">Routing Number</span>
-              <span class="value mono">{{ transferDetail.counterpartyRoutingNumber }}</span>
+            <div class="detail-item" *ngFor="let row of counterpartyRows(transferDetail)">
+              <dt class="label">{{ row.label }}</dt>
+              <dd class="value mono">{{ row.value }}</dd>
             </div>
             <div class="detail-item" *ngIf="transferDetail.counterpartyBankName">
-              <span class="label">Bank / BIC</span>
-              <span class="value">{{ transferDetail.counterpartyBankName }}</span>
+              <dt class="label">Bank / BIC</dt>
+              <dd class="value">{{ transferDetail.counterpartyBankName }}</dd>
             </div>
-          </div>
-        </div>
+          </dl>
+        </section>
 
         <!-- Lifecycle Events -->
-        <div class="detail-section" *ngIf="transferDetail.events?.length">
+        <section class="detail-section" *ngIf="transferDetail.events?.length">
           <h3>Lifecycle</h3>
-          <div class="lifecycle-timeline">
-            <div class="lifecycle-event" *ngFor="let event of transferDetail.events; let last = last">
-              <div class="event-dot-col">
+          <ol class="lifecycle-timeline">
+            <li class="lifecycle-event" *ngFor="let event of transferDetail.events; let last = last">
+              <div class="event-dot-col" aria-hidden="true">
                 <div class="event-dot" [ngClass]="'dot-' + event.status"></div>
                 <div class="event-line" *ngIf="!last"></div>
               </div>
@@ -218,12 +232,12 @@
                 </div>
                 <div class="event-meta">
                   <span>{{ formatDateTime(event.bookingDate) }}</span>
-                  <span class="event-amount">{{ formatAmount(event.amountValue) }} {{ event.amountCurrency }}</span>
+                  <span class="event-amount">{{ event.amountValue | money:event.amountCurrency }}</span>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
+            </li>
+          </ol>
+        </section>
 
       </div>
     </div>

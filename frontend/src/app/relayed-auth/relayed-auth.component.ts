@@ -6,6 +6,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { IssuingService } from '../services';
 import { environment } from '../../environments/environment';
+import { httpErrorMessage } from '../shared';
 
 @Component({
   selector: 'app-relayed-auth',
@@ -28,8 +29,10 @@ export class RelayedAuthComponent implements OnInit {
   approvalPercentage = 100;
   savedPercentage = 100;
   isLoading = true;
+  loadError: string | null = null;
   isSaving = false;
   webhookUrl = '';
+  readonly presets = [0, 25, 50, 75, 100];
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -43,6 +46,7 @@ export class RelayedAuthComponent implements OnInit {
 
   loadConfig() {
     this.isLoading = true;
+    this.loadError = null;
     this.issuingService.getRelayedAuthConfig(this.userId).subscribe({
       next: (config) => {
         this.approvalPercentage = config.approvalPercentage;
@@ -50,26 +54,30 @@ export class RelayedAuthComponent implements OnInit {
         this.isLoading = false;
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.isLoading = false;
-        this.snack.open('Failed to load configuration', 'Close', { duration: 3000 });
+        this.loadError = httpErrorMessage(err, 'Could not load the relayed authorisation settings.');
         this.cdr.detectChanges();
       }
     });
   }
 
   save() {
+    if (this.isSaving || !this.hasChanges) return;
     this.isSaving = true;
     this.issuingService.updateRelayedAuthConfig(this.userId, this.approvalPercentage).subscribe({
       next: (config) => {
         this.savedPercentage = config.approvalPercentage;
         this.isSaving = false;
-        this.snack.open('Approval percentage updated', 'Close', { duration: 3000 });
+        this.snack.open(`Saved: ${this.describe(config.approvalPercentage)}`, 'Close', { duration: 3000 });
         this.cdr.detectChanges();
       },
-      error: () => {
+      error: (err) => {
         this.isSaving = false;
-        this.snack.open('Failed to update configuration', 'Close', { duration: 3000 });
+        this.snack.open(httpErrorMessage(err, 'Could not save the approval percentage.'), 'Close', {
+          duration: 5000,
+          panelClass: 'fintech-snack-error'
+        });
         this.cdr.detectChanges();
       }
     });
@@ -79,20 +87,42 @@ export class RelayedAuthComponent implements OnInit {
     return this.approvalPercentage !== this.savedPercentage;
   }
 
+  resetChanges() {
+    this.approvalPercentage = this.savedPercentage;
+  }
+
   getStatusLabel(): string {
     if (this.approvalPercentage === 100) return 'Approve all';
     if (this.approvalPercentage === 0) return 'Refuse all';
-    return `${this.approvalPercentage}% approval rate`;
+    return 'Approve some';
   }
 
-  getStatusColor(): string {
-    if (this.approvalPercentage >= 80) return '#4caf50';
-    if (this.approvalPercentage >= 50) return '#ff9800';
-    return '#e53935';
+  /** Colour is a supplement; the label above always carries the same meaning. */
+  getStatusClass(): 'high' | 'medium' | 'low' {
+    if (this.approvalPercentage >= 80) return 'high';
+    if (this.approvalPercentage >= 50) return 'medium';
+    return 'low';
   }
 
-  copyWebhookUrl() {
-    navigator.clipboard.writeText(this.webhookUrl);
-    this.snack.open('Webhook URL copied', 'Close', { duration: 2000 });
+  describe(pct: number): string {
+    if (pct === 100) return 'all card payments are approved';
+    if (pct === 0) return 'all card payments are refused';
+    return `about ${pct} out of 100 card payments are approved`;
+  }
+
+  formatPercent(value: number): string {
+    return `${value}%`;
+  }
+
+  async copyWebhookUrl() {
+    try {
+      await navigator.clipboard.writeText(this.webhookUrl);
+      this.snack.open('Webhook URL copied', 'Close', { duration: 2000 });
+    } catch {
+      this.snack.open('Could not copy automatically. Select the URL and copy it manually.', 'Close', {
+        duration: 5000,
+        panelClass: 'fintech-snack-error'
+      });
+    }
   }
 }

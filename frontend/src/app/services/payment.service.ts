@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse} from '../models';
+import {GooglePayJwtResponse, PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class PaymentService {
@@ -23,8 +23,8 @@ export class PaymentService {
     return this.http.get(`${this.baseUrl}/api/payments/redirect`, data);
   }
 
-  getGooglePayJwt(hostname: string): Observable<{ googlePayJwtToken: string }> {
-    return this.http.get<{ googlePayJwtToken: string }>(`${this.baseUrl}/api/payments/gpay-jwt`, {
+  getGooglePayJwt(hostname: string): Observable<GooglePayJwtResponse> {
+    return this.http.get<GooglePayJwtResponse>(`${this.baseUrl}/api/payments/gpay-jwt`, {
       params: {hostname}
     });
   }

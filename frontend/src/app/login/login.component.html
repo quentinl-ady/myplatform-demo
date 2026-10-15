@@ -1,24 +1,47 @@
-<form [formGroup]="form" (ngSubmit)="onSubmit()" class="fintech-form">
+<form [formGroup]="form" (ngSubmit)="onSubmit()" class="fintech-form" novalidate>
 
   <mat-form-field appearance="outline" class="fintech-input">
     <mat-label>Email address</mat-label>
-    <input matInput type="email" formControlName="email" placeholder="name@company.com" required />
-    <mat-error *ngIf="emailInvalid()">Please enter a valid email.</mat-error>
+    <input
+      matInput
+      type="email"
+      formControlName="email"
+      autocomplete="username"
+      inputmode="email"
+      autocapitalize="off"
+      spellcheck="false"
+      placeholder="name@company.com"
+      required />
+    <mat-error *ngIf="emailError() as message">{{ message }}</mat-error>
   </mat-form-field>
 
   <mat-form-field appearance="outline" class="fintech-input">
     <mat-label>Password</mat-label>
-    <input matInput type="password" formControlName="password" placeholder="••••••••" required />
-    <mat-error *ngIf="passwordInvalid()">Password must be at least 4 characters.</mat-error>
+    <input
+      matInput
+      [type]="showPassword ? 'text' : 'password'"
+      formControlName="password"
+      autocomplete="current-password"
+      required />
+    <button
+      mat-icon-button
+      matSuffix
+      type="button"
+      (click)="togglePassword()"
+      aria-label="Show password"
+      [attr.aria-pressed]="showPassword">
+      <mat-icon aria-hidden="true">{{ showPassword ? 'visibility_off' : 'visibility' }}</mat-icon>
+    </button>
+    <mat-error *ngIf="passwordInvalid()">Enter your password.</mat-error>
   </mat-form-field>
 
-  <button mat-flat-button class="fintech-btn primary" [disabled]="form.invalid || loading">
+  <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="loading">
     <span *ngIf="!loading">Log in</span>
-    <mat-spinner *ngIf="loading" diameter="20" color="accent"></mat-spinner>
+    <mat-spinner *ngIf="loading" diameter="20" aria-label="Logging in"></mat-spinner>
   </button>
 
-  <div *ngIf="error" class="error-msg">
-    <mat-icon>error_outline</mat-icon>
+  <div *ngIf="error" class="error-msg" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
     <span>{{ error }}</span>
   </div>
 </form>

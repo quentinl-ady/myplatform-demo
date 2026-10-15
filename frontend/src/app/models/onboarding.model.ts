@@ -1,4 +1,5 @@
-export type VerificationStatus = 'invalid' | 'pending' | 'reject' | 'valid';
+/** 'reject' is a legacy spelling still handled by some screens; Adyen sends 'rejected'. */
+export type VerificationStatus = 'invalid' | 'pending' | 'rejected' | 'reject' | 'valid';
 
 export interface OnboardingPart {
   allowed: boolean;

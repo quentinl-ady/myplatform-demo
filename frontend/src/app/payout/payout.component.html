@@ -1,87 +1,122 @@
 <div class="fintech-wrapper">
 
   <div class="header-section">
-    <h2>Payouts</h2>
+    <h1>Payouts</h1>
     <p>Configure and monitor your automatic payouts.</p>
   </div>
 
-  <!-- Balance Account Selector -->
+  <!-- Balance account selector -->
   <mat-card>
-    <h3 class="card-title">Balance Account</h3>
-    <div class="form-group">
-      <label>Select an account to view its payout configurations</label>
-      <select class="fintech-input" [(ngModel)]="selectedBalanceAccount" (change)="loadConfigurations()">
-        <option value="" disabled selected>Choose a balance account...</option>
-        <option *ngFor="let acc of balanceAccounts()" [value]="acc.balanceAccountId">
-          {{ acc.description }} — {{ acc.currencyCode }}
-        </option>
-      </select>
-    </div>
-  </mat-card>
+    <h2 class="card-title">Balance account</h2>
 
-  <!-- Existing Configurations -->
-  <mat-card *ngIf="selectedBalanceAccount">
-    <h3 class="card-title">Active Configurations</h3>
-
-    <div class="loading-container" *ngIf="loadingConfigurations">
-      <mat-spinner diameter="24"></mat-spinner>
-      <span>Loading configurations...</span>
+    <div class="loading-container" *ngIf="accountsState === 'loading'" role="status">
+      <mat-spinner diameter="24" aria-hidden="true"></mat-spinner>
+      <span>Loading balance accounts...</span>
     </div>
 
-    <ng-container *ngIf="!loadingConfigurations">
-      <div class="config-list" *ngIf="payoutConfigurations().length; else noConfigs">
-        <div *ngFor="let config of payoutConfigurations()" class="config-item">
-          <div class="config-row">
-            <span class="config-label">Currency</span>
-            <span class="config-value">{{ config.currencyCode }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Type</span>
-            <span class="config-value">{{ config | payoutType }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Schedule</span>
-            <span class="config-value schedule-pill">{{ config.schedule }}</span>
-          </div>
-          <div class="config-row">
-            <span class="config-label">Payout Account</span>
-            <span class="config-value mono">{{ config.accountIdentifier }}</span>
-          </div>
-        </div>
+    <div class="inline-alert error" *ngIf="accountsState === 'error'" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ accountsError }}</span>
+      <button type="button" class="link-btn" (click)="loadBalanceAccounts()">Retry</button>
+    </div>
+
+    <ng-container *ngIf="accountsState === 'ready'">
+      <div class="form-group" *ngIf="eligibleAccounts.length; else noAccounts">
+        <label for="payout-balance-account">Account to view and configure</label>
+        <select id="payout-balance-account" class="fintech-input" [(ngModel)]="selectedBalanceAccount" (ngModelChange)="onBalanceAccountChange()">
+          <option value="" disabled>Choose a balance account...</option>
+          <option *ngFor="let acc of eligibleAccounts" [value]="acc.balanceAccountId">
+            {{ acc.description || acc.balanceAccountId }} ({{ acc.currencyCode }})
+          </option>
+        </select>
+        <span class="hint-text">Scheduled payouts aren't available on the business bank account.</span>
       </div>
-      <ng-template #noConfigs>
-        <p class="empty-text">No payout configurations yet for this account.</p>
+      <ng-template #noAccounts>
+        <p class="empty-text">You have no balance account that can be paid out yet.</p>
       </ng-template>
     </ng-container>
   </mat-card>
 
-  <!-- Add New Configuration -->
-  <mat-card>
-    <h3 class="card-title">Add New Configuration</h3>
-    <form [formGroup]="configForm" (ngSubmit)="addConfiguration()" class="config-form">
+  <!-- Existing configurations -->
+  <mat-card *ngIf="selectedBalanceAccount">
+    <h2 class="card-title">Payout schedules</h2>
+
+    <div class="loading-container" *ngIf="configurationsState === 'loading'" role="status">
+      <mat-spinner diameter="24" aria-hidden="true"></mat-spinner>
+      <span>Loading payout schedules...</span>
+    </div>
+
+    <div class="inline-alert error" *ngIf="configurationsState === 'error'" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ configurationsError }}</span>
+      <button type="button" class="link-btn" (click)="loadConfigurations()">Retry</button>
+    </div>
+
+    <ng-container *ngIf="configurationsState === 'ready'">
+      <ul class="config-list" *ngIf="payoutConfigurations().length; else noConfigs">
+        <li *ngFor="let config of payoutConfigurations()" class="config-item">
+          <dl class="config-grid">
+            <div class="config-row">
+              <dt class="config-label">Currency</dt>
+              <dd class="config-value">{{ config.currencyCode }}</dd>
+            </div>
+            <div class="config-row">
+              <dt class="config-label">Speed</dt>
+              <dd class="config-value">{{ config | payoutType }}</dd>
+            </div>
+            <div class="config-row">
+              <dt class="config-label">Frequency</dt>
+              <dd class="config-value">{{ scheduleLabel(config.schedule) }}</dd>
+            </div>
+            <div class="config-row">
+              <dt class="config-label">Payout account</dt>
+              <dd class="config-value mono">{{ config.accountIdentifier }}</dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+      <ng-template #noConfigs>
+        <p class="empty-text">No payout schedules for this account yet. Create one below.</p>
+      </ng-template>
+    </ng-container>
+  </mat-card>
+
+  <!-- Add a new configuration -->
+  <mat-card *ngIf="accountsState === 'ready' && eligibleAccounts.length">
+    <h2 class="card-title">New payout schedule</h2>
+
+    <div class="inline-alert error" *ngIf="payoutAccountsState === 'error'" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ payoutAccountsError }}</span>
+      <button type="button" class="link-btn" (click)="loadPayoutAccounts()">Retry</button>
+    </div>
+    <div class="inline-alert info" *ngIf="payoutAccountsState === 'ready' && payoutAccounts().length === 0">
+      <mat-icon aria-hidden="true">info_outline</mat-icon>
+      <span>You have no payout bank account yet. Add one during onboarding to schedule payouts.</span>
+    </div>
+
+    <form [formGroup]="configForm" #configDir="ngForm" (ngSubmit)="addConfiguration(configDir)" class="config-form">
 
       <div class="form-group">
-        <label>Currency</label>
-        <select class="fintech-input" formControlName="currencyCode">
-          <option value="" disabled selected>Select currency...</option>
-          <option value="EUR">EUR</option>
-          <option value="GBP">GBP</option>
-          <option value="USD">USD</option>
+        <label for="payout-currency">Currency</label>
+        <select id="payout-currency" class="fintech-input" formControlName="currencyCode">
+          <option value="" disabled>Select currency...</option>
+          <option *ngFor="let c of currencies" [value]="c">{{ c }}</option>
         </select>
       </div>
 
-      <div class="form-group">
-        <label>Payout Type</label>
+      <fieldset class="form-group checkbox-fieldset">
+        <legend>Payout speed</legend>
         <div class="checkbox-group">
           <mat-checkbox formControlName="regular" color="primary">Regular</mat-checkbox>
           <mat-checkbox formControlName="instant" color="primary">Instant</mat-checkbox>
         </div>
-      </div>
+      </fieldset>
 
       <div class="form-group">
-        <label>Schedule</label>
-        <select class="fintech-input" formControlName="schedule">
-          <option value="" disabled selected>Select schedule...</option>
+        <label for="payout-schedule">Frequency</label>
+        <select id="payout-schedule" class="fintech-input" formControlName="schedule">
+          <option value="" disabled>Select frequency...</option>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
@@ -89,9 +124,9 @@
       </div>
 
       <div class="form-group">
-        <label>Payout Account</label>
-        <select class="fintech-input" formControlName="transferInstrumentId">
-          <option value="" disabled selected>Select payout account...</option>
+        <label for="payout-bank-account">Payout bank account</label>
+        <select id="payout-bank-account" class="fintech-input" formControlName="transferInstrumentId">
+          <option value="" disabled>{{ payoutAccountsState === 'loading' ? 'Loading bank accounts...' : 'Select payout account...' }}</option>
           <option *ngFor="let acc of payoutAccounts()" [value]="acc.transferInstrumentId">
             {{ acc.accountIdentifier }}
           </option>
@@ -99,17 +134,27 @@
       </div>
 
       <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-        [disabled]="configForm.invalid || submitting || (!configForm.value.regular && !configForm.value.instant)">
-        <span *ngIf="!submitting">Add Configuration</span>
-        <mat-spinner *ngIf="submitting" diameter="20" color="accent"></mat-spinner>
+              [disabled]="!!blockReason || submitting" aria-describedby="payout-submit-hint">
+        <span *ngIf="!submitting">Create payout schedule</span>
+        <mat-spinner *ngIf="submitting" diameter="20" aria-label="Creating payout schedule"></mat-spinner>
       </button>
+      <p class="submit-hint" id="payout-submit-hint" aria-live="polite">{{ blockReason }}</p>
     </form>
   </mat-card>
 
-  <!-- Adyen Payouts Overview -->
+  <!-- Adyen payouts overview -->
   <mat-card>
-    <h3 class="card-title">Payouts Overview</h3>
-    <div id="payout-overview-container"></div>
+    <h2 class="card-title">Payouts overview</h2>
+    <div class="loading-container" *ngIf="overviewState === 'loading'" role="status">
+      <mat-spinner diameter="24" aria-hidden="true"></mat-spinner>
+      <span>Loading payouts...</span>
+    </div>
+    <div class="inline-alert error" *ngIf="overviewState === 'error'" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ overviewError }}</span>
+      <button type="button" class="link-btn" (click)="initAdyenComponents()">Retry</button>
+    </div>
+    <div #overviewContainer [hidden]="overviewState === 'error'"></div>
   </mat-card>
 
 </div>

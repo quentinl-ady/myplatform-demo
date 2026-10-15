@@ -1,27 +1,27 @@
 <div class="speed-status" *ngIf="status === 'idle'">
-  <mat-icon>speed</mat-icon>
+  <mat-icon aria-hidden="true">speed</mat-icon>
   <span>Enter valid bank details to see which transfer speeds are available.</span>
 </div>
 
-<div class="speed-status" *ngIf="status === 'loading'">
-  <mat-spinner diameter="16"></mat-spinner>
-  <span>Checking the available transfer routes...</span>
+<div class="speed-status" *ngIf="status === 'loading'" role="status">
+  <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+  <span>Checking the available transfer speeds...</span>
 </div>
 
-<div class="speed-status error" *ngIf="status === 'error'">
-  <mat-icon>error</mat-icon>
+<div class="speed-status error" *ngIf="status === 'error'" role="alert">
+  <mat-icon aria-hidden="true">error</mat-icon>
   <span>{{ errorMessage }}</span>
   <button type="button" class="retry-btn" (click)="retry()">Retry</button>
 </div>
 
 <ng-container *ngIf="status === 'loaded'">
 
-  <div class="speed-status error" *ngIf="!hasAvailableRoute">
-    <mat-icon>block</mat-icon>
-    <span>No transfer route is available for this beneficiary.</span>
+  <div class="speed-status error" *ngIf="!hasAvailableRoute" role="alert">
+    <mat-icon aria-hidden="true">block</mat-icon>
+    <span>No transfer speed is available for this beneficiary.</span>
   </div>
 
-  <div class="speed-options" role="radiogroup" *ngIf="hasAvailableRoute">
+  <div class="speed-options" role="radiogroup" [attr.aria-labelledby]="labelledBy" *ngIf="hasAvailableRoute">
     <label class="speed-option" *ngFor="let option of options"
            [class.selected]="!!option.route && value === option.priority"
            [class.unavailable]="!option.route">
@@ -29,19 +29,20 @@
              [checked]="!!option.route && value === option.priority"
              [disabled]="disabled || !option.route"
              (change)="select(option.priority)" (blur)="onTouched()" />
+      <mat-icon class="speed-check" *ngIf="!!option.route && value === option.priority" aria-hidden="true">check_circle</mat-icon>
       <span class="speed-label">{{ option.label }}</span>
       <span class="speed-timing">{{ option.route ? option.timing : 'Not available' }}</span>
       <span class="speed-limits" *ngIf="option.route && limitsOf(option.route) as limits">{{ limits }}</span>
     </label>
   </div>
 
-  <div class="speed-message" *ngIf="value && hasAvailableRoute && !selectedRoute">
-    <mat-icon>error</mat-icon>
+  <div class="speed-message" *ngIf="value && hasAvailableRoute && !selectedRoute" role="alert">
+    <mat-icon aria-hidden="true">error</mat-icon>
     <span>{{ selectedLabel }} is not available for this beneficiary. Choose another speed.</span>
   </div>
 
-  <div class="speed-message" *ngIf="amountError">
-    <mat-icon>error</mat-icon>
+  <div class="speed-message" *ngIf="amountError" role="alert">
+    <mat-icon aria-hidden="true">error</mat-icon>
     <span>{{ amountError }}</span>
   </div>
 

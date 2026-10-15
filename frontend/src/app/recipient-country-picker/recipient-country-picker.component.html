@@ -1,9 +1,11 @@
 <div class="country-search">
-  <mat-icon class="search-icon">search</mat-icon>
+  <mat-icon class="search-icon" aria-hidden="true">search</mat-icon>
   <input type="text"
          class="fintech-input"
          placeholder="Search by country name or code"
-         aria-label="Recipient country"
+         autocomplete="off"
+         [attr.id]="inputId"
+         [attr.aria-label]="inputId ? null : 'Recipient country'"
          [formControl]="search"
          [matAutocomplete]="countryAuto"
          (blur)="onTouched()" />

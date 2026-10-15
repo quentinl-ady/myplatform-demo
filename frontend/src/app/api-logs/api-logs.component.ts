@@ -1,9 +1,24 @@
-import { Component, OnInit, OnDestroy, Input, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { ApiLogService } from '../services';
 import { ApiLog } from '../models';
+import { ConfirmService, httpErrorMessage, parseServerDate } from '../shared';
+
+const LIVE_REFRESH_MS = 5000;
+
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit'
+});
+
+const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 @Component({
   selector: 'app-api-logs',
@@ -13,11 +28,22 @@ import { ApiLog } from '../models';
   styleUrl: './api-logs.component.css'
 })
 export class ApiLogsComponent implements OnInit, OnDestroy {
+  private apiLogService = inject(ApiLogService);
+  private confirmService = inject(ConfirmService);
+  private snackBar = inject(MatSnackBar);
 
   @Input() userId?: string;
+  @Output() closed = new EventEmitter<void>();
+
+  readonly methods = ['POST', 'PATCH', 'GET', 'DELETE'];
+
   logs: ApiLog[] = [];
   filteredLogs: ApiLog[] = [];
+  /** First load only; later refreshes keep the list on screen. */
   loading = signal(false);
+  refreshing = signal(false);
+  clearing = signal(false);
+  loadError = signal<string | null>(null);
   expandedLogId: number | null = null;
   activeTab: 'request' | 'response' = 'request';
   copiedId: string | null = null;
@@ -25,9 +51,9 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
   domainFilter: string = 'ALL';
   searchQuery: string = '';
   autoRefresh = false;
-  private pollInterval?: any;
-
-  constructor(private apiLogService: ApiLogService) {}
+  private loaded = false;
+  private pollInterval?: ReturnType<typeof setInterval>;
+  private copiedTimeout?: ReturnType<typeof setTimeout>;
 
   ngOnInit() {
     this.loadLogs();
@@ -35,18 +61,34 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopAutoRefresh();
+    clearTimeout(this.copiedTimeout);
+  }
+
+  get hasActiveFilters(): boolean {
+    return this.methodFilter !== 'ALL' || this.domainFilter !== 'ALL' || !!this.searchQuery.trim();
   }
 
   loadLogs() {
-    this.loading.set(true);
+    if (this.refreshing() || this.loading()) return;
+    (this.loaded ? this.refreshing : this.loading).set(true);
     this.apiLogService.getLogs(this.userId).subscribe({
       next: (logs) => {
-        this.logs = logs;
+        this.logs = logs ?? [];
+        this.loaded = true;
+        this.loadError.set(null);
         this.applyFilters();
         this.loading.set(false);
+        this.refreshing.set(false);
       },
-      error: () => {
+      error: (err) => {
         this.loading.set(false);
+        this.refreshing.set(false);
+        this.loadError.set(httpErrorMessage(err, 'We couldn\'t load the API calls.'));
+        // Live mode would keep hitting a failing endpoint.
+        if (this.autoRefresh) {
+          this.autoRefresh = false;
+          this.stopAutoRefresh();
+        }
       }
     });
   }
@@ -62,11 +104,11 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
       result = result.filter(l => l.apiDomain === this.domainFilter);
     }
 
-    if (this.searchQuery.trim()) {
-      const q = this.searchQuery.toLowerCase();
+    const q = this.searchQuery.trim().toLowerCase();
+    if (q) {
       result = result.filter(l =>
-        l.endpoint.toLowerCase().includes(q) ||
-        l.apiDomain.toLowerCase().includes(q)
+        (l.endpoint || '').toLowerCase().includes(q) ||
+        (l.apiDomain || '').toLowerCase().includes(q)
       );
     }
 
@@ -80,6 +122,13 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
 
   setDomainFilter(domain: string) {
     this.domainFilter = domain;
+    this.applyFilters();
+  }
+
+  clearFilters() {
+    this.methodFilter = 'ALL';
+    this.domainFilter = 'ALL';
+    this.searchQuery = '';
     this.applyFilters();
   }
 
@@ -109,21 +158,38 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
     this.activeTab = tab;
   }
 
-  clearLogs() {
+  async clearLogs() {
+    const confirmed = await this.confirmService.confirm({
+      title: 'Clear API calls?',
+      message: 'All recorded API calls for this account are deleted. This can\'t be undone.',
+      confirmText: 'Clear calls',
+      danger: true
+    });
+    if (!confirmed) return;
+    this.clearing.set(true);
     this.apiLogService.clearLogs(this.userId).subscribe({
       next: () => {
         this.logs = [];
         this.filteredLogs = [];
+        this.expandedLogId = null;
+        this.clearing.set(false);
+      },
+      error: (err) => {
+        this.clearing.set(false);
+        this.snackBar.open(httpErrorMessage(err, 'We couldn\'t clear the API calls. Please try again.'), 'Close', {
+          duration: 6000,
+          panelClass: 'fintech-snack-error'
+        });
       }
     });
   }
 
   toggleAutoRefresh() {
     this.autoRefresh = !this.autoRefresh;
+    this.stopAutoRefresh();
     if (this.autoRefresh) {
-      this.pollInterval = setInterval(() => this.loadLogs(), 5000);
-    } else {
-      this.stopAutoRefresh();
+      this.loadLogs();
+      this.pollInterval = setInterval(() => this.loadLogs(), LIVE_REFRESH_MS);
     }
   }
 
@@ -138,11 +204,16 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
     return this.logs.filter(l => l.httpMethod === method).length;
   }
 
+  methodLabel(method: string): string {
+    return method === 'DELETE' ? 'DEL' : method;
+  }
+
   isImpactful(log: ApiLog): boolean {
     return log.httpMethod === 'POST' || log.httpMethod === 'PATCH';
   }
 
   getShortEndpoint(endpoint: string): string {
+    if (!endpoint) return '';
     try {
       const url = new URL(endpoint);
       return url.pathname;
@@ -151,13 +222,9 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
     }
   }
 
-  getHostname(endpoint: string): string {
-    try {
-      const url = new URL(endpoint);
-      return url.hostname;
-    } catch {
-      return '';
-    }
+  formatDuration(ms: number | null | undefined): string {
+    if (ms == null || isNaN(ms)) return '—';
+    return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`;
   }
 
   formatJson(raw: string): string {
@@ -169,29 +236,49 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
     }
   }
 
+  formatDateTime(dateStr: string): string {
+    const date = parseServerDate(dateStr);
+    return date ? DATE_TIME_FORMAT.format(date) : '';
+  }
+
   getTimeAgo(dateStr: string): string {
-    const normalized = dateStr.endsWith('Z') || dateStr.includes('+') || dateStr.includes('-', 10)
-      ? dateStr
-      : dateStr + 'Z';
-    const date = new Date(normalized);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
+    const date = parseServerDate(dateStr);
+    if (!date) return '—';
+    const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
     if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 60) return `${diffMin} min ago`;
     const diffHrs = Math.floor(diffMin / 60);
-    if (diffHrs < 24) return `${diffHrs}h ago`;
+    if (diffHrs < 24) return `${diffHrs} h ago`;
     const diffDays = Math.floor(diffHrs / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    if (diffDays < 7) return `${diffDays} d ago`;
+    return DATE_FORMAT.format(date);
   }
 
   copyBody(raw: string, id: string) {
     const text = this.formatJson(raw) || raw || '';
-    navigator.clipboard.writeText(text).then(() => {
-      this.copiedId = id;
-      setTimeout(() => { this.copiedId = null; }, 1500);
+    if (!navigator.clipboard) {
+      this.showCopyError();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(
+      () => {
+        this.copiedId = id;
+        clearTimeout(this.copiedTimeout);
+        this.copiedTimeout = setTimeout(() => { this.copiedId = null; }, 1500);
+      },
+      () => this.showCopyError()
+    );
+  }
+
+  private showCopyError() {
+    this.snackBar.open('Couldn\'t copy to the clipboard. Select the text and copy it manually.', 'Close', {
+      duration: 5000,
+      panelClass: 'fintech-snack-error'
     });
+  }
+
+  close() {
+    this.closed.emit();
   }
 
   getDocLink(endpoint: string): string | null {
