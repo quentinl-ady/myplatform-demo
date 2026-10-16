@@ -103,9 +103,12 @@
       <section class="form-section" aria-labelledby="step-auth">
         <div class="section-header">
           <h3 id="step-auth"><span class="step-number" aria-hidden="true">2</span>Authentication</h3>
-          <span class="optional-badge">Optional</span>
+          <span class="optional-badge">Recommended</span>
         </div>
-        <p class="section-description">Add an email and a phone number to authenticate online payments with 3D Secure.</p>
+        <p class="section-description">
+          Some online payments ask the cardholder for a one-time code (3D Secure). We send it by SMS, or by email
+          if there's no mobile number. Without either, those payments are declined.
+        </p>
 
         <div class="form-group">
           <label for="cc-email">Email</label>
@@ -117,20 +120,27 @@
         </div>
 
         <div class="form-group">
-          <label for="cc-phone">Phone number</label>
-          <div class="phone-input-row">
-            <label for="cc-phone-prefix" class="cdk-visually-hidden">Country calling code</label>
-            <select id="cc-phone-prefix" class="fintech-input phone-prefix-select" formControlName="phonePrefix">
-              <option *ngFor="let p of phonePrefixes" [value]="p.code">
-                {{ p.flag }} {{ p.code }} {{ p.country }}
-              </option>
-            </select>
-            <input id="cc-phone" type="tel" class="fintech-input phone-number-input" formControlName="phoneNumber"
-                   autocomplete="tel-national" placeholder="6 11 22 33 44" />
+          <label for="cc-phone">Mobile number</label>
+          <div class="phone-field" [class.invalid]="phoneError">
+            <div class="phone-country">
+              <span class="phone-country-value" aria-hidden="true">
+                <span class="phone-country-code">{{ selectedPhoneCountry.code }}</span>+{{ selectedPhoneCountry.dialCode }}
+              </span>
+              <mat-icon class="phone-country-chevron" aria-hidden="true">expand_more</mat-icon>
+              <label for="cc-phone-country" class="cdk-visually-hidden">Country code</label>
+              <select id="cc-phone-country" formControlName="phoneCountry">
+                <option *ngFor="let country of phoneCountries" [value]="country.code">
+                  {{ country.name }} (+{{ country.dialCode }})
+                </option>
+              </select>
+            </div>
+            <input id="cc-phone" type="tel" class="phone-number-input" formControlName="phoneNumber"
+                   autocomplete="tel" [placeholder]="selectedPhoneCountry.example"
+                   [attr.aria-invalid]="phoneError ? true : null"
+                   [attr.aria-describedby]="phoneError ? 'cc-phone-error' : null"
+                   (paste)="onPhonePaste()" (change)="tidyPhone()" />
           </div>
-          <span class="field-error" *ngIf="form.get('phoneNumber')?.invalid && form.get('phoneNumber')?.touched">
-            Enter a valid phone number (digits, spaces and dashes only).
-          </span>
+          <span id="cc-phone-error" class="field-error" *ngIf="phoneError as error">{{ error }}</span>
         </div>
       </section>
 

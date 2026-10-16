@@ -77,12 +77,9 @@
       </mat-button-toggle>
     </mat-button-toggle-group>
     <p class="hint">
-      <ng-container *ngIf="disableEmbeddedPayment; else activityHint">
+      <ng-container *ngIf="disableEmbeddedPayment">
         Embedded payments aren't available for individual accounts.
       </ng-container>
-      <ng-template #activityHint>
-        Embedded payments unlock point of sale, Pay by Link and stores.
-      </ng-template>
     </p>
 
     <!-- BUSINESS ACTIVITIES (required for embedded payments) -->

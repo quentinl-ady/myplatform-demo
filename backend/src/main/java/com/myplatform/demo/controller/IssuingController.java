@@ -248,41 +248,4 @@ public class IssuingController {
         String network = "visa".equalsIgnoreCase(brand) ? "Visa" : "mc".equalsIgnoreCase(brand) ? "Mastercard" : brand;
         return new BadRequestException(network + " cards aren't configured for " + currency + " balance accounts.");
     }
-
-    @GetMapping("/phone-prefixes")
-    public ResponseEntity<List<PhonePrefix>> getPhonePrefixes() {
-        List<PhonePrefix> prefixes = List.of(
-                new PhonePrefix("+1", "United States", "🇺🇸"),
-                new PhonePrefix("+1", "Canada", "🇨🇦"),
-                new PhonePrefix("+44", "United Kingdom", "🇬🇧"),
-                new PhonePrefix("+33", "France", "🇫🇷"),
-                new PhonePrefix("+49", "Germany", "🇩🇪"),
-                new PhonePrefix("+31", "Netherlands", "🇳🇱"),
-                new PhonePrefix("+34", "Spain", "🇪🇸"),
-                new PhonePrefix("+39", "Italy", "🇮🇹"),
-                new PhonePrefix("+32", "Belgium", "🇧🇪"),
-                new PhonePrefix("+41", "Switzerland", "🇨🇭"),
-                new PhonePrefix("+43", "Austria", "🇦🇹"),
-                new PhonePrefix("+46", "Sweden", "🇸🇪"),
-                new PhonePrefix("+47", "Norway", "🇳🇴"),
-                new PhonePrefix("+45", "Denmark", "🇩🇰"),
-                new PhonePrefix("+358", "Finland", "🇫🇮"),
-                new PhonePrefix("+353", "Ireland", "🇮🇪"),
-                new PhonePrefix("+351", "Portugal", "🇵🇹"),
-                new PhonePrefix("+48", "Poland", "🇵🇱"),
-                new PhonePrefix("+420", "Czech Republic", "🇨🇿"),
-                new PhonePrefix("+36", "Hungary", "🇭🇺"),
-                new PhonePrefix("+40", "Romania", "🇷🇴"),
-                new PhonePrefix("+30", "Greece", "🇬🇷"),
-                new PhonePrefix("+61", "Australia", "🇦🇺"),
-                new PhonePrefix("+81", "Japan", "🇯🇵"),
-                new PhonePrefix("+65", "Singapore", "🇸🇬"),
-                new PhonePrefix("+852", "Hong Kong", "🇭🇰"),
-                new PhonePrefix("+971", "United Arab Emirates", "🇦🇪"),
-                new PhonePrefix("+966", "Saudi Arabia", "🇸🇦"),
-                new PhonePrefix("+55", "Brazil", "🇧🇷"),
-                new PhonePrefix("+52", "Mexico", "🇲🇽")
-        );
-        return ResponseEntity.ok(prefixes);
-    }
 }

@@ -8,7 +8,6 @@ import {
   CardResponse,
   CardTransfer,
   CreateCardRequest,
-  PhonePrefix,
   TransactionRuleResponse
 } from '../models';
 
@@ -19,10 +18,6 @@ export class IssuingService {
 
   createCard(request: CreateCardRequest): Observable<CardResponse> {
     return this.http.post<CardResponse>(`${this.baseUrl}/api/issuing/cards`, request);
-  }
-
-  getPhonePrefixes(): Observable<PhonePrefix[]> {
-    return this.http.get<PhonePrefix[]>(`${this.baseUrl}/api/issuing/phone-prefixes`);
   }
 
   getCardNetworks(): Observable<CardNetworkOption[]> {

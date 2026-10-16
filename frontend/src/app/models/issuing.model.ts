@@ -15,12 +15,6 @@ export interface CreateCardRequest {
   transactionRules?: TransactionRuleRequest[];
 }
 
-export interface PhonePrefix {
-  code: string;
-  country: string;
-  flag: string;
-}
-
 /** A card network the platform can issue cards on. */
 export interface CardNetworkOption {
   brand: string;

@@ -14,17 +14,29 @@ import {
   CardNetworkOption,
   CardResponse,
   CreateCardRequest,
-  TransactionRuleRequest,
-  PhonePrefix
+  TransactionRuleRequest
 } from '../models';
 import { AccountService, IssuingService } from '../services';
 import { formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
+// Imported directly, not through the shared barrel, so the country list stays in this page's lazy chunk.
+import {
+  PHONE_COUNTRIES,
+  ParsedPhoneNumber,
+  PhoneCountry,
+  findPhoneCountry,
+  mobileNumberValidator,
+  parsePhoneNumber,
+  tidyPhoneNumber,
+  toE164
+} from '../shared/phone';
 import { MCC_CODES } from '../industry-codes';
 
 type Mcc = { code: string; label: string; risky?: boolean };
 
 const MAX_SPENDING_RULES = 3;
 const CARD_BRANDS = ['visa', 'mc'];
+/** Used when the account holder's country isn't in the phone country list. */
+const DEFAULT_PHONE_COUNTRY = 'NL';
 
 @Component({
   selector: 'app-card-create',
@@ -63,7 +75,7 @@ export class CardCreateComponent implements OnInit {
   balanceAccounts: BalanceAccount[] = [];
   /** null when unknown: every network stays selectable and the backend checks the choice. */
   cardNetworks: CardNetworkOption[] | null = null;
-  phonePrefixes: PhonePrefix[] = [];
+  readonly phoneCountries = PHONE_COUNTRIES;
   allMccs: Mcc[] = MCC_CODES;
   selectedMccs: Mcc[] = [];
   filteredMccs: Mcc[] = [];
@@ -74,8 +86,8 @@ export class CardCreateComponent implements OnInit {
     cardholderName: ['', [Validators.required, Validators.minLength(2), Validators.pattern(/\S/)]],
     brand: ['visa', Validators.required],
     email: ['', [Validators.email]],
-    phonePrefix: ['+31'],
-    phoneNumber: ['', [Validators.pattern(/^[\d\s\-()]+$/)]],
+    phoneCountry: [DEFAULT_PHONE_COUNTRY],
+    phoneNumber: ['', [mobileNumberValidator('phoneCountry')]],
     rules: this.fb.array<FormGroup>([])
   });
 
@@ -101,9 +113,8 @@ export class CardCreateComponent implements OnInit {
       this.ensureConfiguredBrand(this.currencyOf(id || ''));
     });
 
-    this.issuingService.getPhonePrefixes().subscribe({
-      next: (prefixes) => this.phonePrefixes = prefixes,
-      error: () => this.phonePrefixes = [{ code: '+31', country: 'Netherlands', flag: '🇳🇱' }]
+    this.form.get('phoneCountry')!.valueChanges.subscribe(() => {
+      this.form.get('phoneNumber')!.updateValueAndValidity();
     });
   }
 
@@ -121,6 +132,9 @@ export class CardCreateComponent implements OnInit {
         this.cardNetworks = networks;
         if (user.email && !this.form.value.email) {
           this.form.patchValue({ email: user.email });
+        }
+        if (this.form.get('phoneCountry')!.pristine) {
+          this.form.patchValue({ phoneCountry: this.defaultPhoneCountry });
         }
         if (this.balanceAccounts.length === 1) {
           this.form.patchValue({ balanceAccountId: this.balanceAccounts[0].balanceAccountId });
@@ -172,6 +186,39 @@ export class CardCreateComponent implements OnInit {
     const brand = CARD_BRANDS.find(b => this.isBrandConfigured(b, currency));
     if (brand) {
       this.form.patchValue({ brand });
+    }
+  }
+
+  /** The account holder's country, so most cardholders don't have to change it. */
+  private get defaultPhoneCountry(): string {
+    return findPhoneCountry(this.user?.countryCode)?.code ?? DEFAULT_PHONE_COUNTRY;
+  }
+
+  get selectedPhoneCountry(): PhoneCountry {
+    return findPhoneCountry(this.form.value.phoneCountry) ?? findPhoneCountry(DEFAULT_PHONE_COUNTRY)!;
+  }
+
+  get phoneError(): string | null {
+    const control = this.form.get('phoneNumber')!;
+    const parsed: ParsedPhoneNumber | undefined = control.errors?.['mobileNumber'];
+    if (!parsed || !control.touched) return null;
+    if (parsed.error === 'characters') return 'Use digits only. Spaces, dashes and brackets are fine.';
+    if (parsed.error === 'countryCode') return 'Unknown country code. Choose the country from the list.';
+    const { lengths, dialCode } = parsed.country;
+    if (lengths) return `Enter ${lengths.join(' or ')} digits after +${dialCode}.`;
+    return parsed.error === 'tooShort' ? 'This number is too short.' : 'This number is too long.';
+  }
+
+  onPhonePaste() {
+    // Runs once the pasted text is in the field.
+    setTimeout(() => this.tidyPhone());
+  }
+
+  /** Moves a typed or pasted country code to the country picker and cleans up the number. */
+  tidyPhone() {
+    const tidy = tidyPhoneNumber(this.form.value.phoneNumber, this.selectedPhoneCountry);
+    if (tidy) {
+      this.form.patchValue({ phoneCountry: tidy.country.code, phoneNumber: tidy.number });
     }
   }
 
@@ -262,7 +309,7 @@ export class CardCreateComponent implements OnInit {
     if (!this.isBrandConfigured(f.value.brand || '')) return `No card network is configured for ${this.currency}.`;
     if (f.get('cardholderName')?.invalid) return 'Enter the cardholder name (at least 2 characters).';
     if (f.get('email')?.invalid) return 'Enter a valid email address or leave it empty.';
-    if (f.get('phoneNumber')?.invalid) return 'Enter a valid phone number or leave it empty.';
+    if (f.get('phoneNumber')?.invalid) return 'Check the mobile number or leave it empty.';
     if (this.rulesArray.invalid) return 'Complete or remove the spending limits.';
     return null;
   }
@@ -291,8 +338,8 @@ export class CardCreateComponent implements OnInit {
     }
 
     const email = this.form.value.email?.trim() || undefined;
-    const phoneNumber = this.form.value.phoneNumber?.trim();
-    const phone = phoneNumber ? `${this.form.value.phonePrefix} ${phoneNumber}` : undefined;
+    const mobileNumber = parsePhoneNumber(this.form.value.phoneNumber, this.selectedPhoneCountry);
+    const phone = mobileNumber ? toE164(mobileNumber) : undefined;
 
     const request: CreateCardRequest = {
       userId: this.userId,
@@ -335,7 +382,7 @@ export class CardCreateComponent implements OnInit {
       brand: 'visa',
       cardholderName: '',
       email: this.user?.email || '',
-      phonePrefix: '+31',
+      phoneCountry: this.defaultPhoneCountry,
       phoneNumber: ''
     });
     this.ensureConfiguredBrand();

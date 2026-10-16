@@ -15,11 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/**
- * Card ranges (BINs) configured on the balance platform. Adyen finds the range from the brand variant, the issuing
- * country and the currency of the balance account, and has no API to list them, so they are declared in
- * adyen.issuing.card-ranges as brandVariant:issuingCountryCode:currency entries, in order of preference.
- */
+
 @Component
 public class CardRangeCatalog {
 
