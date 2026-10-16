@@ -4,12 +4,14 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { MaterialModule } from '../material.module';
 
 import {
   User,
   BalanceAccount,
+  CardNetworkOption,
   CardResponse,
   CreateCardRequest,
   TransactionRuleRequest,
@@ -22,6 +24,7 @@ import { MCC_CODES } from '../industry-codes';
 type Mcc = { code: string; label: string; risky?: boolean };
 
 const MAX_SPENDING_RULES = 3;
+const CARD_BRANDS = ['visa', 'mc'];
 
 @Component({
   selector: 'app-card-create',
@@ -58,6 +61,8 @@ export class CardCreateComponent implements OnInit {
   createdRules: TransactionRuleRequest[] = [];
 
   balanceAccounts: BalanceAccount[] = [];
+  /** null when unknown: every network stays selectable and the backend checks the choice. */
+  cardNetworks: CardNetworkOption[] | null = null;
   phonePrefixes: PhonePrefix[] = [];
   allMccs: Mcc[] = MCC_CODES;
   selectedMccs: Mcc[] = [];
@@ -91,6 +96,11 @@ export class CardCreateComponent implements OnInit {
     });
     this.filteredMccs = this.allMccs;
 
+    // form.value still holds the previous account while the control emits, hence the emitted id.
+    this.form.get('balanceAccountId')!.valueChanges.subscribe(id => {
+      this.ensureConfiguredBrand(this.currencyOf(id || ''));
+    });
+
     this.issuingService.getPhonePrefixes().subscribe({
       next: (prefixes) => this.phonePrefixes = prefixes,
       error: () => this.phonePrefixes = [{ code: '+31', country: 'Netherlands', flag: '🇳🇱' }]
@@ -102,17 +112,20 @@ export class CardCreateComponent implements OnInit {
     this.loadError = null;
     forkJoin({
       user: this.accountService.getUserById(this.userId),
-      accounts: this.accountService.getBalanceAccounts(this.userId)
+      accounts: this.accountService.getBalanceAccounts(this.userId),
+      networks: this.issuingService.getCardNetworks().pipe(catchError(() => of(null)))
     }).subscribe({
-      next: ({ user, accounts }) => {
+      next: ({ user, accounts, networks }) => {
         this.user = user;
         this.balanceAccounts = accounts || [];
+        this.cardNetworks = networks;
         if (user.email && !this.form.value.email) {
           this.form.patchValue({ email: user.email });
         }
         if (this.balanceAccounts.length === 1) {
           this.form.patchValue({ balanceAccountId: this.balanceAccounts[0].balanceAccountId });
         }
+        this.ensureConfiguredBrand();
         this.isLoading = false;
         this.cdr.detectChanges();
       },
@@ -126,12 +139,40 @@ export class CardCreateComponent implements OnInit {
 
   /** The card spends in the default currency of the selected balance account. */
   get currency(): string {
-    const id = this.form.value.balanceAccountId;
-    return this.balanceAccounts.find(ba => ba.balanceAccountId === id)?.currencyCode || '';
+    return this.currencyOf(this.form.value.balanceAccountId || '');
+  }
+
+  private currencyOf(balanceAccountId: string): string {
+    return this.balanceAccounts.find(ba => ba.balanceAccountId === balanceAccountId)?.currencyCode || '';
   }
 
   get brandLabel(): string {
     return this.form.value.brand === 'mc' ? 'Mastercard' : 'Visa';
+  }
+
+  /** Whether the platform has a card range for this network in the currency (in any currency when none is given). */
+  isBrandConfigured(brand: string, currency = this.currency): boolean {
+    if (!this.cardNetworks) return true;
+    const network = this.cardNetworks.find(n => n.brand === brand);
+    return !!network && (!currency || !network.currencies || network.currencies.includes(currency));
+  }
+
+  hasConfiguredBrand(currency: string): boolean {
+    return CARD_BRANDS.some(brand => this.isBrandConfigured(brand, currency));
+  }
+
+  brandNote(brand: string): string | null {
+    if (this.isBrandConfigured(brand)) return null;
+    const onPlatform = this.cardNetworks?.some(n => n.brand === brand);
+    return onPlatform && this.currency ? `Not configured for ${this.currency}` : 'Not configured';
+  }
+
+  private ensureConfiguredBrand(currency = this.currency) {
+    if (this.isBrandConfigured(this.form.get('brand')!.value || '', currency)) return;
+    const brand = CARD_BRANDS.find(b => this.isBrandConfigured(b, currency));
+    if (brand) {
+      this.form.patchValue({ brand });
+    }
   }
 
   filterMccs(searchTerm: string) {
@@ -159,7 +200,9 @@ export class CardCreateComponent implements OnInit {
   }
 
   selectBrand(brand: string) {
-    this.form.patchValue({ brand });
+    if (this.isBrandConfigured(brand)) {
+      this.form.patchValue({ brand });
+    }
   }
 
   addRule() {
@@ -216,6 +259,7 @@ export class CardCreateComponent implements OnInit {
     const f = this.form;
     if (!this.balanceAccounts.length) return 'You need a balance account to issue a card.';
     if (f.get('balanceAccountId')?.invalid) return 'Select a balance account.';
+    if (!this.isBrandConfigured(f.value.brand || '')) return `No card network is configured for ${this.currency}.`;
     if (f.get('cardholderName')?.invalid) return 'Enter the cardholder name (at least 2 characters).';
     if (f.get('email')?.invalid) return 'Enter a valid email address or leave it empty.';
     if (f.get('phoneNumber')?.invalid) return 'Enter a valid phone number or leave it empty.';
@@ -224,7 +268,7 @@ export class CardCreateComponent implements OnInit {
   }
 
   submit() {
-    if (this.form.invalid || !this.user || this.isProcessing) {
+    if (this.form.invalid || !this.user || this.isProcessing || !this.isBrandConfigured(this.form.value.brand || '')) {
       this.form.markAllAsTouched();
       return;
     }
@@ -294,6 +338,7 @@ export class CardCreateComponent implements OnInit {
       phonePrefix: '+31',
       phoneNumber: ''
     });
+    this.ensureConfiguredBrand();
     this.selectedMccs = [];
     this.filterMccs('');
   }

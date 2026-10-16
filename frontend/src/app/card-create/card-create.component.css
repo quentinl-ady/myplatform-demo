@@ -117,6 +117,9 @@ mat-card {
 .brand-option.selected { border-color: var(--fintech-primary); background: var(--fintech-bg); }
 .brand-option svg { height: 32px; width: 50px; }
 .brand-option span { font-size: 13px; font-weight: 500; color: var(--fintech-text); }
+.brand-option:disabled { cursor: not-allowed; opacity: 0.55; border-color: var(--fintech-border); background: var(--fintech-surface); }
+.brand-option:disabled svg { filter: grayscale(1); }
+.brand-option .brand-note { margin-top: -4px; font-size: 12px; font-weight: 400; color: var(--fintech-text-secondary); }
 
 .rules-container { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
 .rule-item {

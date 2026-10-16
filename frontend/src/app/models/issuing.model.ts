@@ -21,6 +21,13 @@ export interface PhonePrefix {
   flag: string;
 }
 
+/** A card network the platform can issue cards on. */
+export interface CardNetworkOption {
+  brand: string;
+  /** Balance account currencies it can issue cards in; null when it isn't restricted to some currencies. */
+  currencies: string[] | null;
+}
+
 export interface TransactionRuleResponse {
   id: string;
   type: string;

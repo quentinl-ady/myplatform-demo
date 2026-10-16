@@ -1,5 +1,6 @@
 package com.myplatform.demo.controller;
 
+import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.configuration.ApiLogContext;
 import com.myplatform.demo.dto.*;
 import com.myplatform.demo.exception.BadRequestException;
@@ -8,8 +9,11 @@ import com.myplatform.demo.model.Card;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.CardRepository;
 import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.service.CardRangeCatalog;
 import com.myplatform.demo.service.CardTransferService;
 import com.myplatform.demo.service.IssuingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,18 +26,22 @@ import java.util.Set;
 @RequestMapping("/api/issuing")
 public class IssuingController {
 
+    private static final Logger log = LoggerFactory.getLogger(IssuingController.class);
     private static final Set<String> AMOUNT_RULE_TYPES = Set.of("maxAmountPerTransaction", "maxTotalAmount");
 
     private final IssuingService issuingService;
+    private final CardRangeCatalog cardRangeCatalog;
     private final CardTransferService cardTransferService;
     private final UserRepository userRepository;
     private final CardRepository cardRepository;
 
     public IssuingController(IssuingService issuingService,
+                             CardRangeCatalog cardRangeCatalog,
                              CardTransferService cardTransferService,
                              UserRepository userRepository,
                              CardRepository cardRepository) {
         this.issuingService = issuingService;
+        this.cardRangeCatalog = cardRangeCatalog;
         this.cardTransferService = cardTransferService;
         this.userRepository = userRepository;
         this.cardRepository = cardRepository;
@@ -48,6 +56,9 @@ public class IssuingController {
         if (request.getBalanceAccountId() == null || request.getBalanceAccountId().isBlank()) {
             throw new BadRequestException("Balance account is required");
         }
+        if (request.getBrand() == null || request.getBrand().isBlank()) {
+            throw new BadRequestException("Card network is required");
+        }
 
         // Checked before the card exists, so a wrong currency doesn't leave a card without its limits.
         String cardCurrency = issuingService.getBalanceAccountCurrency(request.getBalanceAccountId());
@@ -56,13 +67,26 @@ public class IssuingController {
             requireCardCurrency(rule.getType(), rule.getCurrencyCode(), cardCurrency);
         }
 
-        String paymentInstrumentId = issuingService.createVirtualCard(
-                request.getBalanceAccountId(),
-                request.getCardholderName(),
-                request.getBrand(),
-                request.getEmail(),
-                request.getPhone()
-        );
+        CardRangeCatalog.CardRange cardRange = cardRangeCatalog.find(request.getBrand(), cardCurrency, user.getCountryCode())
+                .orElseThrow(() -> notConfigured(request.getBrand(), cardCurrency));
+
+        String paymentInstrumentId;
+        try {
+            paymentInstrumentId = issuingService.createVirtualCard(
+                    cardRange,
+                    request.getBalanceAccountId(),
+                    request.getCardholderName(),
+                    request.getEmail(),
+                    request.getPhone()
+            );
+        } catch (ApiException e) {
+            if (e.getResponseBody() == null || !e.getResponseBody().contains("No card range available")) {
+                throw e;
+            }
+            log.warn("Adyen has no card range for {} issued in {} in {}: check adyen.issuing.card-ranges",
+                    cardRange.brandVariant(), cardRange.countryCode(), cardCurrency);
+            throw notConfigured(request.getBrand(), cardCurrency);
+        }
 
         Card card = new Card();
         card.setPaymentInstrumentId(paymentInstrumentId);
@@ -80,6 +104,11 @@ public class IssuingController {
         }
 
         return ResponseEntity.ok(issuingService.getCardDetails(paymentInstrumentId));
+    }
+
+    @GetMapping("/card-networks")
+    public ResponseEntity<List<CardNetworkOption>> getCardNetworks() {
+        return ResponseEntity.ok(cardRangeCatalog.networks());
     }
 
     @GetMapping("/cards/{userId}")
@@ -213,6 +242,11 @@ public class IssuingController {
             throw new BadRequestException("Spending limits must be in the card currency (" + cardCurrency
                     + "), the default currency of its balance account.");
         }
+    }
+
+    private static BadRequestException notConfigured(String brand, String currency) {
+        String network = "visa".equalsIgnoreCase(brand) ? "Visa" : "mc".equalsIgnoreCase(brand) ? "Mastercard" : brand;
+        return new BadRequestException(network + " cards aren't configured for " + currency + " balance accounts.");
     }
 
     @GetMapping("/phone-prefixes")

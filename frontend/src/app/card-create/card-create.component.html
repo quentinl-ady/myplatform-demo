@@ -49,8 +49,8 @@
           <label for="cc-balance-account">Balance account</label>
           <select id="cc-balance-account" class="fintech-input" formControlName="balanceAccountId">
             <option value="" disabled>Select a balance account</option>
-            <option *ngFor="let ba of balanceAccounts" [value]="ba.balanceAccountId">
-              {{ ba.description }} ({{ ba.currencyCode }})
+            <option *ngFor="let ba of balanceAccounts" [value]="ba.balanceAccountId" [disabled]="!hasConfiguredBrand(ba.currencyCode)">
+              {{ ba.description }} ({{ ba.currencyCode }}{{ hasConfiguredBrand(ba.currencyCode) ? '' : ', cards not configured' }})
             </option>
           </select>
           <span class="field-hint">
@@ -75,22 +75,26 @@
             <button type="button" class="brand-option" role="radio"
                     [class.selected]="form.value.brand === 'visa'"
                     [attr.aria-checked]="form.value.brand === 'visa'"
+                    [disabled]="!isBrandConfigured('visa')"
                     (click)="selectBrand('visa')">
               <svg viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                 <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#1a1f71"/>
               </svg>
-              <span>Visa debit</span>
+              <span>Visa</span>
+              <span class="brand-note" *ngIf="brandNote('visa') as note">{{ note }}</span>
             </button>
             <button type="button" class="brand-option" role="radio"
                     [class.selected]="form.value.brand === 'mc'"
                     [attr.aria-checked]="form.value.brand === 'mc'"
+                    [disabled]="!isBrandConfigured('mc')"
                     (click)="selectBrand('mc')">
               <svg viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                 <circle cx="50" cy="50" r="45" fill="#eb001b"/>
                 <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
                 <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
               </svg>
-              <span>Mastercard debit</span>
+              <span>Mastercard</span>
+              <span class="brand-note" *ngIf="brandNote('mc') as note">{{ note }}</span>
             </button>
           </div>
         </div>
@@ -229,7 +233,7 @@
       </section>
 
       <button mat-flat-button class="fintech-btn primary full-width" type="submit"
-              [disabled]="form.invalid || isProcessing" aria-describedby="cc-submit-hint">
+              [disabled]="form.invalid || isProcessing || !isBrandConfigured(form.value.brand || '')" aria-describedby="cc-submit-hint">
         <mat-spinner *ngIf="isProcessing" diameter="24" aria-label="Creating card"></mat-spinner>
         <span *ngIf="!isProcessing">Create {{ brandLabel }} card</span>
       </button>

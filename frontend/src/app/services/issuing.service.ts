@@ -4,6 +4,7 @@ import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
 import {
   AddTransactionRuleRequest,
+  CardNetworkOption,
   CardResponse,
   CardTransfer,
   CreateCardRequest,
@@ -22,6 +23,10 @@ export class IssuingService {
 
   getPhonePrefixes(): Observable<PhonePrefix[]> {
     return this.http.get<PhonePrefix[]>(`${this.baseUrl}/api/issuing/phone-prefixes`);
+  }
+
+  getCardNetworks(): Observable<CardNetworkOption[]> {
+    return this.http.get<CardNetworkOption[]>(`${this.baseUrl}/api/issuing/card-networks`);
   }
 
   getCards(userId: string, status?: string): Observable<CardResponse[]> {

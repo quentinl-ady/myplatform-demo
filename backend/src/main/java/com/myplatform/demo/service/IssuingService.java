@@ -7,7 +7,6 @@ import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.dto.CardResponse;
 import com.myplatform.demo.dto.TransactionRuleResponseDTO;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -21,22 +20,12 @@ public class IssuingService {
     private final PaymentInstrumentsApi paymentInstrumentsApi;
     private final TransactionRulesApi transactionRulesApi;
     private final BalanceAccountsApi balanceAccountsApi;
-    private final String issuingCountry;
-    private final String visaSubvariant;
-    private final String mcSubvariant;
 
-    public IssuingService(@Qualifier("balancePlatformClient") Client balancePlatformClient,
-                          @Value("${adyen.issuing.country}") String issuingCountry,
-                          @Value("${adyen.issuing.visa.subvariant}") String visaSubvariant,
-                          @Value("${adyen.issuing.mastercard.subvariant}") String mcSubvariant) {
+    public IssuingService(@Qualifier("balancePlatformClient") Client balancePlatformClient) {
         this.manageCardPinApi = new ManageCardPinApi(balancePlatformClient);
         this.paymentInstrumentsApi = new PaymentInstrumentsApi(balancePlatformClient);
         this.transactionRulesApi = new TransactionRulesApi(balancePlatformClient);
         this.balanceAccountsApi = new BalanceAccountsApi(balancePlatformClient);
-
-        this.issuingCountry = issuingCountry;
-        this.visaSubvariant = visaSubvariant;
-        this.mcSubvariant = mcSubvariant;
     }
 
     public String getPublicKey(String reason) throws IOException, ApiException {
@@ -44,13 +33,12 @@ public class IssuingService {
         return publicKeyResponse.getPublicKey();
     }
 
-    public String createVirtualCard(String balanceAccountId, String cardholderName, String brand, String email, String phone) throws IOException, ApiException {
-        String brandVariant = "visa".equalsIgnoreCase(brand) ? this.visaSubvariant : this.mcSubvariant;
-
+    public String createVirtualCard(CardRangeCatalog.CardRange cardRange, String balanceAccountId, String cardholderName,
+                                    String email, String phone) throws IOException, ApiException {
         CardInfo cardInfo = new CardInfo()
                 .cardholderName(cardholderName)
-                .brand(brand.toLowerCase())
-                .brandVariant(brandVariant)
+                .brand(cardRange.brand())
+                .brandVariant(cardRange.brandVariant())
                 .formFactor(CardInfo.FormFactorEnum.VIRTUAL);
 
         if (email != null || phone != null) {
@@ -69,7 +57,7 @@ public class IssuingService {
 
         PaymentInstrumentInfo paymentInstrumentInfo = new PaymentInstrumentInfo()
                 .balanceAccountId(balanceAccountId)
-                .issuingCountryCode(this.issuingCountry)
+                .issuingCountryCode(cardRange.countryCode())
                 .type(PaymentInstrumentInfo.TypeEnum.CARD)
                 .card(cardInfo);
 
