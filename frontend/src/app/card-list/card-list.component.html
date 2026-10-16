@@ -130,7 +130,7 @@
           </div>
           <div class="card-balance-account" *ngIf="card.balanceAccountDescription">
             <span class="label">Balance account</span>
-            <span class="value">{{ card.balanceAccountDescription }}</span>
+            <span class="value">{{ card.balanceAccountDescription }}<ng-container *ngIf="card.currencyCode"> · {{ card.currencyCode }}</ng-container></span>
           </div>
         </div>
 

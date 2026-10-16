@@ -9,8 +9,8 @@ export class CashManagementService {
   private readonly baseUrl = environment.apiBaseUrl;
   private readonly http = inject(HttpClient);
 
-  createBalanceAccount(userId: string, description: string): Observable<BalanceAccount> {
-    return this.http.post<BalanceAccount>(`${this.baseUrl}/api/cash-management/${userId}/balance-accounts`, {description});
+  createBalanceAccount(userId: string, description: string, currencyCode: string): Observable<BalanceAccount> {
+    return this.http.post<BalanceAccount>(`${this.baseUrl}/api/cash-management/${userId}/balance-accounts`, {description, currencyCode});
   }
 
   internalTransfer(request: InternalTransferRequest): Observable<any> {

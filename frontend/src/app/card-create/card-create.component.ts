@@ -124,8 +124,10 @@ export class CardCreateComponent implements OnInit {
     });
   }
 
+  /** The card spends in the default currency of the selected balance account. */
   get currency(): string {
-    return this.user?.currencyCode || '';
+    const id = this.form.value.balanceAccountId;
+    return this.balanceAccounts.find(ba => ba.balanceAccountId === id)?.currencyCode || '';
   }
 
   get brandLabel(): string {
@@ -233,7 +235,7 @@ export class CardCreateComponent implements OnInit {
       return {
         type,
         value: type === 'maxTransactions' ? Math.round(raw) : toMinorUnits(raw, this.currency),
-        currencyCode: this.currency
+        currencyCode: this.currency || undefined
       };
     });
 

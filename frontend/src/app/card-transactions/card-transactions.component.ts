@@ -111,7 +111,8 @@ export class CardTransactionsComponent implements OnInit {
 
   cardOptionLabel(card: CardResponse): string {
     const brand = card.brand === 'visa' ? 'Visa' : card.brand === 'mc' ? 'Mastercard' : card.brand;
-    return `${card.cardholderName} · ${brand} •••• ${card.lastFour} (${card.status})`;
+    const currency = card.currencyCode ? ` · ${card.currencyCode}` : '';
+    return `${card.cardholderName} · ${brand} •••• ${card.lastFour}${currency} (${card.status})`;
   }
 
   onCardFilterChange() {

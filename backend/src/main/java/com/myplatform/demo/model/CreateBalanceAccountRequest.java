@@ -7,4 +7,5 @@ import lombok.Setter;
 @Setter
 public class CreateBalanceAccountRequest {
     private String description;
+    private String currencyCode;
 }

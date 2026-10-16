@@ -110,10 +110,13 @@ public class BalanceAccountService {
         return customer;
     }
 
-    public BalanceAccount createNewBalanceAccount(String accountHolderId, String description) throws IOException, ApiException {
+    public BalanceAccount createNewBalanceAccount(String accountHolderId, String description, String currencyCode) throws IOException, ApiException {
         BalanceAccountInfo balanceAccountInfo = new BalanceAccountInfo()
                 .accountHolderId(accountHolderId)
                 .description(description != null && !description.isBlank() ? description : "Balance Account");
+        if (currencyCode != null) {
+            balanceAccountInfo.defaultCurrencyCode(currencyCode);
+        }
 
         return balanceAccountsApi.createBalanceAccount(balanceAccountInfo);
     }

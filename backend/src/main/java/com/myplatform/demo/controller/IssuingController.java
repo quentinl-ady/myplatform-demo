@@ -16,10 +16,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/issuing")
 public class IssuingController {
+
+    private static final Set<String> AMOUNT_RULE_TYPES = Set.of("maxAmountPerTransaction", "maxTotalAmount");
 
     private final IssuingService issuingService;
     private final CardTransferService cardTransferService;
@@ -46,6 +49,13 @@ public class IssuingController {
             throw new BadRequestException("Balance account is required");
         }
 
+        // Checked before the card exists, so a wrong currency doesn't leave a card without its limits.
+        String cardCurrency = issuingService.getBalanceAccountCurrency(request.getBalanceAccountId());
+        List<TransactionRuleRequest> rules = request.getTransactionRules() != null ? request.getTransactionRules() : List.of();
+        for (TransactionRuleRequest rule : rules) {
+            requireCardCurrency(rule.getType(), rule.getCurrencyCode(), cardCurrency);
+        }
+
         String paymentInstrumentId = issuingService.createVirtualCard(
                 request.getBalanceAccountId(),
                 request.getCardholderName(),
@@ -59,18 +69,13 @@ public class IssuingController {
         card.setUser(user);
         cardRepository.save(card);
 
-        if (request.getTransactionRules() != null && !request.getTransactionRules().isEmpty()) {
-            for (TransactionRuleRequest ruleRequest : request.getTransactionRules()) {
-                if ("blockedMccs".equals(ruleRequest.getType())) {
-                    if (ruleRequest.getBlockedMccs() != null && !ruleRequest.getBlockedMccs().isEmpty()) {
-                        issuingService.createMccBlockRule(paymentInstrumentId, ruleRequest.getBlockedMccs());
-                    }
-                } else {
-                    String currencyCode = ruleRequest.getCurrencyCode() != null
-                            ? ruleRequest.getCurrencyCode()
-                            : user.getCurrencyCode();
-                    issuingService.createTransactionRule(paymentInstrumentId, ruleRequest.getType(), ruleRequest.getValue(), currencyCode);
+        for (TransactionRuleRequest ruleRequest : rules) {
+            if ("blockedMccs".equals(ruleRequest.getType())) {
+                if (ruleRequest.getBlockedMccs() != null && !ruleRequest.getBlockedMccs().isEmpty()) {
+                    issuingService.createMccBlockRule(paymentInstrumentId, ruleRequest.getBlockedMccs());
                 }
+            } else {
+                issuingService.createTransactionRule(paymentInstrumentId, ruleRequest.getType(), ruleRequest.getValue(), cardCurrency);
             }
         }
 
@@ -129,10 +134,9 @@ public class IssuingController {
             }
             ruleId = issuingService.createMccBlockRule(request.getPaymentInstrumentId(), request.getBlockedMccs());
         } else {
-            String currencyCode = request.getCurrencyCode() != null
-                    ? request.getCurrencyCode()
-                    : card.getUser().getCurrencyCode();
-            ruleId = issuingService.createTransactionRule(request.getPaymentInstrumentId(), request.getType(), request.getValue(), currencyCode);
+            String cardCurrency = issuingService.getCardCurrency(request.getPaymentInstrumentId());
+            requireCardCurrency(request.getType(), request.getCurrencyCode(), cardCurrency);
+            ruleId = issuingService.createTransactionRule(request.getPaymentInstrumentId(), request.getType(), request.getValue(), cardCurrency);
         }
 
         return ResponseEntity.ok(Map.of("ruleId", ruleId, "status", "success"));
@@ -202,6 +206,13 @@ public class IssuingController {
         user.setApprovalPercentage(pct);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("approvalPercentage", pct));
+    }
+
+    private void requireCardCurrency(String ruleType, String requestedCurrency, String cardCurrency) {
+        if (AMOUNT_RULE_TYPES.contains(ruleType) && requestedCurrency != null && !requestedCurrency.equalsIgnoreCase(cardCurrency)) {
+            throw new BadRequestException("Spending limits must be in the card currency (" + cardCurrency
+                    + "), the default currency of its balance account.");
+        }
     }
 
     @GetMapping("/phone-prefixes")

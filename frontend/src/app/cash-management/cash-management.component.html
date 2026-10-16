@@ -53,16 +53,26 @@
 
     <!-- Create form -->
     <form class="create-form" id="create-account-form" *ngIf="showCreateForm" (ngSubmit)="createBalanceAccount()">
-      <label for="new-account-description">Account description</label>
       <div class="create-form-row">
-        <input id="new-account-description" name="newAccountDescription" class="fintech-input" [(ngModel)]="newAccountDescription"
-               placeholder="e.g. Operations EUR" maxlength="150" autocomplete="off"
-               [attr.aria-invalid]="createError ? true : null" [attr.aria-describedby]="createError ? 'create-account-error' : null" />
-        <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="creatingAccount || !newAccountDescription.trim()">
+        <div class="create-field description">
+          <label for="new-account-description">Account description</label>
+          <input id="new-account-description" name="newAccountDescription" class="fintech-input" [(ngModel)]="newAccountDescription"
+                 placeholder="e.g. Operations" maxlength="150" autocomplete="off"
+                 [attr.aria-invalid]="createError ? true : null" [attr.aria-describedby]="createError ? 'create-account-error' : null" />
+        </div>
+        <div class="create-field currency">
+          <label for="new-account-currency">Currency</label>
+          <select id="new-account-currency" name="newAccountCurrency" class="fintech-input" [(ngModel)]="newAccountCurrency"
+                  aria-describedby="new-account-currency-hint">
+            <option *ngFor="let c of accountCurrencies" [value]="c">{{ c }}</option>
+          </select>
+        </div>
+        <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="creatingAccount || !newAccountDescription.trim() || !newAccountCurrency">
           <span *ngIf="!creatingAccount">Create account</span>
           <mat-spinner *ngIf="creatingAccount" diameter="18" aria-label="Creating account"></mat-spinner>
         </button>
       </div>
+      <p class="hint-text create-hint" id="new-account-currency-hint">This becomes the account's default currency. You can't change it once the account is created.</p>
       <p class="field-error" id="create-account-error" *ngIf="createError" role="alert">{{ createError }}</p>
     </form>
 
@@ -77,9 +87,14 @@
       <section class="account-card" *ngFor="let account of balanceAccounts()" [attr.aria-label]="accountName(account)">
         <div class="account-card-header">
           <h3 class="account-name">{{ account.description || 'Balance account' }}</h3>
-          <span class="status-badge" [class.active]="account.status === 'active' || !account.status" [class.inactive]="account.status && account.status !== 'active'">
-            {{ account.status || 'active' }}
-          </span>
+          <div class="account-badges">
+            <span class="currency-badge" *ngIf="account.currencyCode" title="Default currency">
+              <span class="visually-hidden">Default currency: </span>{{ account.currencyCode }}
+            </span>
+            <span class="status-badge" [class.active]="account.status === 'active' || !account.status" [class.inactive]="account.status && account.status !== 'active'">
+              {{ account.status || 'active' }}
+            </span>
+          </div>
         </div>
         <div class="account-id mono">{{ account.balanceAccountId }}</div>
 

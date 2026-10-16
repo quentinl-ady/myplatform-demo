@@ -12,11 +12,15 @@ import com.myplatform.demo.service.PayoutConfigurationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/cash-management")
 public class CashManagementController {
+
+    private static final Pattern CURRENCY_CODE = Pattern.compile("[A-Z]{3}");
 
     private final UserRepository userRepository;
     private final BalanceAccountService balanceAccountService;
@@ -39,7 +43,8 @@ public class CashManagementController {
             @RequestBody CreateBalanceAccountRequest request) throws Exception {
         User user = findUserWithAccountHolder(userId);
         BalanceAccount ba = balanceAccountService.createNewBalanceAccount(
-                user.getAccountHolderId(), request.getDescription());
+                user.getAccountHolderId(), request.getDescription(),
+                resolveCurrencyCode(request.getCurrencyCode(), user.getCurrencyCode()));
 
         BalanceAccountInfoCustomer result = new BalanceAccountInfoCustomer();
         result.setBalanceAccountId(ba.getId());
@@ -95,6 +100,18 @@ public class CashManagementController {
         Map<String, Object> result = cashManagementService.checkInstantEligibility(
                 balanceAccountId, transferInstrumentId, currency);
         return ResponseEntity.ok(result);
+    }
+
+    // Without a currency Adyen creates the balance account in EUR, whatever the user's country.
+    private String resolveCurrencyCode(String requested, String userCurrency) {
+        if (requested == null || requested.isBlank()) {
+            return userCurrency;
+        }
+        String currencyCode = requested.trim().toUpperCase(Locale.ROOT);
+        if (!CURRENCY_CODE.matcher(currencyCode).matches()) {
+            throw new BadRequestException("The currency must be a three-letter ISO code, such as EUR.");
+        }
+        return currencyCode;
     }
 
     private User findUserWithAccountHolder(String userId) {

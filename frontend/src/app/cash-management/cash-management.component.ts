@@ -20,7 +20,14 @@ interface Recap {
 
 const BUSINESS_BANK_ACCOUNT = 'Business Bank Account';
 const DEFAULT_PAYOUT_CURRENCIES = ['EUR', 'GBP', 'USD'];
+const BALANCE_ACCOUNT_CURRENCIES = ['EUR', 'GBP', 'USD'];
 const PAYOUT_FREQUENCY_LABELS: Record<string, string> = {daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'};
+
+function withDefaultCurrencyFirst(account: BalanceAccount): BalanceAccount {
+    if (!account.balances?.length || !account.currencyCode) return account;
+    const isDefault = (b: BalanceInfo) => b.currency === account.currencyCode ? 1 : 0;
+    return {...account, balances: [...account.balances].sort((a, b) => isDefault(b) - isDefault(a))};
+}
 
 @Component({
     selector: 'app-cash-management',
@@ -47,6 +54,8 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     lastUpdated: number | null = null;
     showCreateForm = false;
     newAccountDescription = '';
+    newAccountCurrency = '';
+    readonly accountCurrencies = BALANCE_ACCOUNT_CURRENCIES;
     creatingAccount = false;
     createError = '';
     togglingSweepId: string | null = null;
@@ -162,7 +171,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         }
         this.accountService.getBalanceAccounts(this.userId).subscribe({
             next: res => {
-                this.balanceAccounts.set(res || []);
+                this.balanceAccounts.set((res || []).map(withDefaultCurrencyFirst));
                 this.lastUpdated = Date.now();
                 this.accountsState = 'ready';
                 this.refreshDerivedState();
@@ -196,23 +205,26 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     toggleCreateForm() {
         this.showCreateForm = !this.showCreateForm;
         this.createError = '';
-        if (!this.showCreateForm) {
+        if (this.showCreateForm) {
+            this.newAccountCurrency = this.accountCurrencies.includes(this.userCurrency) ? this.userCurrency : this.accountCurrencies[0];
+        } else {
             this.newAccountDescription = '';
         }
     }
 
     createBalanceAccount() {
         const description = this.newAccountDescription.trim();
-        if (!description || this.creatingAccount) return;
+        const currency = this.newAccountCurrency;
+        if (!description || !currency || this.creatingAccount) return;
         this.creatingAccount = true;
         this.createError = '';
-        this.cashManagementService.createBalanceAccount(this.userId, description).subscribe({
+        this.cashManagementService.createBalanceAccount(this.userId, description, currency).subscribe({
             next: res => {
-                this.balanceAccounts.set([...this.balanceAccounts(), res]);
+                this.balanceAccounts.set([...this.balanceAccounts(), withDefaultCurrencyFirst(res)]);
                 this.newAccountDescription = '';
                 this.showCreateForm = false;
                 this.creatingAccount = false;
-                this.toastSuccess(`Balance account "${res.description || description}" created`);
+                this.toastSuccess(`Balance account "${res.description || description}" created in ${res.currencyCode || currency}`);
             },
             error: err => {
                 this.creatingAccount = false;

@@ -77,6 +77,15 @@ public class IssuingService {
         return paymentInstrument.getId();
     }
 
+    // A card spends in the default currency of the balance account it is linked to.
+    public String getBalanceAccountCurrency(String balanceAccountId) throws IOException, ApiException {
+        return balanceAccountsApi.getBalanceAccount(balanceAccountId).getDefaultCurrencyCode();
+    }
+
+    public String getCardCurrency(String paymentInstrumentId) throws IOException, ApiException {
+        return getBalanceAccountCurrency(paymentInstrumentsApi.getPaymentInstrument(paymentInstrumentId).getBalanceAccountId());
+    }
+
     public CardResponse getCardDetails(String paymentInstrumentId) throws IOException, ApiException {
         PaymentInstrument pi = paymentInstrumentsApi.getPaymentInstrument(paymentInstrumentId);
 
@@ -88,6 +97,7 @@ public class IssuingService {
             try {
                 BalanceAccount ba = balanceAccountsApi.getBalanceAccount(pi.getBalanceAccountId());
                 response.setBalanceAccountDescription(ba.getDescription());
+                response.setCurrencyCode(ba.getDefaultCurrencyCode());
             } catch (Exception e) {
                 response.setBalanceAccountDescription(pi.getBalanceAccountId());
             }

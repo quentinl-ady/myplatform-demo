@@ -53,7 +53,9 @@
               {{ ba.description }} ({{ ba.currencyCode }})
             </option>
           </select>
-          <span class="field-hint">The card spends the funds of this account.</span>
+          <span class="field-hint">
+            The card spends the funds of this account, in its default currency<ng-container *ngIf="currency">: <strong>{{ currency }}</strong></ng-container>.
+          </span>
           <span class="field-error" *ngIf="balanceAccounts.length === 0">No balance account found. A balance account is required to issue a card.</span>
           <span class="field-error" *ngIf="balanceAccounts.length > 0 && form.get('balanceAccountId')?.invalid && form.get('balanceAccountId')?.touched">Select a balance account.</span>
         </div>
@@ -133,7 +135,10 @@
           <h3 id="step-rules"><span class="step-number" aria-hidden="true">3</span>Spending controls</h3>
           <span class="optional-badge">Optional</span>
         </div>
-        <p class="section-description">Set spending limits and block merchant categories. You can also add rules later from My cards.</p>
+        <p class="section-description">
+          Set spending limits and block merchant categories. Amounts are in the card currency{{ currency ? ' (' + currency + ')' : '' }}.
+          You can also add rules later from My cards.
+        </p>
 
         <div class="rules-subsection">
           <h4 class="subsection-title">
@@ -261,6 +266,10 @@
       <div class="detail-row" *ngIf="createdCard.balanceAccountDescription">
         <dt class="label">Balance account</dt>
         <dd class="value">{{ createdCard.balanceAccountDescription }}</dd>
+      </div>
+      <div class="detail-row" *ngIf="createdCard.currencyCode">
+        <dt class="label">Card currency</dt>
+        <dd class="value">{{ createdCard.currencyCode }}</dd>
       </div>
       <div class="detail-row" *ngIf="createdCard.paymentInstrumentId">
         <dt class="label">Payment instrument ID</dt>

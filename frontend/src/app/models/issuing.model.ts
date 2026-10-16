@@ -40,6 +40,8 @@ export interface CardResponse {
   expiryYear: string;
   status: string;
   balanceAccountDescription: string;
+  /** Default currency of the card's balance account, which is the currency the card spends in. */
+  currencyCode?: string;
   transactionRules: TransactionRuleResponse[];
 }
 

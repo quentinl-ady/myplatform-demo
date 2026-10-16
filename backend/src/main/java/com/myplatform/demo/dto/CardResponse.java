@@ -15,5 +15,6 @@ public class CardResponse {
     private String expiryYear;
     private String status;
     private String balanceAccountDescription;
+    private String currencyCode;
     private List<TransactionRuleResponseDTO> transactionRules;
 }

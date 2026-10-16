@@ -11,12 +11,11 @@ import { firstValueFrom, forkJoin } from 'rxjs';
 import { MaterialModule } from '../material.module';
 
 import {
-  User,
   CardResponse,
   TransactionRuleResponse,
   AddTransactionRuleRequest
 } from '../models';
-import { AccountService, IssuingService } from '../services';
+import { IssuingService } from '../services';
 import { ConfirmService, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 import { FormatCardNumberPipe } from './format-card-number.pipe';
 import { MCC_CODES } from '../industry-codes';
@@ -44,7 +43,6 @@ const REVEAL_DURATION_MS = 30000;
 export class CardListComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private accountService = inject(AccountService);
   private issuingService = inject(IssuingService);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
@@ -52,7 +50,6 @@ export class CardListComponent implements OnInit, OnDestroy {
   private confirmService = inject(ConfirmService);
 
   userId = '';
-  user?: User;
   activeCards: CardResponse[] = [];
   suspendedCards: CardResponse[] = [];
   closedCards: CardResponse[] = [];
@@ -94,7 +91,6 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       if (this.userId) {
-        this.loadUser();
         this.loadActiveAndSuspended();
       }
     });
@@ -110,15 +106,6 @@ export class CardListComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.revealTimer);
-  }
-
-  loadUser() {
-    this.accountService.getUserById(this.userId).subscribe({
-      next: (user) => {
-        this.user = user;
-        this.cdr.detectChanges();
-      }
-    });
   }
 
   loadActiveAndSuspended() {
@@ -431,7 +418,7 @@ export class CardListComponent implements OnInit, OnDestroy {
   }
 
   get ruleCurrency(): string {
-    return this.user?.currencyCode || '';
+    return this.selectedCard?.currencyCode || '';
   }
 
   get isCountRule(): boolean {
@@ -475,8 +462,8 @@ export class CardListComponent implements OnInit, OnDestroy {
       request = {
         paymentInstrumentId: this.selectedCard.paymentInstrumentId,
         type,
-        value: type === 'maxTransactions' ? Math.round(rawValue) : toMinorUnits(rawValue, this.user?.currencyCode),
-        currencyCode: this.user?.currencyCode
+        value: type === 'maxTransactions' ? Math.round(rawValue) : toMinorUnits(rawValue, this.ruleCurrency),
+        currencyCode: this.ruleCurrency || undefined
       };
     }
 
