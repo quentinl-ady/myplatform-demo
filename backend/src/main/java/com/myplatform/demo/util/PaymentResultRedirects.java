@@ -21,10 +21,18 @@ public final class PaymentResultRedirects {
     }
 
     public static String returnUrl(String backendRedirectEndpoint, String userId, String source) {
+        return returnUrl(backendRedirectEndpoint, userId, source, null);
+    }
+
+    /** @param paymentId CheckoutPayment to update with the redirect result, null when the payment isn't tracked */
+    public static String returnUrl(String backendRedirectEndpoint, String userId, String source, String paymentId) {
         StringBuilder url = new StringBuilder(backendRedirectEndpoint)
                 .append("?source=").append(encode(source));
         if (userId != null && !userId.isBlank()) {
             url.append("&userId=").append(encode(userId));
+        }
+        if (paymentId != null && !paymentId.isBlank()) {
+            url.append("&paymentId=").append(encode(paymentId));
         }
         return url.toString();
     }

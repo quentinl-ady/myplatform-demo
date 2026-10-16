@@ -13,6 +13,7 @@ import com.myplatform.demo.model.RequestPayment;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.configuration.ApiLogContext;
+import com.myplatform.demo.service.CheckoutPaymentService;
 import com.myplatform.demo.service.GpayJwtService;
 import com.myplatform.demo.service.PaymentCheckoutService;
 import com.myplatform.demo.util.PaymentResultRedirects;
@@ -35,17 +36,20 @@ public class PaymentController {
 
     private final UserRepository userRepository;
     private final PaymentCheckoutService paymentCheckoutService;
+    private final CheckoutPaymentService checkoutPaymentService;
     private final GpayJwtService gpayJwtService;
     private final String frontendUrl;
     private final String googlePayMerchantName;
 
     public PaymentController(UserRepository userRepository,
                              PaymentCheckoutService paymentCheckoutService,
+                             CheckoutPaymentService checkoutPaymentService,
                              GpayJwtService gpayJwtService,
                              @Value("${app.frontend.url}") String frontendUrl,
                              @Value("${adyen.gpay.merchantName:My Platform}") String googlePayMerchantName) {
         this.userRepository = userRepository;
         this.paymentCheckoutService = paymentCheckoutService;
+        this.checkoutPaymentService = checkoutPaymentService;
         this.gpayJwtService = gpayJwtService;
         this.frontendUrl = frontendUrl;
         this.googlePayMerchantName = googlePayMerchantName;
@@ -68,7 +72,8 @@ public class PaymentController {
                 user.getId(),
                 requestPayment.getStoreReference(),
                 user.getActivityReason(),
-                user.getBalanceAccountId());
+                user.getBalanceAccountId(),
+                requestPayment.getAdvancedOptions());
 
         return ResponseEntity.ok(paymentSessionResponse);
     }
@@ -77,7 +82,8 @@ public class PaymentController {
     public RedirectView handleShopperRedirect(@RequestParam(required = false) String payload,
                                               @RequestParam(required = false) String redirectResult,
                                               @RequestParam(required = false) String userId,
-                                              @RequestParam(required = false) String source) {
+                                              @RequestParam(required = false) String source,
+                                              @RequestParam(required = false) String paymentId) {
         String resultSource = source != null ? source : PaymentResultRedirects.SOURCE_CHECKOUT;
         try {
             PaymentCompletionDetails completionDetails = new PaymentCompletionDetails();
@@ -91,6 +97,7 @@ public class PaymentController {
             detailsRequest.setDetails(completionDetails);
 
             PaymentDetailsResponse paymentDetailsResponse = paymentCheckoutService.getPaymentsApi().paymentsDetails(detailsRequest);
+            checkoutPaymentService.recordRedirectResult(paymentId, paymentDetailsResponse);
 
             return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, paymentDetailsResponse, userId, resultSource));
         } catch (Exception e) {
@@ -176,11 +183,13 @@ public class PaymentController {
                 tokenPaymentRequest.getCurrencyCode(),
                 tokenPaymentRequest.getAmount(),
                 tokenPaymentRequest.getReference(),
+                user.getId(),
                 tokenPaymentRequest.getStoreReference(),
                 user.getActivityReason(),
                 user.getBalanceAccountId(),
                 tokenPaymentRequest.getStoredPaymentMethodId(),
-                tokenPaymentRequest.getType());
+                tokenPaymentRequest.getType(),
+                tokenPaymentRequest.getAdvancedOptions());
 
         return ResponseEntity.ok(response);
     }

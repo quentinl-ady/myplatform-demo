@@ -88,6 +88,10 @@
             <span class="helper-text error" *ngIf="checkoutForm.get('reference')?.touched && checkoutForm.get('reference')?.invalid">Enter an order reference.</span>
           </div>
 
+          <app-advanced-options [group]="paymentAdvanced" [currency]="checkoutForm.get('currencyCode')?.value"
+                                [amount]="minorAmount(checkoutForm)" [defaultSplit]="defaultSplit" idPrefix="pay-advanced">
+          </app-advanced-options>
+
           <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit"
                   [disabled]="checkoutForm.invalid || submitting()" aria-describedby="pay-submit-hint">
             <mat-spinner *ngIf="submitting()" diameter="20" aria-label="Loading payment form"></mat-spinner>
@@ -111,9 +115,9 @@
         <app-payment-outcome-panel *ngIf="paymentOutcome() as outcome"
                                    [outcome]="outcome"
                                    [primaryLabel]="isPositive(outcome) ? 'New payment' : 'Try again'"
-                                   [secondaryLabel]="isPositive(outcome) ? undefined : 'New payment'"
+                                   [secondaryLabel]="isPositive(outcome) ? (paymentTrackingId() ? 'View in Captures' : undefined) : 'New payment'"
                                    (primary)="isPositive(outcome) ? newPayment() : retryPayment()"
-                                   (secondary)="newPayment()">
+                                   (secondary)="isPositive(outcome) ? openCaptures() : newPayment()">
         </app-payment-outcome-panel>
 
         <div class="dropin-wrapper" [hidden]="!dropinActive()">
@@ -285,9 +289,9 @@
         <app-payment-outcome-panel *ngIf="tokenPaymentOutcome() as outcome"
                                    [outcome]="outcome"
                                    [primaryLabel]="isPositive(outcome) ? 'New payment' : 'Try again'"
-                                   [secondaryLabel]="isPositive(outcome) ? undefined : 'New payment'"
+                                   [secondaryLabel]="isPositive(outcome) ? (tokenPaymentTrackingId() ? 'View in Captures' : undefined) : 'New payment'"
                                    (primary)="isPositive(outcome) ? newTokenPayment() : retryTokenPayment()"
-                                   (secondary)="newTokenPayment()">
+                                   (secondary)="isPositive(outcome) ? openCaptures() : newTokenPayment()">
         </app-payment-outcome-panel>
 
         <ng-container *ngIf="!tokenPaymentOutcome()">
@@ -332,6 +336,10 @@
               </div>
               <span class="helper-text error" *ngIf="tokenPaymentForm.get('reference')?.touched && tokenPaymentForm.get('reference')?.invalid">Enter a payment reference.</span>
             </div>
+
+            <app-advanced-options [group]="tokenPaymentAdvanced" [currency]="tokenPaymentForm.get('currencyCode')?.value"
+                                  [amount]="minorAmount(tokenPaymentForm)" [defaultSplit]="defaultSplit" idPrefix="tp-advanced">
+            </app-advanced-options>
 
             <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit"
                     [disabled]="tokenPaymentForm.invalid || submittingTokenPayment()" aria-describedby="tp-submit-hint">

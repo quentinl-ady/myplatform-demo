@@ -1,12 +1,12 @@
 import { Component, NgZone, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { MaterialModule } from '../material.module';
-import { SendPaymentPayload, SendPaymentResponse, Store, StoredPaymentMethod, TokenPaymentPayload, User } from '../models';
-import { AccountService, PaymentService, StoreService } from '../services';
+import { AdvancedPaymentOptions, SendPaymentPayload, SendPaymentResponse, Store, StoredPaymentMethod, TokenPaymentPayload, User } from '../models';
+import { AccountService, CaptureService, PaymentService, StoreService } from '../services';
 import { ConfirmService, httpErrorMessage, toMinorUnits } from '../shared';
 import { AdyenCheckout, AdyenCheckoutError, CoreConfiguration, Dropin } from '@adyen/adyen-web/auto';
 import '@adyen/adyen-web/styles/adyen.css';
@@ -20,8 +20,17 @@ import {
   dropinLoadFailure,
   errorOutcome,
   resultExtras,
+  sessionResultOf,
 } from './payment-outcome';
 import { PaymentOutcomePanelComponent } from './payment-outcome-panel.component';
+import { AdvancedOptionsComponent } from './advanced-options/advanced-options.component';
+import {
+  commissionWithinAmount,
+  createAdvancedOptionsForm,
+  defaultSplitDescription,
+  toAdvancedOptions,
+  withCaptureNote,
+} from './advanced-options/advanced-options';
 
 const log = (...args: unknown[]) => { if (!environment.production) console.log(...args); };
 
@@ -35,7 +44,8 @@ type CheckoutTab = 'payment' | 'tokenize' | 'token-payment';
     MaterialModule,
     ReactiveFormsModule,
     RouterLink,
-    PaymentOutcomePanelComponent
+    PaymentOutcomePanelComponent,
+    AdvancedOptionsComponent
   ],
   templateUrl: './checkout.component.html',
   styleUrl: './checkout.component.css'
@@ -54,6 +64,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   readonly submitting = signal(false);
   readonly dropinActive = signal(false);
   readonly paymentOutcome = signal<PaymentOutcome | null>(null);
+  /** Id on the Captures page of the current Drop-in payment (delayed or manual capture only). */
+  readonly paymentTrackingId = signal<string | null>(null);
 
   readonly submittingTokenize = signal(false);
   readonly tokenizeDropinActive = signal(false);
@@ -66,6 +78,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   readonly deletingToken = signal<string | null>(null);
   readonly submittingTokenPayment = signal(false);
   readonly tokenPaymentOutcome = signal<PaymentOutcome | null>(null);
+  readonly tokenPaymentTrackingId = signal<string | null>(null);
 
   checkoutForm: FormGroup;
   tokenizeForm: FormGroup;
@@ -73,9 +86,11 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   private fb = inject(FormBuilder);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private zone = inject(NgZone);
   private accountService = inject(AccountService);
   private paymentService = inject(PaymentService);
+  private captureService = inject(CaptureService);
   private storeService = inject(StoreService);
   private matSnackBar = inject(MatSnackBar);
   private confirmService = inject(ConfirmService);
@@ -91,8 +106,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       storeReference: [''],
       currencyCode: ['EUR', Validators.required],
       amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-      reference: ['', [Validators.required, Validators.pattern(/\S/)]]
-    });
+      reference: ['', [Validators.required, Validators.pattern(/\S/)]],
+      advanced: createAdvancedOptionsForm(this.fb)
+    }, { validators: commissionWithinAmount('amount', ['advanced', 'split']) });
 
     this.tokenizeForm = this.fb.group({
       storeReference: [''],
@@ -104,12 +120,36 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       storeReference: [''],
       currencyCode: ['EUR', Validators.required],
       amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
-      reference: ['', [Validators.required, Validators.pattern(/\S/)]]
-    });
+      reference: ['', [Validators.required, Validators.pattern(/\S/)]],
+      advanced: createAdvancedOptionsForm(this.fb)
+    }, { validators: commissionWithinAmount('amount', ['advanced', 'split']) });
   }
 
   get isEmbeddedPayment(): boolean {
     return this.user()?.activityReason === 'embeddedPayment';
+  }
+
+  get paymentAdvanced(): FormGroup {
+    return this.checkoutForm.get('advanced') as FormGroup;
+  }
+
+  get tokenPaymentAdvanced(): FormGroup {
+    return this.tokenPaymentForm.get('advanced') as FormGroup;
+  }
+
+  get defaultSplit(): string {
+    return defaultSplitDescription(this.user()?.activityReason);
+  }
+
+  /** Amount of the form in minor units, or null while it isn't valid. */
+  minorAmount(form: FormGroup): number | null {
+    const control = form.get('amount');
+    const value = Number(control?.value);
+    return control?.valid && value > 0 ? toMinorUnits(value, form.get('currencyCode')?.value) : null;
+  }
+
+  openCaptures(): void {
+    this.router.navigate(['/', this.userId, 'captures']);
   }
 
   ngOnInit() {
@@ -189,6 +229,12 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     if (form.get('reference')?.invalid) {
       return 'Enter a reference to continue.';
     }
+    if (form.get('advanced')?.invalid) {
+      return 'Fix the advanced options to continue.';
+    }
+    if (form.hasError('commissionTooHigh')) {
+      return "The commission can't be higher than the amount.";
+    }
     return null;
   }
 
@@ -218,22 +264,26 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const currency: string = this.checkoutForm.get('currencyCode')?.value;
     const reference: string = String(this.checkoutForm.get('reference')?.value).trim();
     const amount = toMinorUnits(Number(this.checkoutForm.get('amount')?.value), currency);
+    const advancedOptions = toAdvancedOptions(this.paymentAdvanced, currency);
 
     const payload: SendPaymentPayload = {
       amount,
       currencyCode: currency,
       storeReference: this.storeReferenceOf(this.checkoutForm),
       userId: this.userId,
-      reference
+      reference,
+      advancedOptions
     };
 
     this.unmountPaymentDropin();
     this.paymentOutcome.set(null);
+    this.paymentTrackingId.set(null);
     this.submitting.set(true);
     this.paymentService.sendPayment(payload).subscribe({
       next: (res) => {
         log('sendPayment response:', res);
-        this.mountPaymentDropin(res, { amount: res.amount ?? amount, currency: res.currency || currency, reference });
+        this.paymentTrackingId.set(res.trackingId || null);
+        this.mountPaymentDropin(res, { amount: res.amount ?? amount, currency: res.currency || currency, reference }, advancedOptions);
       },
       error: (err) => {
         this.showError(httpErrorMessage(err, "Couldn't create the payment session. Try again."));
@@ -245,11 +295,14 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   newPayment(): void {
     this.unmountPaymentDropin();
     this.paymentOutcome.set(null);
+    this.paymentTrackingId.set(null);
     this.checkoutForm.reset({
       storeReference: this.checkoutForm.get('storeReference')?.value || '',
       currencyCode: this.checkoutForm.get('currencyCode')?.value || 'EUR',
       amount: null,
-      reference: ''
+      reference: '',
+      // Kept like the currency, so several payments can be tested with the same capture and split settings.
+      advanced: this.paymentAdvanced.getRawValue()
     });
   }
 
@@ -258,7 +311,8 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.onSubmit();
   }
 
-  private async mountPaymentDropin(session: SendPaymentResponse, context: PaymentContext): Promise<void> {
+  private async mountPaymentDropin(session: SendPaymentResponse, context: PaymentContext,
+                                   options?: AdvancedPaymentOptions): Promise<void> {
     this.dropinActive.set(true);
     let mounted = false;
     try {
@@ -272,9 +326,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
         amount: { value: session.amount, currency: session.currency },
         clientKey,
         onPaymentCompleted: (result) => this.zone.run(() =>
-          this.showPaymentOutcome(describePaymentResult(result.resultCode, context, resultExtras(result)))),
+          this.showDropinResult(result.resultCode, result, session, context, options)),
         onPaymentFailed: (result) => this.zone.run(() =>
-          this.showPaymentOutcome(describePaymentResult(result?.resultCode ?? 'Error', context, resultExtras(result)))),
+          this.showDropinResult(result?.resultCode ?? 'Error', result, session, context, options)),
         onError: (error) => this.zone.run(() => {
           if (this.isShopperCancel(error)) return;
           log('Drop-in error:', error);
@@ -311,6 +365,25 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   private showPaymentOutcome(outcome: PaymentOutcome): void {
     this.unmountPaymentDropin();
     this.paymentOutcome.set(outcome);
+  }
+
+  private showDropinResult(resultCode: string, result: unknown, session: SendPaymentResponse,
+                           context: PaymentContext, options?: AdvancedPaymentOptions): void {
+    const trackingId = session.trackingId || null;
+    const outcome = withCaptureNote(describePaymentResult(resultCode, context, resultExtras(result)), options, !!trackingId);
+    this.showPaymentOutcome(outcome);
+
+    const sessionResult = sessionResultOf(result);
+    if (!trackingId || !sessionResult) return;
+    // The Drop-in result of the sessions flow has no PSP reference: the backend gets it from the session result.
+    this.captureService.syncSessionResult(trackingId, this.userId, sessionResult).subscribe({
+      next: (payment) => {
+        if (payment.pspReference && !outcome.pspReference && this.paymentOutcome() === outcome) {
+          this.paymentOutcome.set({ ...outcome, pspReference: payment.pspReference });
+        }
+      },
+      error: (err) => log('Session result not synced, the Captures page relies on the webhook:', err)
+    });
   }
 
   private unmountPaymentDropin(): void {
@@ -541,6 +614,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const reference: string = String(this.tokenPaymentForm.get('reference')?.value).trim();
     const amount = toMinorUnits(Number(this.tokenPaymentForm.get('amount')?.value), currency);
     const context: PaymentContext = { amount, currency, reference };
+    const advancedOptions = toAdvancedOptions(this.tokenPaymentAdvanced, currency);
 
     const payload: TokenPaymentPayload = {
       amount,
@@ -549,17 +623,20 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       userId: this.userId,
       reference,
       storedPaymentMethodId: method.recurringDetailReference,
-      type: method.type
+      type: method.type,
+      advancedOptions
     };
 
+    this.tokenPaymentTrackingId.set(null);
     this.submittingTokenPayment.set(true);
     this.paymentService.makeTokenPayment(payload).subscribe({
       next: (res) => {
         log('token payment response:', res);
-        this.tokenPaymentOutcome.set(describePaymentResult(res.resultCode, context, {
+        this.tokenPaymentTrackingId.set(res.trackingId || null);
+        this.tokenPaymentOutcome.set(withCaptureNote(describePaymentResult(res.resultCode, context, {
           refusalReason: res.refusalReason || undefined,
           pspReference: res.pspReference || undefined
-        }));
+        }), advancedOptions, !!res.trackingId));
         this.submittingTokenPayment.set(false);
       },
       error: (err) => {
@@ -571,11 +648,13 @@ export class CheckoutComponent implements OnInit, OnDestroy {
 
   newTokenPayment(): void {
     this.tokenPaymentOutcome.set(null);
+    this.tokenPaymentTrackingId.set(null);
     this.tokenPaymentForm.reset({
       storeReference: this.tokenPaymentForm.get('storeReference')?.value || '',
       currencyCode: this.tokenPaymentForm.get('currencyCode')?.value || 'EUR',
       amount: null,
-      reference: ''
+      reference: '',
+      advanced: this.tokenPaymentAdvanced.getRawValue()
     });
   }
 

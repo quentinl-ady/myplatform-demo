@@ -67,6 +67,11 @@ const routeConfig: Routes = [
         title: 'Checkout'
       },
       {
+        path: 'captures',
+        loadComponent: () => import('./captures/captures.component').then(m => m.CapturesComponent),
+        title: 'Captures'
+      },
+      {
          path: 'paybylink',
          loadComponent: () => import('./paybylink/paybylink.component').then(m => m.PayByLinkComponent),
          title: 'Pay by Link'

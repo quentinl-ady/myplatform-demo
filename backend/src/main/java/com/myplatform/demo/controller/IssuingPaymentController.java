@@ -13,6 +13,7 @@ import com.myplatform.demo.model.RequestPayment;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.configuration.ApiLogContext;
+import com.myplatform.demo.service.CheckoutPaymentService;
 import com.myplatform.demo.service.IssuingPaymentCheckoutService;
 import com.myplatform.demo.util.PaymentResultRedirects;
 import org.slf4j.Logger;
@@ -33,13 +34,16 @@ public class IssuingPaymentController {
 
     private final UserRepository userRepository;
     private final IssuingPaymentCheckoutService issuingPaymentCheckoutService;
+    private final CheckoutPaymentService checkoutPaymentService;
     private final String frontendUrl;
 
     public IssuingPaymentController(UserRepository userRepository,
                                     IssuingPaymentCheckoutService issuingPaymentCheckoutService,
+                                    CheckoutPaymentService checkoutPaymentService,
                                     @Value("${app.frontend.url}") String frontendUrl) {
         this.userRepository = userRepository;
         this.issuingPaymentCheckoutService = issuingPaymentCheckoutService;
+        this.checkoutPaymentService = checkoutPaymentService;
         this.frontendUrl = frontendUrl;
     }
 
@@ -61,7 +65,8 @@ public class IssuingPaymentController {
                 requestPayment.getStoreReference(),
                 user.getActivityReason(),
                 user.getBalanceAccountId(),
-                requestPayment.getReturnUserId());
+                requestPayment.getReturnUserId(),
+                requestPayment.getAdvancedOptions());
 
         return ResponseEntity.ok(paymentSessionResponse);
     }
@@ -69,7 +74,8 @@ public class IssuingPaymentController {
     @GetMapping("/redirect")
     public RedirectView handleShopperRedirect(@RequestParam(required = false) String payload,
                                               @RequestParam(required = false) String redirectResult,
-                                              @RequestParam(required = false) String userId) {
+                                              @RequestParam(required = false) String userId,
+                                              @RequestParam(required = false) String paymentId) {
         String source = PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT;
         try {
             PaymentCompletionDetails completionDetails = new PaymentCompletionDetails();
@@ -83,6 +89,7 @@ public class IssuingPaymentController {
             detailsRequest.setDetails(completionDetails);
 
             PaymentDetailsResponse paymentDetailsResponse = issuingPaymentCheckoutService.paymentDetails(detailsRequest);
+            checkoutPaymentService.recordRedirectResult(paymentId, paymentDetailsResponse);
 
             return new RedirectView(PaymentResultRedirects.resultPage(frontendUrl, paymentDetailsResponse, userId, source));
         } catch (Exception e) {
@@ -170,7 +177,9 @@ public class IssuingPaymentController {
                 user.getActivityReason(),
                 user.getBalanceAccountId(),
                 tokenPaymentRequest.getStoredPaymentMethodId(),
-                tokenPaymentRequest.getType());
+                tokenPaymentRequest.getType(),
+                tokenPaymentRequest.getReturnUserId(),
+                tokenPaymentRequest.getAdvancedOptions());
 
         return ResponseEntity.ok(response);
     }

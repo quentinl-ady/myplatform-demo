@@ -76,6 +76,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
       items: [
         { label: 'Transactions', icon: 'payment', path: 'transactions' },
         { label: 'Checkout', icon: 'shop', path: 'checkout' },
+        { label: 'Captures', icon: 'price_check', path: 'captures' },
         { label: 'Point of sale', icon: 'computer', path: 'pos', lock: 'embeddedPayment' },
         { label: 'Pay by Link', icon: 'link', path: 'paybylink', lock: 'embeddedPayment' },
         { label: 'Stores', icon: 'store', path: 'store', lock: 'embeddedPayment' }

@@ -1,0 +1,53 @@
+/* Form controls of the advanced checkout options and the capture dialog (their own view encapsulation
+   doesn't inherit the page styles). */
+.field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.field label,
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fintech-text-secondary);
+  margin-bottom: 8px;
+}
+.fintech-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  box-sizing: border-box;
+  background: var(--fintech-surface);
+  color: var(--fintech-text);
+  transition: border-color 0.2s;
+}
+.fintech-input:focus {
+  outline: none;
+  border-color: var(--fintech-primary);
+}
+.fintech-input[aria-invalid="true"] {
+  border-color: var(--fintech-danger);
+}
+.choice-toggle {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.choice-toggle ::ng-deep .mat-button-toggle-label-content {
+  line-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.helper-text {
+  display: block;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fintech-text-secondary);
+}
+.helper-text.error {
+  color: var(--fintech-danger);
+}

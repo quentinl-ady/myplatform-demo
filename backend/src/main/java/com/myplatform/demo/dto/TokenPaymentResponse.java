@@ -9,4 +9,6 @@ public class TokenPaymentResponse {
     private String pspReference;
     private String resultCode;
     private String refusalReason;
+    /** Id of the payment on the Captures page; null for immediate capture. */
+    private String trackingId;
 }

@@ -7,12 +7,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 @Repository
 public interface WebhookEventRepository extends JpaRepository<WebhookEvent, Long> {
 
     List<WebhookEvent> findByUserIdOrderByReceivedAtDesc(String userId);
+
+    List<WebhookEvent> findByResourceIdInOrderByReceivedAtAsc(Collection<String> resourceIds);
 
     List<WebhookEvent> findTop50ByUserIdOrderByReceivedAtDesc(String userId);
 

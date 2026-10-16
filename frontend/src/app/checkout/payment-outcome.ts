@@ -27,6 +27,12 @@ export interface PaymentResultExtras {
   pspReference?: string;
 }
 
+/** sessionResult of a Drop-in result in the sessions flow, used to get the payment result from the backend. */
+export function sessionResultOf(result: unknown): string | undefined {
+  const value = result && typeof result === 'object' ? (result as Record<string, unknown>)['sessionResult'] : undefined;
+  return typeof value === 'string' && value ? value : undefined;
+}
+
 /** Reads optional fields that Adyen may add to a Drop-in result object. */
 export function resultExtras(result: unknown): PaymentResultExtras {
   if (!result || typeof result !== 'object') return {};

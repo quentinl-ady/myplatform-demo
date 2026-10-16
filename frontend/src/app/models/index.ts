@@ -4,6 +4,7 @@ export * from './account.model';
 export * from './session.model';
 export * from './store.model';
 export * from './payment.model';
+export * from './capture.model';
 export * from './payout.model';
 export * from './transfer.model';
 export * from './issuing.model';

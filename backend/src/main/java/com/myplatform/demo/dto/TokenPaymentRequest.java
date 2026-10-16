@@ -13,4 +13,7 @@ public class TokenPaymentRequest {
     private String reference;
     private String storedPaymentMethodId;
     private String type;
+    /** Issuing tests: platform user whose Captures page lists the payment. */
+    private String returnUserId;
+    private AdvancedPaymentOptions advancedOptions;
 }

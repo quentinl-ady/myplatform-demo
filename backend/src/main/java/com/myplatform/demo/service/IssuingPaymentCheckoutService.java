@@ -12,6 +12,7 @@ import com.adyen.model.recurring.RecurringDetailsResult;
 import com.adyen.service.checkout.PaymentsApi;
 import com.adyen.service.exception.ApiException;
 import com.adyen.service.recurring.RecurringApi;
+import com.myplatform.demo.dto.AdvancedPaymentOptions;
 import com.myplatform.demo.dto.StoredPaymentMethodDTO;
 import com.myplatform.demo.dto.TokenPaymentResponse;
 import com.myplatform.demo.model.PaymentSessionResponse;
@@ -40,6 +41,7 @@ public class IssuingPaymentCheckoutService {
     @Getter
     private final String issuingUserId;
     private final StoreCustomerRepository storeCustomerRepository;
+    private final CheckoutPaymentService checkoutPaymentService;
     private final String backendUrl;
 
     public IssuingPaymentCheckoutService(@Qualifier("issuingPspClient") Client issuingPspClient,
@@ -47,7 +49,8 @@ public class IssuingPaymentCheckoutService {
                                          @Value("${adyen.issuing.clientKey}") String clientKey,
                                          @Value("${adyen.issuing.userId}") String issuingUserId,
                                          @Value("${app.backend.url}") String backendUrl,
-                                         StoreCustomerRepository storeCustomerRepository) {
+                                         StoreCustomerRepository storeCustomerRepository,
+                                         CheckoutPaymentService checkoutPaymentService) {
         this.paymentsApi = new PaymentsApi(issuingPspClient);
         this.recurringApi = new RecurringApi(issuingPspClient);
         this.merchantAccount = merchantAccount;
@@ -55,15 +58,26 @@ public class IssuingPaymentCheckoutService {
         this.issuingUserId = issuingUserId;
         this.backendUrl = backendUrl;
         this.storeCustomerRepository = storeCustomerRepository;
+        this.checkoutPaymentService = checkoutPaymentService;
     }
 
     public PaymentDetailsResponse paymentDetails(PaymentDetailsRequest request) throws IOException, ApiException {
         return paymentsApi.paymentsDetails(request);
     }
 
+    /**
+     * @param returnUserId platform user testing the issuing card: the result page links back to them and
+     *                     their Captures page lists the payment. Defaults to the issuing test merchant.
+     */
     public PaymentSessionResponse createPaymentSession(String currencyCode, Long amount, String reference,
                                                        String storeRef, String activityReason,
-                                                       String balanceAccountId, String returnUserId) throws IOException, ApiException {
+                                                       String balanceAccountId, String returnUserId,
+                                                       AdvancedPaymentOptions advancedOptions) throws IOException, ApiException {
+
+        boolean embeddedPayment = "embeddedPayment".equals(activityReason);
+        ResolvedPaymentOptions options = checkoutPaymentService.resolve(advancedOptions,
+                target(returnUserId, activityReason, balanceAccountId, embeddedPayment ? storeRef : null),
+                amount, currencyCode, reference);
 
         ThreeDSRequestData threeDSRequestData = new ThreeDSRequestData()
                 .nativeThreeDS(ThreeDSRequestData.NativeThreeDSEnum.PREFERRED);
@@ -102,42 +116,17 @@ public class IssuingPaymentCheckoutService {
                 .shopperIP("192.168.1.1")
                 .shopperName(new ShopperName().firstName("Issuing").lastName("Test"))
                 .dateOfBirth(LocalDate.of(1990, 1, 1))
-                .captureDelayHours(0)
                 .telephoneNumber("+33610101010")
-                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/issuing-payments/redirect", returnUserId, PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT))
+                .returnUrl(PaymentResultRedirects.returnUrl(backendUrl + "/api/issuing-payments/redirect", returnUserId,
+                        PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT, options.trackingId()))
                 .addAllowedPaymentMethodsItem("scheme");
 
-        if ("embeddedPayment".equals(activityReason)) {
+        if (embeddedPayment) {
             createCheckoutSessionRequest.setStore(storeRef);
             StoreCustomer storeCustomer = this.storeCustomerRepository.findByStoreRef(storeRef);
             createCheckoutSessionRequest.setCountryCode(storeCustomer.getCountry());
-        } else if ("marketplace".equals(activityReason)) {
-            List<Split> splits = new ArrayList<>();
-
-            long commissionAmount = Math.round(amount * 0.10);
-            long sellerAmount = amount - commissionAmount;
-
-            Split sellerSplit = new Split();
-            sellerSplit.setAmount(new SplitAmount().currency(currencyCode).value(sellerAmount));
-            sellerSplit.setType(Split.TypeEnum.BALANCEACCOUNT);
-            sellerSplit.setAccount(balanceAccountId);
-            sellerSplit.setReference("SELLER_" + reference);
-
-            Split platformSplit = new Split();
-            platformSplit.setAmount(new SplitAmount().currency(currencyCode).value(commissionAmount));
-            platformSplit.setType(Split.TypeEnum.COMMISSION);
-            platformSplit.setReference("PLATFORM_FEE_" + reference);
-
-            splits.add(sellerSplit);
-            splits.add(platformSplit);
-
-            createCheckoutSessionRequest.setSplits(splits);
-
-            long totalSplits = splits.stream().mapToLong(s -> s.getAmount().getValue()).sum();
-            if (totalSplits != amount) {
-                throw new IllegalStateException("The sum of the splits (" + totalSplits + ") does not match the total amount (" + amount + ")");
-            }
         }
+        options.applyTo(createCheckoutSessionRequest);
 
         CreateCheckoutSessionResponse response = paymentsApi.sessions(createCheckoutSessionRequest);
 
@@ -146,7 +135,15 @@ public class IssuingPaymentCheckoutService {
         paymentSessionResponse.setSessionData(response.getSessionData());
         paymentSessionResponse.setAmount(amount);
         paymentSessionResponse.setCurrency(currencyCode);
+        paymentSessionResponse.setTrackingId(checkoutPaymentService.recordSession(options, response.getId()));
         return paymentSessionResponse;
+    }
+
+    private ResolvedPaymentOptions.Target target(String ownerUserId, String activityReason, String balanceAccountId,
+                                                 String storeReference) {
+        String owner = ownerUserId != null && !ownerUserId.isBlank() ? ownerUserId : issuingUserId;
+        return new ResolvedPaymentOptions.Target(PaymentResultRedirects.SOURCE_ISSUING_CHECKOUT, merchantAccount,
+                owner, issuingUserId, activityReason, balanceAccountId, storeReference);
     }
 
     public PaymentSessionResponse createTokenizationSession(String currencyCode, String reference,
@@ -249,8 +246,14 @@ public class IssuingPaymentCheckoutService {
     public TokenPaymentResponse makeTokenPayment(String currencyCode, Long amount, String reference,
                                                   String storeRef, String activityReason,
                                                   String balanceAccountId, String storedPaymentMethodId,
-                                                  String type)
+                                                  String type, String returnUserId,
+                                                  AdvancedPaymentOptions advancedOptions)
             throws IOException, ApiException {
+
+        boolean embeddedPayment = "embeddedPayment".equals(activityReason);
+        ResolvedPaymentOptions options = checkoutPaymentService.resolve(advancedOptions,
+                target(returnUserId, activityReason, balanceAccountId, embeddedPayment ? storeRef : null),
+                amount, currencyCode, reference);
 
         String shopperReference = "issuing_test@adyen.com_" + storeRef;
 
@@ -276,30 +279,10 @@ public class IssuingPaymentCheckoutService {
         paymentRequest.setPaymentMethod(checkoutPaymentMethod);
         paymentRequest.setShopperEmail("issuing_test@adyen.com");
 
-        if ("embeddedPayment".equals(activityReason)) {
+        if (embeddedPayment) {
             paymentRequest.setStore(storeRef);
-        } else if ("marketplace".equals(activityReason)) {
-            List<Split> splits = new ArrayList<>();
-
-            long commissionAmount = Math.round(amount * 0.10);
-            long sellerAmount = amount - commissionAmount;
-
-            Split sellerSplit = new Split();
-            sellerSplit.setAmount(new SplitAmount().currency(currencyCode).value(sellerAmount));
-            sellerSplit.setType(Split.TypeEnum.BALANCEACCOUNT);
-            sellerSplit.setAccount(balanceAccountId);
-            sellerSplit.setReference("SELLER_" + reference);
-
-            Split platformSplit = new Split();
-            platformSplit.setAmount(new SplitAmount().currency(currencyCode).value(commissionAmount));
-            platformSplit.setType(Split.TypeEnum.COMMISSION);
-            platformSplit.setReference("PLATFORM_FEE_" + reference);
-
-            splits.add(sellerSplit);
-            splits.add(platformSplit);
-
-            paymentRequest.setSplits(splits);
         }
+        options.applyTo(paymentRequest);
 
         PaymentResponse response = paymentsApi.payments(paymentRequest);
 
@@ -307,6 +290,7 @@ public class IssuingPaymentCheckoutService {
         tokenPaymentResponse.setPspReference(response.getPspReference());
         tokenPaymentResponse.setResultCode(response.getResultCode() != null ? response.getResultCode().getValue() : null);
         tokenPaymentResponse.setRefusalReason(response.getRefusalReason());
+        tokenPaymentResponse.setTrackingId(checkoutPaymentService.recordTokenPayment(options, response));
         return tokenPaymentResponse;
     }
 

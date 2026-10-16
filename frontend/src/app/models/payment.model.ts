@@ -1,3 +1,5 @@
+import { AdvancedPaymentOptions } from './capture.model';
+
 export interface SendPaymentPayload {
   amount: number;
   currencyCode: string;
@@ -6,6 +8,7 @@ export interface SendPaymentPayload {
   reference: string;
   /** Platform user the result page links back to when the payment uses a redirect. */
   returnUserId?: string;
+  advancedOptions?: AdvancedPaymentOptions;
 }
 
 export interface SendPaymentResponse {
@@ -13,6 +16,8 @@ export interface SendPaymentResponse {
   sessionData: string;
   amount: number;
   currency: string;
+  /** Id of the payment on the Captures page; null for immediate capture. */
+  trackingId?: string | null;
 }
 
 export interface PosPaymentRequest {
@@ -50,12 +55,17 @@ export interface TokenPaymentPayload {
   reference: string;
   storedPaymentMethodId: string;
   type: string;
+  /** Issuing tests: platform user whose Captures page lists the payment. */
+  returnUserId?: string;
+  advancedOptions?: AdvancedPaymentOptions;
 }
 
 export interface TokenPaymentResponse {
   pspReference: string;
   resultCode: string;
   refusalReason: string;
+  /** Id of the payment on the Captures page; null for immediate capture. */
+  trackingId?: string | null;
 }
 
 export interface GooglePayJwtResponse {

@@ -1,0 +1,181 @@
+<div class="captures-wrapper">
+
+  <div class="captures-header">
+    <div>
+      <h1>Captures</h1>
+      <p class="captures-subtitle">Checkout payments taken with delayed or manual capture. Capture all or part of a payment, or cancel it before it is captured.</p>
+    </div>
+    <div class="captures-header-right">
+      <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
+                               class="captures-toggle" aria-label="Show payments">
+        <mat-button-toggle value="all">All</mat-button-toggle>
+        <mat-button-toggle value="open">Open<span *ngIf="openCount() > 0"> ({{ openCount() }})</span></mat-button-toggle>
+      </mat-button-toggle-group>
+      <button mat-icon-button type="button" (click)="load()" [disabled]="loading()"
+              matTooltip="Refresh" aria-label="Refresh payments">
+        <mat-icon [class.spinning]="loading() || refreshing()" aria-hidden="true">refresh</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <mat-card class="captures-card" [attr.aria-busy]="loading()">
+
+    <div *ngIf="loading()" class="loading-spinner" role="status">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span class="cdk-visually-hidden">Loading payments</span>
+    </div>
+
+    <div *ngIf="!loading() && loadError() as error" class="empty-state" role="alert">
+      <mat-icon class="empty-icon error-icon" aria-hidden="true">error_outline</mat-icon>
+      <p>Payments could not be loaded</p>
+      <span class="empty-hint">{{ error }}</span>
+      <button mat-flat-button type="button" class="fintech-btn" (click)="load()">Retry</button>
+    </div>
+
+    <ng-container *ngIf="!loading() && !loadError() && visiblePayments().length === 0">
+      <div class="empty-state" *ngIf="payments().length === 0; else nothingOpen">
+        <mat-icon class="empty-icon" aria-hidden="true">price_check</mat-icon>
+        <p>No payments to capture yet</p>
+        <span class="empty-hint">On the Checkout page, open <strong>Advanced options</strong> and choose a delayed or manual capture. The payment then appears here.</span>
+        <a mat-stroked-button [routerLink]="['/', userId, 'checkout']">Go to Checkout</a>
+      </div>
+      <ng-template #nothingOpen>
+        <div class="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">task_alt</mat-icon>
+          <p>Nothing left to do</p>
+          <span class="empty-hint">All payments are captured or cancelled.</span>
+          <button mat-stroked-button type="button" (click)="setFilter('all')">Show all payments</button>
+        </div>
+      </ng-template>
+    </ng-container>
+
+    <ul class="payment-list" *ngIf="!loading() && !loadError() && visiblePayments().length > 0" aria-label="Payments">
+      <li *ngFor="let p of visiblePayments(); trackBy: trackById" class="payment-item"
+          [class.expanded]="expandedId() === p.id">
+        <div class="payment-row">
+          <div class="payment-main" role="button" tabindex="0"
+               [attr.aria-expanded]="expandedId() === p.id"
+               [attr.aria-controls]="'payment-detail-' + p.id"
+               (click)="toggle(p, $event)"
+               (keydown.enter)="toggle(p, $event)"
+               (keydown.space)="toggle(p, $event)">
+            <div class="payment-icon" [attr.data-tone]="stateOf(p).tone" aria-hidden="true">
+              <mat-icon>{{ stateOf(p).icon }}</mat-icon>
+            </div>
+            <div class="payment-content">
+              <div class="payment-title">
+                <span class="payment-reference">{{ p.merchantReference }}</span>
+                <span class="payment-amount">{{ p.amount | money:p.currency }}</span>
+              </div>
+              <div class="payment-description">{{ summaryOf(p) }}</div>
+              <div class="payment-meta">
+                <span class="state-chip" [attr.data-tone]="stateOf(p).tone">{{ stateOf(p).label }}</span>
+                <span>{{ sourceLabel(p) }}</span>
+                <time [attr.datetime]="p.createdAt" [attr.title]="dateTime(p.createdAt)">{{ timeAgo(p.createdAt) }}</time>
+              </div>
+            </div>
+            <mat-icon class="payment-chevron" aria-hidden="true">{{ expandedId() === p.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </div>
+
+          <div class="payment-actions" *ngIf="p.canCapture || p.canCancel">
+            <button mat-flat-button type="button" class="action-btn primary" *ngIf="p.canCapture"
+                    [disabled]="cancellingId() === p.id" (click)="openCapture(p)"
+                    [attr.aria-label]="'Capture ' + p.merchantReference">
+              Capture
+            </button>
+            <button mat-stroked-button type="button" class="action-btn" *ngIf="p.canCancel"
+                    [disabled]="cancellingId() === p.id" (click)="cancel(p)"
+                    [attr.aria-label]="'Cancel ' + p.merchantReference">
+              <mat-spinner *ngIf="cancellingId() === p.id" diameter="16" aria-hidden="true"></mat-spinner>
+              {{ cancellingId() === p.id ? 'Cancelling…' : 'Cancel' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="payment-detail" *ngIf="expandedId() === p.id" [id]="'payment-detail-' + p.id">
+          <dl class="detail-grid">
+            <div class="detail-item">
+              <dt>PSP reference</dt>
+              <dd class="mono">{{ p.pspReference || 'Not known yet' }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Taken from</dt>
+              <dd>{{ sourceLabel(p) }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Capture</dt>
+              <dd>{{ captureText(p) }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Split</dt>
+              <dd>{{ splitText(p) }}</dd>
+            </div>
+            <div class="detail-item" *ngIf="p.storeReference">
+              <dt>Store</dt>
+              <dd class="mono">{{ p.storeReference }}</dd>
+            </div>
+            <div class="detail-item" *ngIf="p.balanceAccountId">
+              <dt>Sub-merchant balance account</dt>
+              <dd class="mono">{{ p.balanceAccountId }}</dd>
+            </div>
+            <div class="detail-item">
+              <dt>Created</dt>
+              <dd>{{ dateTime(p.createdAt) }}</dd>
+            </div>
+            <div class="detail-item" *ngIf="p.authorisedAt">
+              <dt>Authorised</dt>
+              <dd>{{ dateTime(p.authorisedAt) }}</dd>
+            </div>
+          </dl>
+
+          <p class="detail-note" *ngIf="p.state === 'PENDING_AUTHORISATION'">
+            The payment is pending. Adyen sends the final result with the AUTHORISATION webhook.
+          </p>
+          <p class="detail-note" *ngIf="p.releasedAmount > 0">
+            Adyen released the remaining {{ p.releasedAmount | money:p.currency }} after the first partial capture, because multiple partial captures aren't enabled on the merchant account.
+          </p>
+          <p class="detail-note" *ngIf="p.state === 'AUTO_CAPTURED'">
+            The capture delay is over, so Adyen has captured the payment. Adyen only sends a CAPTURE webhook for it when <strong>Delayed Capture</strong> is turned on in the webhook settings.
+          </p>
+
+          <section class="detail-section" *ngIf="p.splits.length">
+            <h3 class="detail-heading">Split sent with the payment</h3>
+            <ul class="split-lines">
+              <li class="split-line" *ngFor="let s of p.splits">
+                <span class="split-type">{{ splitLabel(s.type) }}</span>
+                <span class="split-amount">{{ s.amount != null ? (s.amount | money:p.currency) : 'Actual fees' }}</span>
+                <span class="split-ref mono">{{ s.account ? s.account + ' · ' : '' }}{{ s.reference }}</span>
+              </li>
+            </ul>
+          </section>
+
+          <section class="detail-section" *ngIf="p.operations.length">
+            <h3 class="detail-heading">History</h3>
+            <ol class="operation-list">
+              <li class="operation" *ngFor="let op of p.operations; trackBy: trackOperation" [attr.data-status]="op.status">
+                <mat-icon class="operation-icon" aria-hidden="true">{{ operationIcon(op) }}</mat-icon>
+                <div class="operation-content">
+                  <div class="operation-title">
+                    <span>{{ operationTitle(op, p) }}</span>
+                    <time [attr.datetime]="op.createdAt" [attr.title]="dateTime(op.createdAt)">{{ timeAgo(op.createdAt) }}</time>
+                  </div>
+                  <div class="operation-status">{{ operationStatus(op) }}</div>
+                  <div class="operation-ref mono" *ngIf="op.reference || op.pspReference">
+                    {{ op.reference }}{{ op.reference && op.pspReference ? ' · ' : '' }}{{ op.pspReference }}
+                  </div>
+                  <ul class="split-lines compact" *ngIf="op.splits.length" aria-label="Split of this capture">
+                    <li class="split-line" *ngFor="let s of op.splits">
+                      <span class="split-type">{{ splitLabel(s.type) }}</span>
+                      <span class="split-amount">{{ s.amount != null ? (s.amount | money:p.currency) : 'Actual fees' }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+            </ol>
+          </section>
+        </div>
+      </li>
+    </ul>
+  </mat-card>
+
+</div>

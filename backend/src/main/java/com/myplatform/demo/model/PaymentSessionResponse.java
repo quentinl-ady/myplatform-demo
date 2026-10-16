@@ -11,4 +11,6 @@ public class PaymentSessionResponse {
     String sessionData;
     Long amount;
     String currency;
+    /** Id of the payment on the Captures page; null for immediate capture. */
+    String trackingId;
 }
