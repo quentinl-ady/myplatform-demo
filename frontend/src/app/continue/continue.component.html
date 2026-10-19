@@ -1,0 +1,112 @@
+<main class="phone-page">
+
+  <header class="brand">
+    <img class="brand-logo" [src]="logo()" alt="" (error)="logoFailed.set(true)" />
+    <span class="brand-name">{{ platformName() }}</span>
+  </header>
+
+  <section class="card center" *ngIf="stage() === 'loading'" role="status">
+    <mat-spinner diameter="36" aria-hidden="true"></mat-spinner>
+    <p class="muted">Opening the request...</p>
+  </section>
+
+  <section class="card center" *ngIf="stage() === 'ended'" role="alert">
+    <div class="state-icon" aria-hidden="true"><mat-icon>link_off</mat-icon></div>
+    <h1>{{ endTitle() }}</h1>
+    <p class="muted">{{ endText() }}</p>
+  </section>
+
+  <section class="card center" *ngIf="stage() === 'done'" role="status">
+    <div class="state-icon done" aria-hidden="true"><mat-icon>check</mat-icon></div>
+    <h1>{{ done().title }}</h1>
+    <p class="muted">{{ done().text }}</p>
+  </section>
+
+  <section class="card" *ngIf="stage() === 'ready' || stage() === 'working' || stage() === 'confirm'" aria-labelledby="request-title">
+    <p class="account" *ngIf="session()?.accountName as accountName">
+      {{ accountName }}<ng-container *ngIf="session()?.maskedEmail as email"> · {{ email }}</ng-container>
+    </p>
+    <h1 id="request-title">{{ title() }}</h1>
+
+    <!-- Registration of this phone -->
+    <ng-container *ngIf="type() === 'pairing'">
+      <p class="lead">This phone becomes a trusted device of this account: to approve a transfer with it, scan the QR code your computer shows.</p>
+      <dl class="rows">
+        <div class="row"><dt>Phone name</dt><dd>{{ summary()['deviceName'] || defaultName }}</dd></div>
+        <div class="row"><dt>Browser</dt><dd>{{ label }}</dd></div>
+      </dl>
+    </ng-container>
+
+    <!-- Transfer or scheduled transfer -->
+    <ng-container *ngIf="type() === 'transfer' || type() === 'standingOrder'">
+      <div class="amount-block">
+        <p class="amount">{{ summary()['amount'] | money:summary()['currency'] }}</p>
+        <p class="amount-to">to <strong>{{ summary()['counterpartyName'] || 'the beneficiary' }}</strong></p>
+      </div>
+      <dl class="rows">
+        <div class="row" *ngIf="summary()['counterpartyCountry']"><dt>Country</dt><dd>{{ countryName(summary()['counterpartyCountry']) }}</dd></div>
+        <div class="row" *ngFor="let row of bankRows()"><dt>{{ row.label }}</dt><dd class="mono">{{ row.value }}</dd></div>
+        <div class="row" *ngIf="type() === 'standingOrder'"><dt>Schedule</dt><dd>{{ scheduleLabel(summary()['schedule']) }}</dd></div>
+        <div class="row" *ngIf="summary()['priority']"><dt>Speed</dt><dd>{{ speedLabel(summary()['priority']) }}</dd></div>
+        <div class="row" *ngIf="summary()['reference']"><dt>Reference</dt><dd>{{ summary()['reference'] }}</dd></div>
+        <div class="row" *ngIf="summary()['description']"><dt>Description</dt><dd>{{ summary()['description'] }}</dd></div>
+      </dl>
+    </ng-container>
+
+    <!-- Batch -->
+    <ng-container *ngIf="type() === 'batch'">
+      <div class="amount-block">
+        <p class="amount">
+          <ng-container *ngFor="let total of batchTotals(); let last = last">{{ total.amount | money:total.currency }}<ng-container *ngIf="!last"> + </ng-container></ng-container>
+        </p>
+        <p class="amount-to">{{ summary()['count'] === 1 ? '1 transfer' : summary()['count'] + ' transfers' }}</p>
+      </div>
+      <ul class="lines" *ngIf="batchLines().length">
+        <li class="line" *ngFor="let line of batchLines()">
+          <span class="line-name">
+            {{ line.counterpartyName || 'Beneficiary' }}
+            <span class="line-ref" *ngIf="line.reference">{{ line.reference }}</span>
+          </span>
+          <span class="line-amount">{{ line.amount | money:line.currency }}</span>
+        </li>
+      </ul>
+    </ng-container>
+
+    <!-- Transactions -->
+    <p class="lead" *ngIf="type() === 'transactions'">
+      Your computer asks to show the bank transactions of the last {{ summary()['days'] || 90 }} days.
+    </p>
+
+    <div class="notice warning" *ngIf="passkeys() === false" role="alert">
+      <mat-icon aria-hidden="true">warning_amber</mat-icon>
+      <div>
+        <p>This browser can't use passkeys. Open this page in Safari on iPhone or Chrome on Android, with Face ID, a fingerprint or a screen lock set up.</p>
+        <button type="button" class="text-btn" *ngIf="canCopy" (click)="copyLink()">{{ copied() ? 'Link copied' : 'Copy the link' }}</button>
+      </div>
+    </div>
+
+    <div class="notice" *ngIf="stage() === 'confirm'" role="status">
+      <mat-icon aria-hidden="true">fingerprint</mat-icon>
+      <span>{{ confirmText }}</span>
+    </div>
+
+    <div class="notice error" *ngIf="error()" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <span>{{ error() }}</span>
+    </div>
+
+    <div class="working" *ngIf="stage() === 'working'" role="status">
+      <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+      <span>{{ status() }}</span>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn primary" *ngIf="stage() !== 'confirm'" (click)="approve()"
+              [disabled]="stage() !== 'ready' || !passkeys()">{{ primaryText }}</button>
+      <button type="button" class="btn primary" *ngIf="stage() === 'confirm'" (click)="continuePending()">Continue</button>
+      <button type="button" class="btn secondary" (click)="decline()" [disabled]="stage() === 'working'">Decline</button>
+    </div>
+    <p class="countdown">Expires in {{ countdown() }}</p>
+  </section>
+
+</main>

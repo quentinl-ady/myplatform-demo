@@ -1,5 +1,6 @@
 package com.myplatform.demo.util;
 
+import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.model.RecipientCountry;
 
 import java.util.List;
@@ -53,6 +54,12 @@ public final class RecipientCountries {
         return forAccountCurrency(accountCurrency).stream()
                 .filter(country -> country.getCountryCode().equals(countryCode))
                 .findFirst();
+    }
+
+    public static RecipientCountry require(String accountCurrency, String countryCode) {
+        return find(accountCurrency, countryCode)
+                .orElseThrow(() -> new BadRequestException(
+                        "Transfers to " + countryCode + " are not available from a " + accountCurrency + " account"));
     }
 
     private static RecipientCountry sepaCountry(String countryCode) {

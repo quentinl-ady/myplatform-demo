@@ -1,8 +1,68 @@
+import { StandingOrderCreateRequest } from './standing-order.model';
+
+export type DeviceKind = 'phone' | 'tablet' | 'computer';
+
 export interface Device {
   id: string;
   name: string;
   paymentInstrumentId: string;
   type: string;
+  /** Unknown for the devices registered before the platform recorded it. */
+  kind?: DeviceKind | null;
+  /** e.g. "iPhone · Safari" */
+  platform?: string | null;
+  registeredAt?: string | null;
+}
+
+export type RemoteSessionType = 'pairing' | 'transfer' | 'standingOrder' | 'batch' | 'transactions';
+
+export type RemoteApprovalType = Exclude<RemoteSessionType, 'pairing'>;
+
+export type RemoteSessionStatus = 'waiting' | 'opened' | 'in_progress' | 'completed' | 'declined' | 'cancelled' | 'expired';
+
+/** A registration or an approval started on this computer and finished on a phone. */
+export interface RemoteSession {
+  id: string;
+  type: RemoteSessionType;
+  status: RemoteSessionStatus;
+  secondsLeft: number;
+  phoneLabel: string | null;
+  phonePasskeys: boolean | null;
+  /** Last problem on the phone; the user can try again there. */
+  message: string | null;
+  summary: Record<string, unknown> | null;
+  /** What the operation returned once completed. */
+  result?: any;
+  /** Only when the session is created: the secret of the QR code link. */
+  token?: string;
+}
+
+export interface RemoteApprovalRequest {
+  userId: string;
+  type: RemoteApprovalType;
+  transfer?: InitiateTransferRequest;
+  standingOrder?: StandingOrderCreateRequest;
+  transferIds?: string[];
+}
+
+/** The session as the phone sees it. */
+export interface PhoneSession {
+  type: RemoteSessionType;
+  status: RemoteSessionStatus;
+  secondsLeft: number;
+  summary?: Record<string, any> | null;
+  accountName?: string | null;
+  maskedEmail?: string | null;
+  platformName?: string | null;
+  logoData?: string | null;
+}
+
+export interface PhoneStepResponse {
+  /** 'sca_required', 'in_progress' or 'completed'; absent when the step returns what to sign. */
+  status?: string;
+  sdkInput?: string;
+  authParam1?: string;
+  associationRequired?: boolean;
 }
 
 export interface RegisterSCAResponse {

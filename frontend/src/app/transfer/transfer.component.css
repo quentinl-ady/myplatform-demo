@@ -45,6 +45,8 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .error-state { text-align: center; padding: 48px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .error-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--fintech-danger); }
 .error-state span { color: var(--fintech-text-secondary); font-size: 14px; }
+.phone-approval { padding: 32px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.phone-approval h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--fintech-text); text-align: center; }
 
 /* Transactions list */
 .tx-scroll { overflow-x: auto; border-radius: var(--fintech-radius); }

@@ -324,6 +324,22 @@ public class TransferService {
         return response;
     }
 
+    /** The details of the given transfers; those not propagated yet or failing are left out. */
+    public List<Map<String, Object>> getTransferDetails(List<String> transferIds) {
+        List<Map<String, Object>> results = new java.util.ArrayList<>();
+        for (String transferId : transferIds) {
+            try {
+                Map<String, Object> detail = fetchTransferDetail(transferId);
+                if (detail != null) {
+                    results.add(detail);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to fetch transfer detail for {}: {}", transferId, e.getMessage());
+            }
+        }
+        return results;
+    }
+
     private Map<String, Object> fetchTransferDetail(String transferId) {
         String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers/" + transferId;
 

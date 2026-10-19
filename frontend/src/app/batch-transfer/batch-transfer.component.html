@@ -234,15 +234,20 @@
       </div>
       <div class="modal-body">
         <p>You are about to approve <strong>{{ pendingTransfers.length === 1 ? '1 transfer' : pendingTransfers.length + ' transfers' }}</strong> for a total of <strong>{{ getBatchTotal() }}</strong>.</p>
-        <p>Approve with the passkey of your trusted device to send them all at once.</p>
+        <p *ngIf="!batchRemoteStart">Approve with the passkey of your trusted device to send them all at once.</p>
+        <app-remote-session-panel *ngIf="batchRemoteStart" [userId]="userId" [start]="batchRemoteStart"
+                                  instructions="Scan this QR code with your phone, then approve the transfers there to send them all at once."
+                                  (completed)="onBatchApprovedOnPhone()"></app-remote-session-panel>
         <div class="sca-banner" *ngIf="scaStatus" role="status">
           <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
           {{ scaStatus }}
         </div>
+        <app-approval-switch *ngIf="approval.canSwitch" [mode]="batchRemoteStart ? 'phone' : 'here'" [disabled]="isApproving"
+                             (switchTo)="switchApproval($event)"></app-approval-switch>
       </div>
       <div class="actions">
         <button mat-flat-button type="button" class="fintech-btn secondary" (click)="declineApproval()" [disabled]="isApproving">Cancel</button>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="confirmApproval()" [disabled]="isApproving" cdkFocusInitial>
+        <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!batchRemoteStart" (click)="confirmApproval()" [disabled]="isApproving" cdkFocusInitial>
           <mat-spinner diameter="20" *ngIf="isApproving" aria-hidden="true"></mat-spinner>
           {{ isApproving ? 'Approving...' : 'Approve' }}
         </button>

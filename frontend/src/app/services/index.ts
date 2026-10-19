@@ -15,3 +15,4 @@ export {WebhookService} from './webhook.service';
 export {ApiLogService} from './api-log.service';
 export {IssuingPaymentService} from './issuing-payment.service';
 export {CaptureService} from './capture.service';
+export {RemoteSessionService} from './remote-session.service';

@@ -4,9 +4,12 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Observable } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
+import { RemoteSessionPanelComponent } from '../remote-session/remote-session-panel.component';
+import { ApprovalSwitchComponent } from '../remote-session/approval-switch.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
 import {
@@ -16,12 +19,16 @@ import {
   BatchTransferResponse,
   PendingBatchTransfersResponse,
   RecipientCountry,
+  RemoteSession,
   TestAccount,
   User,
   VerifyCounterpartyNameRequest
 } from '../models';
-import { AccountService, TransferService } from '../services';
-import { ConfirmService, MoneyPipe, formatMoney, httpErrorMessage, scaErrorMessage, toMinorUnits } from '../shared';
+import { AccountService, RemoteSessionService, TransferService } from '../services';
+import {
+  ApprovalChoice, ApprovalMode, ConfirmService, MoneyPipe, approvalChoice, formatMoney, httpErrorMessage, saveApprovalMode,
+  scaErrorMessage, toMinorUnits
+} from '../shared';
 import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
 import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
 import { BankDetailsCheck, speedBlockReason } from '../banktransfer/bank-details';
@@ -50,7 +57,9 @@ interface ApprovalRecap {
     AccountSetupStateComponent,
     RecipientCountryPickerComponent,
     TransferSpeedPickerComponent,
-    BankDetailsFieldsComponent
+    BankDetailsFieldsComponent,
+    RemoteSessionPanelComponent,
+    ApprovalSwitchComponent
   ],
   templateUrl: './batch-transfer.component.html',
   styleUrl: './batch-transfer.component.css'
@@ -60,6 +69,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private accountService = inject(AccountService);
   private transferService = inject(TransferService);
+  private remoteSessions = inject(RemoteSessionService);
   private confirmService = inject(ConfirmService);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
@@ -73,6 +83,8 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   accountState: LoadState = 'loading';
   devicesState: LoadState = 'loading';
   hasDevices = false;
+  /** With the passkey of this browser, or on a phone from a QR code. */
+  approval: ApprovalChoice = { mode: 'here', canSwitch: false };
   loadErrorMessage = '';
 
   recipientCountries: RecipientCountry[] = [];
@@ -111,6 +123,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   approvalRecap: ApprovalRecap | null = null;
   showScaModal = false;
   scaStatus = '';
+  batchRemoteStart: (() => Observable<RemoteSession>) | null = null;
   private approveAuthParam1 = '';
   private approvingIds: string[] = [];
 
@@ -198,17 +211,21 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     });
   }
 
-  checkDevices() {
-    this.devicesState = 'loading';
+  /** A refresh after a registration keeps the page as it is if it fails. */
+  checkDevices(refresh = false) {
+    if (!refresh) this.devicesState = 'loading';
     this.transferService.listDevices(this.userId).subscribe({
-      next: (devices) => {
+      next: async (devices) => {
+        this.approval = await approvalChoice(devices, this.userId);
         this.hasDevices = !!devices && devices.length > 0;
         this.devicesState = 'ready';
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.devicesState = failedLoadState(err);
-        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        if (!refresh) {
+          this.devicesState = failedLoadState(err);
+          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        }
         this.cdr.detectChanges();
       }
     });
@@ -242,6 +259,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   onDeviceRegistered() {
     this.hasDevices = true;
     this.snack.open('Device registered. You can now make batch transfers.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
+    this.checkDevices(true);
     this.cdr.detectChanges();
   }
 
@@ -508,12 +526,30 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   // ─────────── Approval ───────────
 
-  async approveAll() {
+  approveAll() {
     if (this.pendingTransfers.length === 0 || this.isApproving) return;
-
-    this.isApproving = true;
-    this.scaStatus = 'Checking passkey availability...';
     this.approvingIds = this.pendingTransfers.map(t => t.id);
+    if (this.approval.mode === 'phone') {
+      this.openBatchOnPhone();
+    } else {
+      this.prepareBatchHere();
+    }
+  }
+
+  private openBatchOnPhone() {
+    const transferIds = this.approvingIds;
+    this.approveAuthParam1 = '';
+    this.scaStatus = '';
+    this.batchRemoteStart = () => this.remoteSessions.createApproval({ userId: this.userId, type: 'batch', transferIds });
+    this.showScaModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /** Gets the challenge of the batch for the passkey of this browser. */
+  private async prepareBatchHere() {
+    this.isApproving = true;
+    this.approveAuthParam1 = '';
+    this.scaStatus = 'Checking passkey availability...';
     this.cdr.detectChanges();
 
     try {
@@ -527,13 +563,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
         next: (res: BatchApproveResponse) => {
           this.ngZone.run(() => {
             if (res.status === 'transfers_not_ready') {
-              this.isApproving = false;
-              this.scaStatus = '';
-              this.snack.open(
-                res.message || 'Some transfers are still being created. Wait about a minute and try again.',
-                'Close',
-                { duration: 6000, panelClass: 'fintech-snack-error' }
-              );
+              this.failBatchStart(res.message || 'Some transfers are still being created. Wait about a minute and try again.');
             } else if (res.status === 'sca_required' && res.authParam1) {
               this.approveAuthParam1 = res.authParam1;
               this.showScaModal = true;
@@ -545,30 +575,48 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isApproving = false;
-            this.scaStatus = '';
-            this.toastError(httpErrorMessage(err, "Couldn't start the approval. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.failBatchStart(httpErrorMessage(err, "Couldn't start the approval. Try again."))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isApproving = false;
-        this.scaStatus = '';
-        this.toastError(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
-        this.cdr.detectChanges();
-      });
+      this.failBatchStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+    }
+  }
+
+  /** The modal is already open when the user switched to this browser. */
+  private failBatchStart(message: string) {
+    this.ngZone.run(() => {
+      this.isApproving = false;
+      this.scaStatus = '';
+      this.showScaModal = false;
+      this.toastError(message);
+      this.cdr.detectChanges();
+    });
+  }
+
+  /** Removing the QR code cancels its session, so the phone can no longer approve the batch. */
+  switchApproval(mode: ApprovalMode) {
+    if (this.isApproving) return;
+    this.approval = { ...this.approval, mode };
+    saveApprovalMode(this.userId, mode);
+    if (mode === 'phone') {
+      this.openBatchOnPhone();
+    } else {
+      this.batchRemoteStart = null;
+      this.prepareBatchHere();
     }
   }
 
   declineApproval() {
     if (this.isApproving) return;
     this.showScaModal = false;
+    this.batchRemoteStart = null;
     this.approveAuthParam1 = '';
     this.scaStatus = '';
+  }
+
+  onBatchApprovedOnPhone() {
+    this.onApprovalComplete();
+    this.cdr.detectChanges();
   }
 
   async confirmApproval() {
@@ -626,6 +674,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.isApproving = false;
     this.scaStatus = '';
     this.showScaModal = false;
+    this.batchRemoteStart = null;
     this.approveAuthParam1 = '';
     this.approvingIds = [];
     this.transferService.invalidateTransactionCache(this.userId);

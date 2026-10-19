@@ -12,18 +12,23 @@
 
   <ng-container *ngIf="state() === 'ready'">
 
-    <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
-
     <section class="device-list" *ngIf="devices().length > 0" aria-labelledby="devices-title">
-      <h2 class="section-title" id="devices-title">Your devices ({{ devices().length }})</h2>
+      <h2 class="section-title" id="devices-title">{{ devices().length === 1 ? 'Your trusted device' : 'Your trusted devices (' + devices().length + ')' }}</h2>
 
       <mat-card *ngFor="let d of devices()" class="device-card">
         <div class="device-info">
           <div class="device-icon" aria-hidden="true">
-            <mat-icon>devices</mat-icon>
+            <mat-icon>{{ kindIcon(d) }}</mat-icon>
           </div>
           <div class="device-details">
             <h3>{{ d.name || 'Unnamed device' }}</h3>
+            <span class="device-meta" *ngIf="d.platform || d.registeredAt">
+              {{ d.platform }}<ng-container *ngIf="d.platform && d.registeredAt"> · </ng-container><ng-container *ngIf="d.registeredAt">Registered {{ formatDateTime(d.registeredAt) }}</ng-container>
+            </span>
+            <span class="device-approval" *ngIf="approvalHint(d) as hint">
+              <mat-icon aria-hidden="true">{{ approvesWithQrCode(d) ? 'qr_code_2' : 'fingerprint' }}</mat-icon>
+              {{ hint }}
+            </span>
             <span class="device-meta"><strong>Type:</strong> {{ d.type }}</span>
             <span class="device-meta"><strong>ID: </strong><span class="mono">{{ d.id }}</span></span>
             <span class="device-meta"><strong>Payment instrument: </strong><span class="mono">{{ d.paymentInstrumentId }}</span></span>
@@ -46,8 +51,10 @@
         <mat-icon>phonelink_off</mat-icon>
       </div>
       <h2>No trusted devices yet</h2>
-      <p>Register this device above to approve transfers and view your bank transactions.</p>
+      <p>Register a device below to approve transfers and view your bank transactions.</p>
     </mat-card>
+
+    <app-device-registration [userId]="userId" [devices]="devices()" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
 
   </ng-container>
 

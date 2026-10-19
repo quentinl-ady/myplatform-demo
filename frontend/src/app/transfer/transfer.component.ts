@@ -3,14 +3,19 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Observable } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
+import { RemoteSessionPanelComponent } from '../remote-session/remote-session-panel.component';
+import { ApprovalSwitchComponent } from '../remote-session/approval-switch.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
-import { BankAccountInformationResponse, BankTransaction, TransferDetail } from "../models";
-import { AccountService, TransferService } from "../services";
-import { MoneyPipe, httpErrorMessage, scaErrorMessage } from '../shared';
+import { BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
+import { AccountService, RemoteSessionService, TransferService } from "../services";
+import {
+  ApprovalChoice, ApprovalMode, MoneyPipe, approvalChoice, httpErrorMessage, saveApprovalMode, scaErrorMessage
+} from '../shared';
 import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
 import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
 
@@ -24,7 +29,9 @@ import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
     MaterialModule,
     MoneyPipe,
     DeviceRegistrationComponent,
-    AccountSetupStateComponent
+    AccountSetupStateComponent,
+    RemoteSessionPanelComponent,
+    ApprovalSwitchComponent
   ],
   templateUrl: './transfer.component.html',
   styleUrl: './transfer.component.css'
@@ -34,6 +41,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private accountService = inject(AccountService);
   private transferService = inject(TransferService);
+  private remoteSessions = inject(RemoteSessionService);
   private snack = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
   private ngZone = inject(NgZone);
@@ -45,11 +53,15 @@ export class TransferComponent implements OnInit, OnDestroy {
   accountState: LoadState = 'loading';
   devicesState: LoadState = 'loading';
   hasDevices = false;
+  /** With the passkey of this browser, or on a phone from a QR code. */
+  approval: ApprovalChoice = { mode: 'here', canSwitch: false };
   loadErrorMessage = '';
 
   transactions: BankTransaction[] = [];
   isLoadingTransactions = false;
   transactionsError = '';
+  /** Set while the transactions wait for the approval on the phone. */
+  transactionsRemoteStart: (() => Observable<RemoteSession>) | null = null;
 
   transferDetail?: TransferDetail;
   isLoadingDetail = false;
@@ -101,10 +113,12 @@ export class TransferComponent implements OnInit, OnDestroy {
     });
   }
 
-  checkDevices() {
-    this.devicesState = 'loading';
+  /** After a registration, a failed refresh still loads the transactions with what the page knows. */
+  checkDevices(refresh = false) {
+    if (!refresh) this.devicesState = 'loading';
     this.transferService.listDevices(this.userId).subscribe({
-      next: (devices) => {
+      next: async (devices) => {
+        this.approval = await approvalChoice(devices, this.userId);
         this.hasDevices = !!devices && devices.length > 0;
         this.devicesState = 'ready';
         if (this.hasDevices) {
@@ -113,8 +127,12 @@ export class TransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.devicesState = failedLoadState(err);
-        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        if (refresh) {
+          this.loadTransactions();
+        } else {
+          this.devicesState = failedLoadState(err);
+          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        }
         this.cdr.detectChanges();
       }
     });
@@ -123,7 +141,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   onDeviceRegistered() {
     this.hasDevices = true;
     this.snack.open('Device registered. You can now view your transactions.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
-    this.loadTransactions();
+    this.checkDevices(true);
     this.cdr.detectChanges();
   }
 
@@ -144,6 +162,12 @@ export class TransferComponent implements OnInit, OnDestroy {
 
     this.isLoadingTransactions = true;
     this.transactionsError = '';
+
+    if (this.approval.mode === 'phone') {
+      this.transactionsRemoteStart = () => this.remoteSessions.createApproval({ userId: this.userId, type: 'transactions' });
+      this.cdr.detectChanges();
+      return;
+    }
     this.cdr.detectChanges();
 
     try {
@@ -189,7 +213,21 @@ export class TransferComponent implements OnInit, OnDestroy {
     }
   }
 
+  onTransactionsApprovedOnPhone(session: RemoteSession) {
+    this.onTransactionsLoaded(session.result?.transactions);
+  }
+
+  /** Removing the QR code cancels its session. The choice also applies to the next visits in this browser. */
+  switchApproval(mode: ApprovalMode) {
+    this.approval = { ...this.approval, mode };
+    saveApprovalMode(this.userId, mode);
+    this.transactionsRemoteStart = null;
+    this.isLoadingTransactions = false;
+    this.loadTransactions(true);
+  }
+
   private onTransactionsLoaded(transactions: BankTransaction[] | null | undefined) {
+    this.transactionsRemoteStart = null;
     this.transactions = transactions || [];
     this.transferService.setCachedTransactions(this.userId, this.transactions);
     this.lastUpdated = Date.now();

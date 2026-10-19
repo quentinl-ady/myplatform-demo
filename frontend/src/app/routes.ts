@@ -18,6 +18,12 @@ const routeConfig: Routes = [
     redirectTo: ''
   },
   {
+    // Opened on the phone from the QR code; it must come before ':id', which would take it for a user id.
+    path: 'continue',
+    loadComponent: () => import('./continue/continue.component').then(m => m.ContinueComponent),
+    title: 'Continue on your phone'
+  },
+  {
     path: ':id',
     component: LayoutComponent,
     children: [

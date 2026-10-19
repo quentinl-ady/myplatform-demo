@@ -7,6 +7,7 @@ import {
   CounterpartyVerificationResponse,
   DeleteDeviceRequest,
   Device,
+  DeviceKind,
   InitiateTransferRequest,
   InitiateTransferResponse,
   IsBankAccountValidRequest,
@@ -72,8 +73,8 @@ export class TransferService {
     return this.http.post<RegisterSCAResponse>(`${this.baseUrl}/api/transfers/devices/register`, {sdkOutput, userId, deviceName, otpCode});
   }
 
-  finalizeRegistration(id: string, sdkOutput: string, userId: string): Observable<RegisterSCAFinalResponse> {
-    return this.http.post<RegisterSCAFinalResponse>(`${this.baseUrl}/api/transfers/devices/register/finalize`, {id, sdkOutput, userId});
+  finalizeRegistration(id: string, sdkOutput: string, userId: string, kind: DeviceKind, platform: string): Observable<RegisterSCAFinalResponse> {
+    return this.http.post<RegisterSCAFinalResponse>(`${this.baseUrl}/api/transfers/devices/register/finalize`, {id, sdkOutput, userId, kind, platform});
   }
 
   deleteDevice(request: DeleteDeviceRequest): Observable<{ status: string }> {

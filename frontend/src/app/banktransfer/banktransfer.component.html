@@ -470,12 +470,17 @@
           <div class="recap-row" *ngIf="draft.reference"><dt>Reference</dt><dd>{{ draft.reference }}</dd></div>
           <div class="recap-row" *ngIf="draft.description"><dt>Description</dt><dd>{{ draft.description }}</dd></div>
         </dl>
-        <p class="modal-note">Approve with the passkey of your trusted device to send the money.</p>
+        <p class="modal-note" *ngIf="!oneshotRemoteStart">Approve with the passkey of your trusted device to send the money.</p>
+        <app-remote-session-panel *ngIf="oneshotRemoteStart" [userId]="userId" [start]="oneshotRemoteStart"
+                                  instructions="Scan this QR code with your phone, then approve the transfer there to send the money."
+                                  (completed)="onOneshotApprovedOnPhone()"></app-remote-session-panel>
+        <app-approval-switch *ngIf="approval.canSwitch" [mode]="oneshotRemoteStart ? 'phone' : 'here'" [disabled]="isOneshotProcessing"
+                             (switchTo)="switchOneshotApproval($event)"></app-approval-switch>
       </div>
 
       <div class="actions">
         <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="declineOneshot()" [disabled]="isOneshotProcessing">Cancel</button>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="approveOneshot()" [disabled]="isOneshotProcessing" cdkFocusInitial>
+        <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!oneshotRemoteStart" (click)="approveOneshot()" [disabled]="isOneshotProcessing" cdkFocusInitial>
           <span *ngIf="!isOneshotProcessing">Approve</span>
           <mat-spinner *ngIf="isOneshotProcessing" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
         </button>
@@ -495,15 +500,20 @@
           <div class="recap-row"><dt>Beneficiary</dt><dd>{{ order.counterparty.bankAccount.accountHolder.fullName }}</dd></div>
           <div class="recap-row"><dt>Schedule</dt><dd>{{ getScheduleLabel(order.schedule) }}</dd></div>
         </dl>
-        <p>Strong customer authentication (SCA) is required to create this scheduled transfer. Approve it with the passkey of your trusted device.</p>
+        <p *ngIf="!soRemoteStart">Strong customer authentication (SCA) is required to create this scheduled transfer. Approve it with the passkey of your trusted device.</p>
+        <app-remote-session-panel *ngIf="soRemoteStart" [userId]="userId" [start]="soRemoteStart"
+                                  instructions="Scan this QR code with your phone, then approve the scheduled transfer there to create it."
+                                  (completed)="onSoApprovedOnPhone()"></app-remote-session-panel>
         <div class="sca-banner" *ngIf="scaStatus" role="status">
           <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
           <span>{{ scaStatus }}</span>
         </div>
+        <app-approval-switch *ngIf="approval.canSwitch" [mode]="soRemoteStart ? 'phone' : 'here'" [disabled]="isCreating"
+                             (switchTo)="switchSoApproval($event)"></app-approval-switch>
       </div>
       <div class="actions">
         <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelSoSca()" [disabled]="isCreating">Cancel</button>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="approveSoScaChallenge()" [disabled]="isCreating" cdkFocusInitial>
+        <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!soRemoteStart" (click)="approveSoScaChallenge()" [disabled]="isCreating" cdkFocusInitial>
           <span *ngIf="!isCreating">Approve</span>
           <mat-spinner *ngIf="isCreating" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
         </button>

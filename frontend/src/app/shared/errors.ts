@@ -72,5 +72,8 @@ export function scaErrorMessage(err: unknown, fallback: string): string {
   if ((err as { message?: unknown } | null)?.message === 'TIMEOUT') {
     return 'Authentication timed out. Please try again.';
   }
+  if ((err as { code?: unknown } | null)?.code === 'SCA_UNAVAILABLE') {
+    return "This browser can't use passkeys. Approve from the browser where you registered your trusted device, or add your phone in Trusted devices.";
+  }
   return fallback;
 }

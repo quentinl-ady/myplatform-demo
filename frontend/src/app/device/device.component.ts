@@ -8,8 +8,10 @@ import { AccountSetupStateComponent, LoadState, failedLoadState } from './accoun
 
 import { Device } from "../models";
 import { TransferService } from "../services";
-import { ConfirmService, httpErrorMessage } from '../shared';
+import { ConfirmService, approvesWithQrCode, formatDateTime, httpErrorMessage } from '../shared';
 import { firstValueFrom } from 'rxjs';
+
+const KIND_ICONS: Record<string, string> = { phone: 'smartphone', tablet: 'tablet_mac', computer: 'laptop' };
 
 @Component({
   selector: 'app-device',
@@ -36,6 +38,21 @@ export class DeviceComponent implements OnInit {
   state = signal<LoadState>('loading');
   errorMessage = signal('');
   deletingId = signal<string | null>(null);
+
+  readonly formatDateTime = formatDateTime;
+  readonly approvesWithQrCode = approvesWithQrCode;
+
+  kindIcon(device: Device): string {
+    return (device.kind && KIND_ICONS[device.kind]) || 'devices';
+  }
+
+  /** How operations are approved with this device, once its kind is known. */
+  approvalHint(device: Device): string {
+    if (!device.kind) return '';
+    return approvesWithQrCode(device)
+      ? 'To approve, scan the QR code shown on screen with this device.'
+      : 'To approve, use its passkey in the browser it was registered in.';
+  }
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -71,9 +88,12 @@ export class DeviceComponent implements OnInit {
   async deleteDevice(device: Device) {
     if (this.deletingId()) return;
 
+    const others = this.devices().filter(d => d.id !== device.id).length;
     const confirmed = await this.confirmService.confirm({
       title: 'Remove this trusted device?',
-      message: 'You will no longer be able to approve transfers with this device. You can register it again later.',
+      message: others
+        ? `You will no longer be able to approve transfers with this device. Your other trusted ${others === 1 ? 'device keeps' : 'devices keep'} working. You can register it again later.`
+        : 'You will no longer be able to approve transfers until you register a trusted device again.',
       details: [
         { label: 'Device', value: device.name || 'Unnamed device' },
         { label: 'Type', value: device.type || '—' }

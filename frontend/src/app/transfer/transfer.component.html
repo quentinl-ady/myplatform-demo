@@ -53,17 +53,26 @@
         <div class="header-actions">
           <span class="last-updated-label" *ngIf="lastUpdated && !isLoadingTransactions">{{ getLastUpdatedLabel() }}</span>
           <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
-            <mat-icon *ngIf="!isLoadingTransactions" aria-hidden="true">refresh</mat-icon>
-            <mat-spinner *ngIf="isLoadingTransactions" diameter="18" aria-hidden="true"></mat-spinner>
-            {{ isLoadingTransactions ? 'Refreshing...' : 'Refresh' }}
+            <mat-icon *ngIf="!isLoadingTransactions || transactionsRemoteStart" aria-hidden="true">refresh</mat-icon>
+            <mat-spinner *ngIf="isLoadingTransactions && !transactionsRemoteStart" diameter="18" aria-hidden="true"></mat-spinner>
+            {{ isLoadingTransactions && !transactionsRemoteStart ? 'Refreshing...' : 'Refresh' }}
           </button>
         </div>
       </div>
 
       <!-- Loading -->
-      <div class="loading-state" *ngIf="isLoadingTransactions" role="status">
+      <div class="loading-state" *ngIf="isLoadingTransactions && !transactionsRemoteStart" role="status">
         <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
         <p>Loading transactions... Approve the request with your passkey if your browser asks.</p>
+      </div>
+
+      <!-- Approval on the phone -->
+      <div class="phone-approval" *ngIf="transactionsRemoteStart">
+        <h3>Approve on your phone to see your transactions</h3>
+        <app-remote-session-panel [userId]="userId" [start]="transactionsRemoteStart"
+                                  instructions="Scan this QR code with your phone, then approve there. Your transactions appear here right after."
+                                  (completed)="onTransactionsApprovedOnPhone($event)"></app-remote-session-panel>
+        <app-approval-switch *ngIf="approval.canSwitch" mode="phone" (switchTo)="switchApproval($event)"></app-approval-switch>
       </div>
 
       <!-- Error -->
@@ -71,6 +80,7 @@
         <mat-icon aria-hidden="true">error_outline</mat-icon>
         <span>{{ transactionsError }}</span>
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()">Retry</button>
+        <app-approval-switch *ngIf="approval.canSwitch" [mode]="approval.mode" (switchTo)="switchApproval($event)"></app-approval-switch>
       </div>
 
       <!-- Empty State -->

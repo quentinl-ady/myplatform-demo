@@ -7,12 +7,16 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
+import { RemoteSessionPanelComponent } from '../remote-session/remote-session-panel.component';
+import { ApprovalSwitchComponent } from '../remote-session/approval-switch.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
+import { Observable } from 'rxjs';
 import {
   BankAccountInformationResponse,
   InitiateTransferRequest,
   RecipientCountry,
+  RemoteSession,
   VerifyCounterpartyNameRequest,
   StandingOrder,
   StandingOrderCreateRequest,
@@ -21,14 +25,17 @@ import {
   TransferRouteRequest,
   User
 } from '../models';
-import { AccountService, TransferService, StandingOrderService } from '../services';
-import { ConfirmService, MoneyPipe, formatMoney, fromMinorUnits, httpErrorMessage, scaErrorMessage, toMinorUnits } from '../shared';
+import { AccountService, RemoteSessionService, TransferService, StandingOrderService } from '../services';
+import {
+  ApprovalChoice, ApprovalMode, ConfirmService, MoneyPipe, approvalChoice, formatMoney, fromMinorUnits, httpErrorMessage,
+  saveApprovalMode, scaErrorMessage, toMinorUnits
+} from '../shared';
 import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
 import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
 import { BankDetailsCheck, DetailRow, bankDetailRows, bankDetailsSummary, speedBlockReason } from './bank-details';
 import { BankDetailsFieldsComponent } from './bank-details-fields.component';
 import { countryName, formatDateTime, speedLabel } from './format-date';
-import { describeSchedule } from './schedule-label';
+import { STANDING_ORDER_SCHEDULES, describeSchedule } from './schedule-label';
 
 type PageState = LoadState | 'no-device';
 
@@ -44,11 +51,6 @@ export interface TransferRecap {
   date: string;
 }
 
-const STANDING_ORDER_SCHEDULES: Record<string, string> = {
-  weekly: 'Every week, on the first business day',
-  monthly: 'Every month, on the first business day'
-};
-
 @Component({
   selector: 'app-banktransfer',
   standalone: true,
@@ -62,7 +64,9 @@ const STANDING_ORDER_SCHEDULES: Record<string, string> = {
     AccountSetupStateComponent,
     RecipientCountryPickerComponent,
     TransferSpeedPickerComponent,
-    BankDetailsFieldsComponent
+    BankDetailsFieldsComponent,
+    RemoteSessionPanelComponent,
+    ApprovalSwitchComponent
   ],
   templateUrl: './banktransfer.component.html',
   styleUrl: './banktransfer.component.css'
@@ -73,6 +77,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountService);
   private transferService = inject(TransferService);
   private soService = inject(StandingOrderService);
+  private remoteSessions = inject(RemoteSessionService);
   private confirmService = inject(ConfirmService);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
@@ -87,6 +92,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   accountState: LoadState = 'loading';
   devicesState: LoadState = 'loading';
   hasDevices = false;
+  /** With the passkey of this browser, or on a phone from a QR code. */
+  approval: ApprovalChoice = { mode: 'here', canSwitch: false };
   loadErrorMessage = '';
 
   // ─── Tab management ───
@@ -120,6 +127,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   isOneshotProcessing = false;
   showOneshotScaModal = false;
+  /** Creates the approval of the transfer on the phone. */
+  oneshotRemoteStart: (() => Observable<RemoteSession>) | null = null;
   private oneshotAuthParam = '';
   // Recap of the transfer being approved, then of the completed one.
   oneshotDraft: TransferRecap | null = null;
@@ -164,6 +173,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   showSoScaModal = false;
   scaInitiateResult: StandingOrderInitiateResponse | null = null;
   pendingStandingOrder: StandingOrderCreateRequest | null = null;
+  /** Creates the approval of the scheduled transfer on the phone. */
+  soRemoteStart: (() => Observable<RemoteSession>) | null = null;
 
   // ─────────── Lifecycle ───────────
 
@@ -256,17 +267,21 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     });
   }
 
-  checkDevices() {
-    this.devicesState = 'loading';
+  /** A refresh after a registration keeps the page as it is if it fails. */
+  checkDevices(refresh = false) {
+    if (!refresh) this.devicesState = 'loading';
     this.transferService.listDevices(this.userId).subscribe({
-      next: (devices) => {
+      next: async (devices) => {
+        this.approval = await approvalChoice(devices, this.userId);
         this.hasDevices = !!devices && devices.length > 0;
         this.devicesState = 'ready';
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.devicesState = failedLoadState(err);
-        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        if (!refresh) {
+          this.devicesState = failedLoadState(err);
+          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+        }
         this.cdr.detectChanges();
       }
     });
@@ -275,6 +290,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   onDeviceRegistered() {
     this.hasDevices = true;
     this.snack.open('Device registered. You can now make transfers.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
+    this.checkDevices(true);
     this.cdr.detectChanges();
   }
 
@@ -473,20 +489,30 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.verifyPayee('oneshot', () => this.initiateTransferFlow(), busy => this.isOneshotProcessing = busy);
   }
 
-  async initiateTransferFlow() {
+  initiateTransferFlow() {
+    if (this.approval.mode === 'phone') {
+      this.openOneshotOnPhone();
+    } else {
+      this.prepareOneshotHere();
+    }
+  }
+
+  /** Gets the challenge of the transfer for the passkey of this browser. */
+  private async prepareOneshotHere() {
     this.isOneshotProcessing = true;
     this.cdr.detectChanges();
+    const draft = this.buildOneshotRecap();
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.checkAvailability();
       const request = this.buildTransferRequest(String(sdkOutput));
-      const draft = this.buildOneshotRecap();
 
       this.transferService.initiateTransfer(request).subscribe({
         next: (res) => {
           this.ngZone.run(() => {
             this.isOneshotProcessing = false;
             if (!res.authParam1) {
+              this.showOneshotScaModal = false;
               this.completeOneshot(draft);
             } else {
               this.oneshotAuthParam = res.authParam1;
@@ -496,26 +522,57 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isOneshotProcessing = false;
-            this.toastError(httpErrorMessage(err, "Couldn't start the transfer. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.failOneshotStart(httpErrorMessage(err, "Couldn't start the transfer. Try again."))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isOneshotProcessing = false;
-        this.toastError(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
-        this.cdr.detectChanges();
-      });
+      this.failOneshotStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
     }
+  }
+
+  /** Back to the form, which kept its values. The modal is already open when the user switched to this browser. */
+  private failOneshotStart(message: string) {
+    this.ngZone.run(() => {
+      this.isOneshotProcessing = false;
+      this.showOneshotScaModal = false;
+      this.toastError(message);
+      this.cdr.detectChanges();
+    });
+  }
+
+  /** The phone gets its own challenge: the transfer is only sent to Adyen once it opened the link. */
+  private openOneshotOnPhone() {
+    const transfer = this.buildTransferRequest('');
+    this.oneshotAuthParam = '';
+    this.oneshotDraft = this.buildOneshotRecap();
+    this.oneshotRemoteStart = () => this.remoteSessions.createApproval({ userId: this.userId, type: 'transfer', transfer });
+    this.showOneshotScaModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /** Removing the QR code cancels its session, so the phone can no longer send the transfer. */
+  switchOneshotApproval(mode: ApprovalMode) {
+    if (this.isOneshotProcessing) return;
+    this.chooseApproval(mode);
+    if (mode === 'phone') {
+      this.openOneshotOnPhone();
+    } else {
+      this.oneshotRemoteStart = null;
+      this.prepareOneshotHere();
+    }
+  }
+
+  onOneshotApprovedOnPhone() {
+    const draft = this.oneshotDraft;
+    this.showOneshotScaModal = false;
+    this.oneshotRemoteStart = null;
+    if (draft) this.completeOneshot(draft);
+    this.cdr.detectChanges();
   }
 
   declineOneshot() {
     if (this.isOneshotProcessing) return;
     this.showOneshotScaModal = false;
+    this.oneshotRemoteStart = null;
     this.oneshotAuthParam = '';
   }
 
@@ -796,12 +853,27 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.verifyPayee('standing', () => this.initiateStandingOrderFlow(), busy => this.isCreating = busy);
   }
 
-  async initiateStandingOrderFlow() {
-    this.isCreating = true;
-    this.scaStatus = '';
+  initiateStandingOrderFlow() {
+    this.pendingStandingOrder = this.buildCreatePayload();
+    if (this.approval.mode === 'phone') {
+      this.openSoOnPhone(this.pendingStandingOrder);
+    } else {
+      this.prepareSoHere(this.pendingStandingOrder);
+    }
+  }
 
-    const standingOrder = this.buildCreatePayload();
-    this.pendingStandingOrder = standingOrder;
+  private openSoOnPhone(standingOrder: StandingOrderCreateRequest) {
+    this.scaStatus = '';
+    this.scaInitiateResult = null;
+    this.soRemoteStart = () => this.remoteSessions.createApproval({ userId: this.userId, type: 'standingOrder', standingOrder });
+    this.showSoScaModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /** Gets the challenge of the scheduled transfer for the passkey of this browser. */
+  private async prepareSoHere(standingOrder: StandingOrderCreateRequest) {
+    this.isCreating = true;
+    this.scaInitiateResult = null;
 
     try {
       this.scaStatus = 'Checking passkey availability...';
@@ -818,6 +890,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             if (result.status === 'completed') {
               this.scaStatus = '';
               this.isCreating = false;
+              this.showSoScaModal = false;
               this.onStandingOrderCreated(standingOrder);
             } else if (result.status === 'sca_required') {
               this.scaInitiateResult = result;
@@ -825,29 +898,39 @@ export class BankTransferComponent implements OnInit, OnDestroy {
               this.showSoScaModal = true;
               this.isCreating = false;
             } else {
-              this.scaStatus = '';
-              this.isCreating = false;
-              this.toastError("Couldn't create the scheduled transfer: unexpected response. Try again.");
+              this.failSoStart("Couldn't create the scheduled transfer: unexpected response. Try again.");
             }
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isCreating = false;
-            this.scaStatus = '';
-            this.toastError(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.failSoStart(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isCreating = false;
-        this.scaStatus = '';
-        this.toastError(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
-        this.cdr.detectChanges();
-      });
+      this.failSoStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+    }
+  }
+
+  /** Back to the form, which kept its values. The modal is already open when the user switched to this browser. */
+  private failSoStart(message: string) {
+    this.ngZone.run(() => {
+      this.isCreating = false;
+      this.scaStatus = '';
+      this.showSoScaModal = false;
+      this.toastError(message);
+      this.cdr.detectChanges();
+    });
+  }
+
+  /** Removing the QR code cancels its session, so the phone can no longer create the scheduled transfer. */
+  switchSoApproval(mode: ApprovalMode) {
+    const standingOrder = this.pendingStandingOrder;
+    if (this.isCreating || !standingOrder) return;
+    this.chooseApproval(mode);
+    if (mode === 'phone') {
+      this.openSoOnPhone(standingOrder);
+    } else {
+      this.soRemoteStart = null;
+      this.prepareSoHere(standingOrder);
     }
   }
 
@@ -908,10 +991,25 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.showSoList();
   }
 
+  onSoApprovedOnPhone() {
+    const order = this.pendingStandingOrder;
+    this.showSoScaModal = false;
+    this.soRemoteStart = null;
+    if (order) this.onStandingOrderCreated(order);
+    this.cdr.detectChanges();
+  }
+
   cancelSoSca() {
     if (this.isCreating) return;
     this.showSoScaModal = false;
+    this.soRemoteStart = null;
     this.scaStatus = '';
+  }
+
+  /** The next operations of this page, and of the next visits in this browser, are approved the same way. */
+  private chooseApproval(mode: ApprovalMode) {
+    this.approval = { ...this.approval, mode };
+    saveApprovalMode(this.userId, mode);
   }
 
   private toastError(message: string) {

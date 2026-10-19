@@ -7,6 +7,12 @@ const KEYWORD_LABELS: Record<string, string> = {
   balance: 'When the balance reaches its threshold',
 };
 
+/** Scheduled transfers (standing orders) run weekly and monthly schedules on the first business day. */
+export const STANDING_ORDER_SCHEDULES: Record<string, string> = {
+  weekly: 'Every week, on the first business day',
+  monthly: 'Every month, on the first business day'
+};
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DAY_ALIASES: Record<string, number> = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

@@ -21,6 +21,8 @@ import java.util.*;
 public class BankTransferService {
 
     private static final Logger log = LoggerFactory.getLogger(BankTransferService.class);
+    /** How far back the bank transactions are listed. */
+    public static final int HISTORY_DAYS = 90;
 
     private final String apiKey;
     private final RestTemplate restTemplate;
@@ -37,7 +39,7 @@ public class BankTransferService {
 
     public Map<String, Object> initiateBankTransfers(String accountHolderId, String balanceAccountId, String sdkOutput) {
         OffsetDateTime now = OffsetDateTime.now();
-        String createdSince = now.minusDays(90).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        String createdSince = now.minusDays(HISTORY_DAYS).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         String createdUntil = now.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
 
         try {
