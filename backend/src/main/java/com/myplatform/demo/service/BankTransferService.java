@@ -260,13 +260,10 @@ public class BankTransferService {
                 te.setId(getText(event, "id"));
                 te.setStatus(getText(event, "status"));
                 te.setBookingDate(getText(event, "bookingDate"));
+                te.setUpdateDate(getText(event, "updateDate"));
                 te.setType(getText(event, "type"));
+                setEventAmount(te, event, dto.getDirection());
 
-                JsonNode eventAmount = event.get("amount");
-                if (eventAmount != null) {
-                    te.setAmountValue(eventAmount.has("value") ? eventAmount.get("value").asLong() : 0);
-                    te.setAmountCurrency(getText(eventAmount, "currency"));
-                }
                 JsonNode origAmount = event.get("originalAmount");
                 if (origAmount != null) {
                     te.setOriginalAmountValue(origAmount.has("value") ? origAmount.get("value").asLong() : 0);
@@ -278,6 +275,35 @@ public class BankTransferService {
         }
 
         return dto;
+    }
+
+    /**
+     * Bank transfer events carry no amount, only the mutations of the balance account registers. Each
+     * accounting event moves the money one register further (received, then reserved, then balance),
+     * so the furthest register it changes holds the event's amount, already signed.
+     */
+    private void setEventAmount(BankTransferDTO.TransferEvent te, JsonNode event, String direction) {
+        JsonNode mutations = event.get("mutations");
+        if (mutations != null && mutations.isArray()) {
+            for (String register : List.of("balance", "reserved", "received")) {
+                for (JsonNode mutation : mutations) {
+                    long value = mutation.path(register).asLong();
+                    if (value != 0) {
+                        te.setAmountValue(value);
+                        te.setAmountCurrency(getText(mutation, "currency"));
+                        return;
+                    }
+                }
+            }
+        }
+        // Without mutations, the direction signs the amount, as the page does for the unsigned transfer amount.
+        JsonNode amount = event.get("amount");
+        if (amount != null && amount.has("value")) {
+            long value = amount.get("value").asLong();
+            boolean flip = "outgoing".equals(direction) && value > 0 || "incoming".equals(direction) && value < 0;
+            te.setAmountValue(flip ? -value : value);
+            te.setAmountCurrency(getText(amount, "currency"));
+        }
     }
 
     private void parseAccountIdentification(BankTransferDTO dto, JsonNode accountIdentification) {

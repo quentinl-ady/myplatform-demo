@@ -233,9 +233,12 @@ export interface TransferEvent {
   id: string;
   status: string;
   bookingDate: string;
+  /** Tracking events have no booking date, only this one. */
+  updateDate: string | null;
   type: string;
-  amountValue: number;
-  amountCurrency: string;
+  /** Signed: negative when money leaves the account. Null when the event moves no money, like a tracking event. */
+  amountValue: number | null;
+  amountCurrency: string | null;
   originalAmountValue: number;
   originalAmountCurrency: string;
 }

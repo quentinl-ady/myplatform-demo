@@ -241,8 +241,8 @@
                   <span class="event-type">({{ event.type }})</span>
                 </div>
                 <div class="event-meta">
-                  <span>{{ formatDateTime(event.bookingDate) }}</span>
-                  <span class="event-amount">{{ event.amountValue | money:event.amountCurrency }}</span>
+                  <span>{{ formatDateTime(event.bookingDate || event.updateDate) }}</span>
+                  <span class="event-amount" *ngIf="event.amountValue != null">{{ event.amountValue | money:event.amountCurrency:'exceptZero' }}</span>
                 </div>
               </div>
             </li>

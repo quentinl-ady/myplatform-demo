@@ -49,8 +49,11 @@ public class BankTransferDTO {
         private String id;
         private String status;
         private String bookingDate;
+        /** Tracking events have no booking date, only this one. */
+        private String updateDate;
         private String type;
-        private long amountValue;
+        /** Signed: negative when money leaves the account. Null when the event moves no money, like a tracking event. */
+        private Long amountValue;
         private String amountCurrency;
         private long originalAmountValue;
         private String originalAmountCurrency;
