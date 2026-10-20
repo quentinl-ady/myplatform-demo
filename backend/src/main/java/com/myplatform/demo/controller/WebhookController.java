@@ -1,6 +1,7 @@
 package com.myplatform.demo.controller;
 
 import com.myplatform.demo.model.WebhookEvent;
+import com.myplatform.demo.service.AccountStatementService;
 import com.myplatform.demo.service.CheckoutPaymentService;
 import com.myplatform.demo.service.WebhookService;
 import org.springframework.http.ResponseEntity;
@@ -15,16 +16,20 @@ public class WebhookController {
 
     private final WebhookService webhookService;
     private final CheckoutPaymentService checkoutPaymentService;
+    private final AccountStatementService accountStatementService;
 
-    public WebhookController(WebhookService webhookService, CheckoutPaymentService checkoutPaymentService) {
+    public WebhookController(WebhookService webhookService, CheckoutPaymentService checkoutPaymentService,
+                             AccountStatementService accountStatementService) {
         this.webhookService = webhookService;
         this.checkoutPaymentService = checkoutPaymentService;
+        this.accountStatementService = accountStatementService;
     }
 
     @PostMapping("/adyen")
     public ResponseEntity<String> receiveAdyenWebhook(@RequestBody String rawJson) {
         webhookService.processWebhook(rawJson, "adyen");
         checkoutPaymentService.applyWebhook(rawJson);
+        accountStatementService.applyWebhook(rawJson);
         return ResponseEntity.ok("[accepted]");
     }
 
@@ -32,6 +37,7 @@ public class WebhookController {
     public ResponseEntity<WebhookEvent> pushWebhookManually(@RequestBody String rawJson) {
         WebhookEvent event = webhookService.processWebhook(rawJson, "manual");
         checkoutPaymentService.applyWebhook(rawJson);
+        accountStatementService.applyWebhook(rawJson);
         return ResponseEntity.ok(event);
     }
 

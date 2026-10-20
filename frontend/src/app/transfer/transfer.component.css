@@ -11,12 +11,18 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .account-label { color: var(--fintech-text-secondary); font-size: 14px; font-weight: 500; margin: 0 0 8px 0; }
 .account-balance { font-size: 40px; font-weight: 700; color: var(--fintech-text); margin: 0 0 8px 0; letter-spacing: -1px; overflow-wrap: anywhere; }
 .account-details { font-size: 13px; color: var(--fintech-text-secondary); margin: 0; overflow-wrap: anywhere; }
-.account-actions { display: flex; justify-content: center; }
+.account-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
 
 .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
 .fintech-btn:disabled { background-color: var(--fintech-border) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; opacity: 0.7; box-shadow: none !important; }
 .fintech-btn.secondary { background-color: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
+
+/* Statements menu: it opens in an overlay, so these rules target the elements of the template */
+.statements-menu-title { margin: 0; padding: 4px 16px 8px; font-size: 12px; font-weight: 600; color: var(--fintech-text-secondary); }
+.statements-menu-state { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 16px 12px; font-size: 13px; line-height: 1.4; color: var(--fintech-text-secondary); }
+.statement-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.statement-currency { padding: 2px 8px; border-radius: 999px; background: var(--fintech-bg); color: var(--fintech-text-secondary); font-size: 12px; font-weight: 600; }
 
 /* No device warning */
 .no-device-warning { border-left: 4px solid var(--fintech-warning) !important; display: flex; flex-direction: column; gap: 20px; }

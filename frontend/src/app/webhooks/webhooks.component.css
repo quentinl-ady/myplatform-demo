@@ -170,6 +170,7 @@ mat-card {
 .notif-icon-wrapper[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
 .notif-icon-wrapper[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
 .notif-icon-wrapper[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
+.notif-icon-wrapper[data-type="report"]        { background: #e0f2f1; color: #00695c; }
 
 .notif-dot {
   position: absolute;
@@ -224,6 +225,7 @@ mat-card {
 .notif-category[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
 .notif-category[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
 .notif-category[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
+.notif-category[data-type="report"]        { background: #e0f2f1; color: #00695c; }
 .notif-time {
   white-space: nowrap;
 }

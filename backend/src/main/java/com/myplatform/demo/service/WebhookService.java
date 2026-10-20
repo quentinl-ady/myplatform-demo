@@ -8,6 +8,7 @@ import com.myplatform.demo.model.WebhookEvent;
 import com.myplatform.demo.repository.StoreCustomerRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.repository.WebhookEventRepository;
+import com.myplatform.demo.util.AccountStatementFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -230,6 +231,23 @@ public class WebhookService {
                 break;
             }
 
+            // ── Reports: account statements and the other balance platform reports ──
+            case "balancePlatform.report.created": {
+                String fileName = extractText(data, "fileName");
+                if (AccountStatementFile.isStatement(fileName, extractText(data, "downloadUrl"))) {
+                    String currency = AccountStatementFile.currency(fileName);
+                    AccountStatementFile.Period period = AccountStatementFile.period(fileName);
+                    event.setTitle("Account statement ready");
+                    event.setDescription("Your " + (currency != null ? currency + " " : "") + "account statement" +
+                            (period != null ? " for " + period.label() : "") +
+                            " is ready to download from your business account.");
+                } else {
+                    event.setTitle("Report ready");
+                    event.setDescription((fileName != null ? fileName : "A new report") + " is ready to download.");
+                }
+                break;
+            }
+
             // ── Standard payment notifications ──
             case "AUTHORISATION": {
                 JsonNode notifItem = extractStandardNotificationItem(root);
@@ -325,6 +343,7 @@ public class WebhookService {
             String type = root.get("type").asText("");
             if (type.startsWith("balancePlatform.transfer")) return "transfer";
             if (type.startsWith("balancePlatform.transaction")) return "transaction";
+            if (type.startsWith("balancePlatform.report")) return "report";
             if (type.startsWith("balancePlatform.")) return "configuration";
         }
         if (root.has("eventCode")) return "standard";

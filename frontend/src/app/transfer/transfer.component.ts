@@ -3,7 +3,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Observable } from 'rxjs';
+import { MatMenuModule } from '@angular/material/menu';
+import { Observable, Subscription } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
@@ -11,10 +12,11 @@ import { RemoteSessionPanelComponent } from '../remote-session/remote-session-pa
 import { ApprovalSwitchComponent } from '../remote-session/approval-switch.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
-import { BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
+import { AccountStatement, BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
 import { AccountService, RemoteSessionService, TransferService } from "../services";
 import {
-  ApprovalChoice, ApprovalMode, MoneyPipe, approvalChoice, httpErrorMessage, saveApprovalMode, scaErrorMessage
+  ApprovalChoice, ApprovalMode, MoneyPipe, approvalChoice, blobHttpErrorMessage, httpErrorMessage, saveApprovalMode,
+  scaErrorMessage
 } from '../shared';
 import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
 import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
@@ -27,6 +29,7 @@ import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
     RouterLink,
     A11yModule,
     MaterialModule,
+    MatMenuModule,
     MoneyPipe,
     DeviceRegistrationComponent,
     AccountSetupStateComponent,
@@ -49,6 +52,13 @@ export class TransferComponent implements OnInit, OnDestroy {
   userId = '';
   accountInfo?: BankAccountInformationResponse;
   isDownloadingRib = false;
+
+  /** The latest account statements of the business account, listed in the Statements menu. */
+  statements: AccountStatement[] = [];
+  statementsState: 'loading' | 'ready' | 'error' = 'loading';
+  /** File name of the statement being downloaded. */
+  downloadingStatement: string | null = null;
+  private statementsRequest?: Subscription;
 
   accountState: LoadState = 'loading';
   devicesState: LoadState = 'loading';
@@ -80,12 +90,14 @@ export class TransferComponent implements OnInit, OnDestroy {
       if (this.userId) {
         this.fetchAccountInformation();
         this.checkDevices();
+        this.loadStatements();
       }
     });
   }
 
   ngOnDestroy() {
     this.stopLastUpdatedTimer();
+    this.statementsRequest?.unsubscribe();
   }
 
   get setupState(): LoadState {
@@ -282,14 +294,7 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.isDownloadingRib = true;
     this.accountService.getRibPdf(this.userId).subscribe({
       next: (blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `RIB_${this.accountInfo?.bankAccountNumber || 'Account'}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        this.saveFile(blob, `RIB_${this.accountInfo?.bankAccountNumber || 'Account'}.pdf`);
         this.isDownloadingRib = false;
         this.cdr.detectChanges();
       },
@@ -299,6 +304,70 @@ export class TransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  /** Also called each time the menu opens: Adyen adds statements while the page stays open. */
+  loadStatements() {
+    if (this.statementsState === 'error') {
+      this.statementsState = 'loading';
+    }
+    this.statementsRequest?.unsubscribe();
+    this.statementsRequest = this.accountService.getStatements(this.userId).subscribe({
+      next: (statements) => {
+        this.statements = statements;
+        this.statementsState = 'ready';
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        // A failed refresh keeps the statements already listed.
+        if (this.statementsState !== 'ready') {
+          this.statementsState = 'error';
+        }
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  downloadStatement(statement: AccountStatement) {
+    this.downloadingStatement = statement.fileName;
+    this.cdr.detectChanges();
+    this.accountService.downloadStatement(this.userId, statement.fileName).subscribe({
+      next: (blob) => {
+        this.saveFile(blob, statement.pdfFileName);
+        this.downloadingStatement = null;
+        this.cdr.detectChanges();
+      },
+      error: async (err) => {
+        const message = await blobHttpErrorMessage(err, "Couldn't download the statement. Try again.");
+        this.downloadingStatement = null;
+        this.snack.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /** "19 Oct 2026" for a daily statement, "1 Oct 2026 – 31 Oct 2026" for a longer period. */
+  statementPeriod(statement: AccountStatement): string {
+    if (!statement.periodStart || !statement.periodEnd) {
+      return formatDateTime(statement.creationDate);
+    }
+    const start = formatDate(statement.periodStart);
+    return statement.periodStart === statement.periodEnd ? start : `${start} – ${formatDate(statement.periodEnd)}`;
+  }
+
+  trackStatement(_: number, statement: AccountStatement): string {
+    return statement.fileName;
+  }
+
+  private saveFile(blob: Blob, fileName: string) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   }
 
   isIncoming(tx: BankTransaction): boolean {

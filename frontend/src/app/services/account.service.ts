@@ -3,7 +3,7 @@ import {HttpClient} from '@angular/common/http';
 import {Observable, Subject} from 'rxjs';
 import {shareReplay} from 'rxjs/operators';
 import {environment} from '../../environments/environment';
-import {BalanceAccount, BankAccountInformationResponse, BankAccountStatus, User} from '../models';
+import {AccountStatement, BalanceAccount, BankAccountInformationResponse, BankAccountStatus, User} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class AccountService {
@@ -55,6 +55,17 @@ export class AccountService {
   getRibPdf(userId: string): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/api/bank-statement/rib/pdf`, {
       params: {userId},
+      responseType: 'blob'
+    });
+  }
+
+  getStatements(userId: string): Observable<AccountStatement[]> {
+    return this.http.get<AccountStatement[]>(`${this.baseUrl}/api/statements/${userId}`);
+  }
+
+  downloadStatement(userId: string, fileName: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/api/statements/${userId}/download`, {
+      params: {fileName},
       responseType: 'blob'
     });
   }

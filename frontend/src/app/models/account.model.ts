@@ -81,3 +81,16 @@ export interface BankAccountInformationResponse {
   bankAccountNumber: string;
   description: string;
 }
+
+/** An account statement that Adyen generated for the business account (CAMT.053), downloaded as a PDF. */
+export interface AccountStatement {
+  fileName: string;
+  currency: string | null;
+  /** First and last day covered (yyyy-MM-dd); null when the file name has no period. */
+  periodStart: string | null;
+  periodEnd: string | null;
+  /** When Adyen generated it (ISO-8601 UTC). */
+  creationDate: string;
+  /** The name to save the PDF under, e.g. account-statement_2026-10-19_EUR.pdf. */
+  pdfFileName: string;
+}

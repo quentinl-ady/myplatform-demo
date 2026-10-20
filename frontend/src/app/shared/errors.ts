@@ -24,6 +24,19 @@ export function httpStatus(err: unknown): number | null {
   return err instanceof HttpErrorResponse ? err.status : null;
 }
 
+/** httpErrorMessage for a call made with responseType 'blob': the error body is then a Blob too. */
+export async function blobHttpErrorMessage(err: unknown, fallback: string): Promise<string> {
+  if (err instanceof HttpErrorResponse && err.error instanceof Blob) {
+    try {
+      const body = await err.error.text();
+      return httpErrorMessage(new HttpErrorResponse({ error: body, status: err.status, statusText: err.statusText }), fallback);
+    } catch {
+      return fallback;
+    }
+  }
+  return httpErrorMessage(err, fallback);
+}
+
 function extractMessage(body: unknown, depth = 0): string | null {
   if (!body || depth > 2) return null;
   if (typeof body === 'string') {

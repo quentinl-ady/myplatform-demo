@@ -279,6 +279,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       case 'transfer': return 'swap_horiz';
       case 'transaction': return 'receipt_long';
       case 'standard': return 'payment';
+      case 'report': return 'description';
       default: return 'notifications';
     }
   }
@@ -289,6 +290,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       case 'transfer': return 'Transfer';
       case 'transaction': return 'Transaction';
       case 'standard': return 'Payment';
+      case 'report': return 'Report';
       default: return 'System';
     }
   }

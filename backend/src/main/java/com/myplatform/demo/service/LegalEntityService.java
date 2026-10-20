@@ -8,12 +8,14 @@ import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.*;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
+import com.myplatform.demo.util.PostalAddress;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class LegalEntityService {
@@ -220,5 +222,82 @@ public class LegalEntityService {
                 .filter(Objects::nonNull)
                 .map(ref -> new PayoutAccount(ref.getId(), ref.getAccountIdentifier()))
                 .toList();
+    }
+
+    /** Name, trading name and postal lines of a legal entity, as the account statements show them. */
+    public record Identity(String name, String doingBusinessAs, List<String> address) {
+    }
+
+    /**
+     * The account holder as Adyen verified it; null when the legal entity has no name.
+     * A sole proprietor trades under the sole proprietorship associated to their individual legal entity.
+     */
+    public Identity getIdentity(String legalEntityId) throws IOException, ApiException {
+        LegalEntity entity = lem.getLegalEntity(legalEntityId);
+        Organization organization = entity.getOrganization();
+        if (organization != null) {
+            Address address = organization.getRegisteredAddress() != null
+                    ? organization.getRegisteredAddress()
+                    : organization.getPrincipalPlaceOfBusiness();
+            return identity(organization.getLegalName(), organization.getDoingBusinessAs(), address);
+        }
+        SoleProprietorship ownBusiness = entity.getSoleProprietorship();
+        if (ownBusiness != null) {
+            return identity(ownBusiness.getName(), ownBusiness.getDoingBusinessAs(), ownBusiness.getRegisteredAddress());
+        }
+        Individual individual = entity.getIndividual();
+        if (individual == null) {
+            return null;
+        }
+        String name = fullName(individual.getName());
+        LegalEntityAssociation association = Optional.ofNullable(entity.getEntityAssociations()).orElse(List.of()).stream()
+                .filter(a -> a.getType() == LegalEntityAssociation.TypeEnum.SOLEPROPRIETORSHIP && a.getLegalEntityId() != null)
+                .findFirst()
+                .orElse(null);
+        if (association == null) {
+            return identity(name, null, individual.getResidentialAddress());
+        }
+        SoleProprietorship business = lem.getLegalEntity(association.getLegalEntityId()).getSoleProprietorship();
+        if (business == null) {
+            return identity(name, association.getName(), individual.getResidentialAddress());
+        }
+        return identity(name,
+                isBlank(business.getDoingBusinessAs()) ? business.getName() : business.getDoingBusinessAs(),
+                business.getRegisteredAddress() != null ? business.getRegisteredAddress() : individual.getResidentialAddress());
+    }
+
+    private static Identity identity(String name, String doingBusinessAs, Address address) {
+        if (isBlank(name)) {
+            return null;
+        }
+        String tradingName = isBlank(doingBusinessAs) || doingBusinessAs.trim().equalsIgnoreCase(name.trim())
+                ? null
+                : doingBusinessAs.trim();
+        return new Identity(name.trim(), tradingName, addressLines(address));
+    }
+
+    private static String fullName(Name name) {
+        return name == null ? null : join(" ", name.getFirstName(), name.getInfix(), name.getLastName());
+    }
+
+    private static List<String> addressLines(Address address) {
+        if (address == null) {
+            return List.of();
+        }
+        return PostalAddress.lines(Arrays.asList(address.getStreet(), address.getStreet2()), address.getPostalCode(),
+                address.getCity(), address.getStateOrProvince(), address.getCountry());
+    }
+
+    /** The non-blank parts, trimmed; null when there are none. */
+    private static String join(String separator, String... parts) {
+        String joined = Arrays.stream(parts)
+                .filter(part -> !isBlank(part))
+                .map(String::trim)
+                .collect(Collectors.joining(separator));
+        return joined.isEmpty() ? null : joined;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

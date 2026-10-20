@@ -25,6 +25,38 @@
           <mat-spinner *ngIf="isDownloadingRib" diameter="20" aria-hidden="true"></mat-spinner>
           {{ isDownloadingRib ? 'Downloading...' : 'Download RIB' }}
         </button>
+        <button mat-flat-button type="button" class="fintech-btn secondary"
+                [matMenuTriggerFor]="statementsMenu" (menuOpened)="loadStatements()" [disabled]="!!downloadingStatement">
+          <mat-icon *ngIf="!downloadingStatement" aria-hidden="true">receipt_long</mat-icon>
+          <mat-spinner *ngIf="downloadingStatement" diameter="20" aria-hidden="true"></mat-spinner>
+          {{ downloadingStatement ? 'Downloading...' : 'Statements' }}
+          <mat-icon *ngIf="!downloadingStatement" iconPositionEnd aria-hidden="true">expand_more</mat-icon>
+        </button>
+        <mat-menu #statementsMenu="matMenu">
+          <p class="statements-menu-title">Account statements (PDF)</p>
+          <div class="statements-menu-state" *ngIf="statementsState === 'loading'" role="status">
+            <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+            Loading statements...
+          </div>
+          <button mat-menu-item type="button" *ngIf="statementsState === 'error'" (click)="$event.stopPropagation(); loadStatements()">
+            <mat-icon aria-hidden="true">refresh</mat-icon>
+            <span>Couldn't load your statements. Retry</span>
+          </button>
+          <p class="statements-menu-state" *ngIf="statementsState === 'ready' && !statements.length">
+            No statements yet. New ones appear here as soon as Adyen generates them.
+          </p>
+          <ng-container *ngIf="statementsState === 'ready'">
+            <button mat-menu-item type="button" *ngFor="let s of statements; trackBy: trackStatement"
+                    (click)="downloadStatement(s)"
+                    [attr.aria-label]="'Download the ' + (s.currency ? s.currency + ' ' : '') + 'statement for ' + statementPeriod(s) + ' as a PDF'">
+              <mat-icon aria-hidden="true">download</mat-icon>
+              <span class="statement-item">
+                <span>{{ statementPeriod(s) }}</span>
+                <span class="statement-currency" *ngIf="s.currency">{{ s.currency }}</span>
+              </span>
+            </button>
+          </ng-container>
+        </mat-menu>
       </div>
     </mat-card>
 
