@@ -20,11 +20,6 @@
         <p class="account-details">{{ accountInfo.description }} &bull; <span class="mono">{{ accountInfo.bankAccountNumber }}</span></p>
       </div>
       <div class="account-actions">
-        <button mat-flat-button type="button" class="fintech-btn secondary" (click)="downloadRib()" [disabled]="isDownloadingRib">
-          <mat-icon *ngIf="!isDownloadingRib" aria-hidden="true">download</mat-icon>
-          <mat-spinner *ngIf="isDownloadingRib" diameter="20" aria-hidden="true"></mat-spinner>
-          {{ isDownloadingRib ? 'Downloading...' : 'Download RIB' }}
-        </button>
         <button mat-flat-button type="button" class="fintech-btn secondary"
                 [matMenuTriggerFor]="statementsMenu" (menuOpened)="loadStatements()" [disabled]="!!downloadingStatement">
           <mat-icon *ngIf="!downloadingStatement" aria-hidden="true">receipt_long</mat-icon>

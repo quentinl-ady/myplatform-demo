@@ -25,6 +25,7 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.properties.AreaBreakType;
+import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
@@ -77,6 +78,8 @@ public class AccountStatementPdfService {
 
     /** The same default logo as the frontend. */
     private static final String DEFAULT_LOGO = "/default-platform-logo.svg";
+    /** The statements of this demo come from Adyen's test environment: the badge keeps them from passing for real ones. */
+    private static final String TEST_ONLY = "TEST ONLY – NOT A REAL BANK STATEMENT";
     private static final String ADYEN_WEBSITE = "www.adyen.com";
     private static final String DEPOSITOR_INFORMATION_SHEET =
             "https://docs.adyen.com/business-accounts/compliance-guidelines/eu-depositor-info-sheet";
@@ -95,6 +98,10 @@ public class AccountStatementPdfService {
     private static final DeviceRgb MUTED = new DeviceRgb(107, 114, 128);
     private static final DeviceRgb RULE = new DeviceRgb(229, 231, 235);
     private static final DeviceRgb PANEL = new DeviceRgb(243, 244, 246);
+    /** The amber of the demo banner of the website. */
+    private static final DeviceRgb AMBER_INK = new DeviceRgb(138, 75, 0);
+    private static final DeviceRgb AMBER_PANEL = new DeviceRgb(255, 248, 225);
+    private static final DeviceRgb AMBER_RULE = new DeviceRgb(240, 192, 80);
     private static final float MARGIN = 36;
     private static final float TOP_MARGIN = 32;
     private static final float BOTTOM_MARGIN = 46;
@@ -223,6 +230,7 @@ public class AccountStatementPdfService {
             Table header = new Table(UnitValue.createPercentArray(new float[]{55, 45})).useAllAvailableWidth();
             header.addCell(plain().add(brand()).setVerticalAlignment(VerticalAlignment.MIDDLE));
             Cell title = plain().setTextAlignment(TextAlignment.RIGHT);
+            title.add(testBadge());
             title.add(paragraph("Account statement", bold, 17, INK));
             title.add(paragraph(region.product, regular, 9, MUTED).setMarginTop(2));
             title.add(paragraph(period(statement), bold, 10, INK).setMarginTop(8));
@@ -233,6 +241,13 @@ public class AccountStatementPdfService {
             header.addCell(title);
             document.add(header);
             document.add(rule(12));
+        }
+
+        private Table testBadge() {
+            Cell badge = new Cell().setBorder(new SolidBorder(AMBER_RULE, 0.75f)).setBackgroundColor(AMBER_PANEL)
+                    .setPaddingTop(2).setPaddingBottom(2).setPaddingLeft(6).setPaddingRight(6)
+                    .add(paragraph(TEST_ONLY, bold, 7, AMBER_INK).setCharacterSpacing(0.4f));
+            return new Table(1).addCell(badge).setHorizontalAlignment(HorizontalAlignment.RIGHT).setMarginBottom(6);
         }
 
         private IBlockElement brand() {

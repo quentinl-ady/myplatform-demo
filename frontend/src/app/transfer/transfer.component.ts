@@ -51,7 +51,6 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   userId = '';
   accountInfo?: BankAccountInformationResponse;
-  isDownloadingRib = false;
 
   /** The latest account statements of the business account, listed in the Statements menu. */
   statements: AccountStatement[] = [];
@@ -288,22 +287,6 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.detailError = '';
     this.isLoadingDetail = false;
     this.cdr.detectChanges();
-  }
-
-  downloadRib() {
-    this.isDownloadingRib = true;
-    this.accountService.getRibPdf(this.userId).subscribe({
-      next: (blob) => {
-        this.saveFile(blob, `RIB_${this.accountInfo?.bankAccountNumber || 'Account'}.pdf`);
-        this.isDownloadingRib = false;
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.isDownloadingRib = false;
-        this.snack.open(httpErrorMessage(err, "Couldn't download your bank details (RIB). Try again."), 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
-        this.cdr.detectChanges();
-      }
-    });
   }
 
   /** Also called each time the menu opens: Adyen adds statements while the page stays open. */

@@ -91,12 +91,13 @@ function hasKey(record: object, key: string): boolean {
   `,
   styles: [`
     :host {
-      display: block;
+      display: flex;
+      flex-direction: column;
       min-height: 100%;
       background: var(--fintech-bg);
     }
     .result-page {
-      min-height: 100vh;
+      flex: 1 0 auto;
       box-sizing: border-box;
       display: flex;
       align-items: center;

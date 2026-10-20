@@ -47,15 +47,16 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
   `,
   styles: [`
     :host {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
     }
 
     .fintech-auth-container {
+      flex: 1 0 auto;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
-      min-height: 100dvh;
       box-sizing: border-box;
       background-color: var(--fintech-bg);
       padding: 24px;

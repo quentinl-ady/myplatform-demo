@@ -52,13 +52,6 @@ export class AccountService {
     return this.http.get<BankAccountInformationResponse>(`${this.baseUrl}/api/accounts/${userId}/bank`);
   }
 
-  getRibPdf(userId: string): Observable<Blob> {
-    return this.http.get(`${this.baseUrl}/api/bank-statement/rib/pdf`, {
-      params: {userId},
-      responseType: 'blob'
-    });
-  }
-
   getStatements(userId: string): Observable<AccountStatement[]> {
     return this.http.get<AccountStatement[]>(`${this.baseUrl}/api/statements/${userId}`);
   }
