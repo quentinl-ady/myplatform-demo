@@ -5,13 +5,13 @@
 
 <div class="speed-status" *ngIf="status === 'loading'" role="status">
   <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
-  <span>Checking the available transfer speeds...</span>
+  <span>Checking the available transfer speeds…</span>
 </div>
 
 <div class="speed-status error" *ngIf="status === 'error'" role="alert">
   <mat-icon aria-hidden="true">error</mat-icon>
   <span>{{ errorMessage }}</span>
-  <button type="button" class="retry-btn" (click)="retry()">Retry</button>
+  <button type="button" class="retry-btn" (click)="retry()">Try again</button>
 </div>
 
 <ng-container *ngIf="status === 'loaded'">

@@ -35,13 +35,14 @@
     <mat-error *ngIf="passwordInvalid()">Enter your password.</mat-error>
   </mat-form-field>
 
-  <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="loading">
-    <span *ngIf="!loading">Log in</span>
-    <mat-spinner *ngIf="loading" diameter="20" aria-label="Logging in"></mat-spinner>
-  </button>
+  <app-inline-alert
+    *ngIf="error"
+    class="submit-error"
+    [dismissible]="true"
+    (dismiss)="dismissError()">{{ error }}</app-inline-alert>
 
-  <div *ngIf="error" class="error-msg" role="alert">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <span>{{ error }}</span>
-  </div>
+  <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="loading">
+    <span *ngIf="!loading">Sign in</span>
+    <mat-spinner *ngIf="loading" diameter="20" aria-label="Signing in"></mat-spinner>
+  </button>
 </form>

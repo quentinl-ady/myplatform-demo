@@ -2,11 +2,10 @@ import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { IssuingService } from '../services';
 import { environment } from '../../environments/environment';
-import { httpErrorMessage } from '../shared';
+import { InlineAlertComponent, NotifyService, httpErrorMessage } from '../shared';
 
 @Component({
   selector: 'app-relayed-auth',
@@ -14,7 +13,8 @@ import { httpErrorMessage } from '../shared';
   imports: [
     CommonModule,
     FormsModule,
-    MaterialModule
+    MaterialModule,
+    InlineAlertComponent
   ],
   templateUrl: './relayed-auth.component.html',
   styleUrl: './relayed-auth.component.css'
@@ -22,7 +22,7 @@ import { httpErrorMessage } from '../shared';
 export class RelayedAuthComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private issuingService = inject(IssuingService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private cdr = inject(ChangeDetectorRef);
 
   userId = '';
@@ -31,6 +31,8 @@ export class RelayedAuthComponent implements OnInit {
   isLoading = true;
   loadError: string | null = null;
   isSaving = false;
+  saveError: string | null = null;
+  copyFailed = false;
   webhookUrl = '';
   readonly presets = [0, 25, 50, 75, 100];
 
@@ -56,7 +58,7 @@ export class RelayedAuthComponent implements OnInit {
       },
       error: (err) => {
         this.isLoading = false;
-        this.loadError = httpErrorMessage(err, 'Could not load the relayed authorisation settings.');
+        this.loadError = httpErrorMessage(err, 'Try again in a moment.');
         this.cdr.detectChanges();
       }
     });
@@ -65,19 +67,17 @@ export class RelayedAuthComponent implements OnInit {
   save() {
     if (this.isSaving || !this.hasChanges) return;
     this.isSaving = true;
+    this.saveError = null;
     this.issuingService.updateRelayedAuthConfig(this.userId, this.approvalPercentage).subscribe({
       next: (config) => {
         this.savedPercentage = config.approvalPercentage;
         this.isSaving = false;
-        this.snack.open(`Saved: ${this.describe(config.approvalPercentage)}`, 'Close', { duration: 3000 });
+        this.notify.success(`Saved: ${this.describe(config.approvalPercentage)}.`);
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.isSaving = false;
-        this.snack.open(httpErrorMessage(err, 'Could not save the approval percentage.'), 'Close', {
-          duration: 5000,
-          panelClass: 'fintech-snack-error'
-        });
+        this.saveError = httpErrorMessage(err, 'Unable to save the approval percentage. Try again.');
         this.cdr.detectChanges();
       }
     });
@@ -89,6 +89,7 @@ export class RelayedAuthComponent implements OnInit {
 
   resetChanges() {
     this.approvalPercentage = this.savedPercentage;
+    this.saveError = null;
   }
 
   getStatusLabel(): string {
@@ -115,14 +116,13 @@ export class RelayedAuthComponent implements OnInit {
   }
 
   async copyWebhookUrl() {
+    this.copyFailed = false;
     try {
       await navigator.clipboard.writeText(this.webhookUrl);
-      this.snack.open('Webhook URL copied', 'Close', { duration: 2000 });
+      this.notify.success('Webhook URL copied.');
     } catch {
-      this.snack.open('Could not copy automatically. Select the URL and copy it manually.', 'Close', {
-        duration: 5000,
-        panelClass: 'fintech-snack-error'
-      });
+      this.copyFailed = true;
     }
+    this.cdr.detectChanges();
   }
 }

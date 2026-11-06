@@ -14,7 +14,7 @@
       <div class="logo-mark">
         <img [src]="customLogoSrc || 'assets/logo.svg'" alt="" (error)="onLogoError()" />
       </div>
-      <span class="brand-name">{{ platformName }}</span>
+      <span class="brand-name" [title]="platformName">{{ platformName }}</span>
       <button
         type="button"
         mat-icon-button
@@ -95,7 +95,7 @@
         <mat-icon aria-hidden="true">{{ navOpen ? 'close' : 'menu' }}</mat-icon>
       </button>
 
-      <span class="topbar-brand" *ngIf="isMobile">{{ platformName }}</span>
+      <span class="topbar-brand" *ngIf="isMobile" [title]="platformName">{{ platformName }}</span>
 
       <div class="spacer"></div>
 
@@ -105,8 +105,8 @@
         class="topbar-api-btn"
         [class.active]="apiPanelOpen"
         (click)="toggleApiPanel()"
-        matTooltip="API Explorer"
-        aria-label="API Explorer"
+        matTooltip="API explorer"
+        aria-label="API explorer"
         aria-haspopup="dialog"
         [attr.aria-expanded]="apiPanelOpen">
         <mat-icon aria-hidden="true">api</mat-icon>
@@ -115,6 +115,8 @@
       <a
         mat-icon-button
         [routerLink]="['/', userId, 'notifications']"
+        routerLinkActive="is-current"
+        ariaCurrentWhenActive="page"
         class="topbar-notif-btn"
         matTooltip="Notifications"
         [attr.aria-label]="webhookUnreadCount > 0 ? 'Notifications, ' + webhookUnreadCount + ' unread' : 'Notifications'">
@@ -129,9 +131,9 @@
 
       <div class="user-profile">
         <div class="user-info">
-          <span class="user-name" *ngIf="displayName">{{ displayName }}</span>
-          <span class="user-id" *ngIf="userId">Account ID {{ userId }}</span>
-          <span class="user-email" *ngIf="userEmail">{{ userEmail }}</span>
+          <span class="user-name" *ngIf="displayName" [title]="displayName">{{ displayName }}</span>
+          <span class="user-id" *ngIf="userId" [title]="'Account ID ' + userId">Account ID {{ userId }}</span>
+          <span class="user-email" *ngIf="userEmail" [title]="userEmail">{{ userEmail }}</span>
         </div>
         <div class="user-avatar" aria-hidden="true">
           <span *ngIf="initials; else avatarIcon">{{ initials }}</span>
@@ -158,18 +160,18 @@
 
         <div *ngSwitchCase="'notFound'" class="account-state">
           <mat-icon class="account-state-icon" aria-hidden="true">person_search</mat-icon>
-          <h1 class="account-state-title">We couldn't find this account</h1>
+          <h1 class="account-state-title">Account not found</h1>
           <p class="account-state-text">
-            No account matches the ID <strong>{{ userId }}</strong>. Check the link, or log in again from the home page.
+            No account matches the ID <strong>{{ userId }}</strong>. Check the link, or sign in again from the home page.
           </p>
           <a mat-flat-button class="fintech-btn" routerLink="/" [replaceUrl]="true">Back to home page</a>
         </div>
 
         <div *ngSwitchCase="'error'" class="account-state" role="alert">
           <mat-icon class="account-state-icon error" aria-hidden="true">error_outline</mat-icon>
-          <h1 class="account-state-title">Something went wrong</h1>
+          <h1 class="account-state-title">Unable to load account</h1>
           <p class="account-state-text">{{ accountError }}</p>
-          <button type="button" mat-flat-button class="fintech-btn" (click)="retryAccount()">Retry</button>
+          <button type="button" mat-stroked-button class="fintech-btn secondary" (click)="retryAccount()">Try again</button>
         </div>
 
         <router-outlet *ngSwitchDefault></router-outlet>
@@ -185,7 +187,7 @@
     class="api-panel"
     role="dialog"
     aria-modal="true"
-    aria-label="API Explorer"
+    aria-label="API explorer"
     cdkTrapFocus
     [cdkTrapFocusAutoCapture]="true"
     (keydown.escape)="closeApiPanel()">

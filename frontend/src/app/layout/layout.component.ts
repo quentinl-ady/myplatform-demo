@@ -1,18 +1,18 @@
-import { Component, inject, ChangeDetectorRef, OnInit, OnDestroy } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, inject, ChangeDetectorRef, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { RouterModule, ActivatedRoute, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { A11yModule } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSidenav, MatSidenavContainer } from '@angular/material/sidenav';
 import { MaterialModule } from '../material.module';
 import { AccountService, BrandingService, WebhookService } from '../services';
 import { BankAccountStatus, User, UserBranding } from '../models';
 import { Subscription, filter, map, distinctUntilChanged } from 'rxjs';
-import { BrandingDialogComponent } from './branding-dialog.component';
+import { BrandingDialogComponent, BrandingDialogData, BrandingDialogResult, BrandingPayload } from './branding-dialog.component';
 import { ApiLogsComponent } from '../api-logs/api-logs.component';
 import { DEFAULT_PLATFORM_NAME, PageTitleStrategy } from './page-title.strategy';
-import { ConfirmService, httpErrorMessage, httpStatus } from '../shared';
+import { NotifyService, httpErrorMessage, httpStatus } from '../shared';
 
 type NavLock = 'embeddedPayment' | 'bankAccount' | 'capital' | 'issuing';
 
@@ -31,6 +31,10 @@ interface NavSection {
 
 type AccountState = 'loading' | 'ready' | 'notFound' | 'error';
 
+function hasCustomBranding(branding: UserBranding): boolean {
+  return !!(branding.platformName || branding.logoData || branding.themeId);
+}
+
 const MOBILE_QUERY = '(max-width: 959.98px)';
 const WEBHOOK_POLL_MS = 30000;
 
@@ -47,15 +51,18 @@ const WEBHOOK_POLL_MS = 30000;
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.css'
 })
-export class LayoutComponent implements OnInit, OnDestroy {
+export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
+  @ViewChild(MatSidenavContainer) private sidenavContainer?: MatSidenavContainer;
+  @ViewChild(MatSidenav, { read: ElementRef }) private sidenavRef?: ElementRef<HTMLElement>;
+  private sidenavResize?: ResizeObserver;
+
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private accountService = inject(AccountService);
   private brandingService = inject(BrandingService);
   private webhookService = inject(WebhookService);
   private dialog = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
-  private confirmService = inject(ConfirmService);
+  private notify = inject(NotifyService);
   private breakpointObserver = inject(BreakpointObserver);
   private titleStrategy = inject(PageTitleStrategy);
   private cdr = inject(ChangeDetectorRef);
@@ -96,7 +103,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
     {
       title: 'Cards',
       items: [
-        { label: 'My cards', icon: 'credit_card', path: 'cards', lock: 'issuing' },
+        { label: 'Cards', icon: 'credit_card', path: 'cards', lock: 'issuing' },
         { label: 'Create card', icon: 'add_card', path: 'card-create', lock: 'issuing' },
         { label: 'Card transactions', icon: 'receipt_long', path: 'card-transactions', lock: 'issuing' },
         { label: 'Test issued cards', icon: 'contactless', path: 'issuing-checkout', lock: 'issuing' },
@@ -119,6 +126,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   customLogoSrc: string | null = null;
   customPlatformName: string | null = null;
   customThemeId: string | null = null;
+  private branding: UserBranding | null = null;
   webhookUnreadCount = 0;
 
   bankAccountCreated = false;
@@ -193,7 +201,19 @@ export class LayoutComponent implements OnInit, OnDestroy {
     );
   }
 
+  ngAfterViewInit() {
+    // The menu width follows the text size. Material measures it only on open,
+    // mode and window changes, so a new text size would slide the page under it.
+    const container = this.sidenavContainer;
+    const sidenav = this.sidenavRef?.nativeElement;
+    if (container && sidenav && typeof ResizeObserver !== 'undefined') {
+      this.sidenavResize = new ResizeObserver(() => container.updateContentMargins());
+      this.sidenavResize.observe(sidenav);
+    }
+  }
+
   ngOnDestroy() {
+    this.sidenavResize?.disconnect();
     this.subscriptions.unsubscribe();
     this.resetAccountState();
     this.titleStrategy.setPlatformName(null);
@@ -228,7 +248,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
           this.accountState = 'notFound';
         } else {
           this.accountState = 'error';
-          this.accountError = httpErrorMessage(err, 'We couldn\'t load this account. Please try again.');
+          this.accountError = httpErrorMessage(err, 'Unable to load this account. Try again.');
         }
         this.cdr.detectChanges();
       }
@@ -253,7 +273,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
 
   lockReason(item: NavItem): string | null {
     if (!item.lock) return null;
-    if (this.accountState === 'loading') return 'Loading your account…';
+    if (this.accountState === 'loading') return 'Loading account…';
     if (this.accountState !== 'ready') return 'This account couldn\'t be loaded';
     switch (item.lock) {
       case 'embeddedPayment':
@@ -265,8 +285,8 @@ export class LayoutComponent implements OnInit, OnDestroy {
       case 'bankAccount':
         if (this.bankAccountReady) return null;
         if (!this.bankEnabled) return 'Enable Bank when creating the account to use business accounts';
-        if (this.bankStatusFailed) return 'We couldn\'t check your business bank account. Reload the page to try again.';
-        return 'Create your business bank account on the Onboarding page to unlock this';
+        if (this.bankStatusFailed) return 'Unable to check the business bank account. Reload the page to try again.';
+        return 'Create the business bank account on the Onboarding page to unlock this';
       default:
         return null;
     }
@@ -332,6 +352,7 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   private applyBranding(branding: UserBranding | null) {
+    this.branding = branding;
     this.customPlatformName = branding?.platformName || null;
     this.customLogoSrc = branding?.logoData || null;
     this.customThemeId = branding?.themeId || null;
@@ -343,64 +364,55 @@ export class LayoutComponent implements OnInit, OnDestroy {
   }
 
   openBrandingDialog() {
-    const ref = this.dialog.open(BrandingDialogComponent, {
+    const userId = this.userId;
+    const data: BrandingDialogData = {
+      platformName: this.platformName,
+      logoPreview: this.customLogoSrc,
+      themeId: this.customThemeId,
+      save: (payload) => this.brandingService.updateBranding(userId, payload),
+      reset: () => this.brandingService.resetBranding(userId)
+    };
+    const ref = this.dialog.open<BrandingDialogComponent, BrandingDialogData, BrandingDialogResult>(BrandingDialogComponent, {
       width: '480px',
       maxWidth: 'calc(100vw - 32px)',
       autoFocus: 'first-tabbable',
-      data: {
-        platformName: this.platformName,
-        logoPreview: this.customLogoSrc,
-        themeId: this.customThemeId
-      }
+      data
     });
+    const previous = this.branding;
     ref.afterClosed().subscribe(result => {
-      if (!result) return;
-      if (result.action === 'reset') {
-        this.resetBranding();
-      } else if (result.action === 'save') {
-        this.saveBranding(result);
-      }
-    });
-  }
-
-  private async resetBranding() {
-    const confirmed = await this.confirmService.confirm({
-      title: 'Reset branding?',
-      message: 'The platform name, logo and hosted onboarding theme go back to their defaults.',
-      confirmText: 'Reset branding',
-      danger: true
-    });
-    if (!confirmed) return;
-    this.brandingService.resetBranding(this.userId).subscribe({
-      next: () => {
+      if (!result || userId !== this.userId) return;
+      if (result.action === 'saved') {
+        this.applyBranding(result.branding);
+        this.cdr.detectChanges();
+        this.notify.success('Branding saved');
+      } else if (result.action === 'reset') {
         this.applyBranding(null);
         this.cdr.detectChanges();
-        this.snackBar.open('Branding reset to default', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
-      },
-      error: (err) => this.showError(httpErrorMessage(err, 'We couldn\'t reset the branding. Please try again.'))
+        if (previous && hasCustomBranding(previous)) {
+          this.notify.undoable('Branding reset to default', () => this.restoreBranding(userId, previous));
+        } else {
+          this.notify.success('Branding reset to default');
+        }
+      }
     });
   }
 
-  private saveBranding(result: { platformName?: string; logoData?: string | null; logoType?: string | null; themeId?: string }) {
-    const payload: { platformName?: string; logoData?: string; logoType?: string; themeId?: string } = {};
-    if (result.platformName) payload.platformName = result.platformName;
-    if (result.logoData) {
-      payload.logoData = result.logoData;
-      payload.logoType = result.logoType as string;
+  private restoreBranding(userId: string, previous: UserBranding) {
+    const payload: BrandingPayload = { themeId: previous.themeId || '' };
+    if (previous.platformName) payload.platformName = previous.platformName;
+    if (previous.logoData) {
+      payload.logoData = previous.logoData;
+      payload.logoType = previous.logoType || 'base64';
     }
-    payload.themeId = result.themeId || '';
-    this.brandingService.updateBranding(this.userId, payload).subscribe({
+    this.brandingService.updateBranding(userId, payload).subscribe({
       next: (branding) => {
+        if (userId !== this.userId) return;
         this.applyBranding(branding);
         this.cdr.detectChanges();
-        this.snackBar.open('Branding saved', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Branding restored');
       },
-      error: (err) => this.showError(httpErrorMessage(err, 'We couldn\'t save the branding. Please try again.'))
+      error: (err) => this.notify.error(httpErrorMessage(err, 'Unable to restore the branding. Set it again in Customize branding.'))
     });
-  }
-
-  private showError(message: string) {
-    this.snackBar.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-error' });
   }
 
   toggleApiPanel() {

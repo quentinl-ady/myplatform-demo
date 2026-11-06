@@ -35,20 +35,17 @@
       </div>
     </mat-card>
 
-    <div class="inline-alert error" *ngIf="countriesError" role="alert">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <span>{{ countriesError }}</span>
-      <button type="button" class="link-btn" (click)="loadRecipientCountries()">Retry</button>
-    </div>
+    <app-inline-alert *ngIf="countriesError" title="Unable to load the recipient countries"
+                      actionLabel="Try again" (action)="loadRecipientCountries()">{{ countriesError }}</app-inline-alert>
 
     <!-- ==================== SUCCESS STATE ==================== -->
     <mat-card class="transfer-card success-state" *ngIf="approvalRecap as recap">
       <div class="success-icon" aria-hidden="true">
         <mat-icon>check_circle</mat-icon>
       </div>
-      <h2>Batch approved</h2>
+      <h2>Transfers sent</h2>
       <p class="success-lead">
-        {{ recap.count === 1 ? '1 transfer has' : recap.count + ' transfers have' }} been approved and {{ recap.count === 1 ? 'is' : 'are' }} being processed.
+        {{ recap.count === 1 ? '1 transfer' : recap.count + ' transfers' }} sent for a total of {{ recap.total }}.
       </p>
 
       <dl class="recap-list">
@@ -93,8 +90,9 @@
           <div class="form-group">
             <label for="batch-name">Beneficiary name</label>
             <input id="batch-name" type="text" class="fintech-input" formControlName="counterpartyName"
-                   placeholder="e.g. John Doe or Acme Corp" autocomplete="off" />
-            <span class="hint-text">The name of the account holder, as known by their bank.</span>
+                   placeholder="e.g. John Doe or Acme Corp" autocomplete="off" aria-describedby="batch-name-hint batch-name-check" />
+            <span class="hint-text" id="batch-name-hint">The name of the account holder, as known by their bank.</span>
+            <p class="name-match" id="batch-name-check" role="status"><ng-container *ngIf="nameMatches"><mat-icon aria-hidden="true">check_circle</mat-icon>Name matches</ng-container></p>
           </div>
 
           <div class="form-group">
@@ -127,11 +125,14 @@
 
         </div>
 
+        <app-inline-alert *ngIf="addError" class="form-alert" [title]="addError.title" actionLabel="Try again"
+                          (action)="retryAddTransfer()" [dismissible]="true" (dismiss)="addError = null">{{ addError.message }}</app-inline-alert>
+
         <button mat-flat-button type="submit" class="fintech-btn primary full-width"
                 [disabled]="!!blockReason || isAdding || isApproving" aria-describedby="batch-submit-hint">
           <mat-spinner diameter="20" *ngIf="isAdding" aria-hidden="true"></mat-spinner>
           <mat-icon *ngIf="!isAdding" aria-hidden="true">add</mat-icon>
-          {{ isAdding ? 'Adding...' : 'Add to batch' }}
+          {{ isAdding ? 'Adding…' : 'Add to batch' }}
         </button>
         <p class="submit-hint" id="batch-submit-hint">{{ isAdding ? '' : blockReason }}</p>
       </form>
@@ -154,14 +155,15 @@
 
       <div class="loading-format" *ngIf="isLoadingPending && pendingTransfers.length === 0" role="status">
         <mat-spinner diameter="24" aria-hidden="true"></mat-spinner>
-        <span>Loading the transfers waiting for approval...</span>
+        <span>Loading the transfers waiting for approval…</span>
       </div>
 
-      <div class="inline-alert error" *ngIf="pendingError && !isLoadingPending" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ pendingError }}</span>
-        <button type="button" class="link-btn" (click)="loadPendingTransfers()">Retry</button>
-      </div>
+      <app-inline-alert *ngIf="pendingError && !isLoadingPending" class="list-alert" title="Unable to load the transfers waiting for approval"
+                        actionLabel="Try again" (action)="loadPendingTransfers()">{{ pendingError }}</app-inline-alert>
+
+      <app-inline-alert *ngIf="pendingActionError" class="list-alert" [title]="pendingActionError.title"
+                        [actionLabel]="pendingActionError.actionLabel || 'Try again'" (action)="retryPendingAction()"
+                        [dismissible]="true" (dismiss)="pendingActionError = null">{{ pendingActionError.message }}</app-inline-alert>
 
       <div class="pending-warning" *ngIf="pendingNotFoundCount > 0" role="status">
         <mat-icon aria-hidden="true">schedule</mat-icon>
@@ -194,7 +196,7 @@
                       [disabled]="isApproving || cancellingIds.has(t.id)"
                       [attr.aria-label]="'Cancel the transfer to ' + (t.counterpartyName || 'this beneficiary')" matTooltip="Cancel transfer">
                 <mat-icon *ngIf="!cancellingIds.has(t.id)" aria-hidden="true">close</mat-icon>
-                <mat-spinner *ngIf="cancellingIds.has(t.id)" diameter="16"></mat-spinner>
+                <mat-spinner *ngIf="cancellingIds.has(t.id)" diameter="16" aria-label="Cancelling"></mat-spinner>
               </button>
             </div>
           </li>
@@ -205,19 +207,21 @@
           <span class="batch-total-amount">{{ getBatchTotal() }}</span>
         </div>
 
-        <div class="inline-alert warning" *ngIf="batchExceedsBalance()" role="status">
-          <mat-icon aria-hidden="true">warning_amber</mat-icon>
-          <span>The batch total is above your available balance of {{ accountInfo.amount | money:accountInfo.currency }}. Some transfers may fail.</span>
-        </div>
+        <app-inline-alert *ngIf="batchExceedsBalance()" class="list-alert" kind="warning">
+          The batch total is above your available balance of {{ accountInfo.amount | money:accountInfo.currency }}. Some transfers may fail.
+        </app-inline-alert>
+
+        <app-inline-alert *ngIf="approvalError && !showScaModal" class="list-alert" [title]="approvalError.title" actionLabel="Try again"
+                          (action)="retryApproval()" [dismissible]="true" (dismiss)="approvalError = null">{{ approvalError.message }}</app-inline-alert>
 
         <div class="batch-actions">
-          <button mat-flat-button type="button" class="fintech-btn secondary" (click)="clearBatch()" [disabled]="isApproving || isCancelling">
+          <button mat-stroked-button type="button" class="fintech-btn danger-outline" (click)="clearBatch()" [disabled]="isApproving || isCancelling">
             Cancel all
           </button>
           <button mat-flat-button type="button" class="fintech-btn primary" (click)="approveAll()" [disabled]="isApproving || isCancelling">
             <mat-spinner diameter="20" *ngIf="isApproving" aria-hidden="true"></mat-spinner>
             <mat-icon *ngIf="!isApproving" aria-hidden="true">verified_user</mat-icon>
-            {{ isApproving ? 'Approving...' : 'Approve all' }}
+            {{ isApproving ? 'Approving…' : 'Approve all' }}
           </button>
         </div>
         <p class="sca-status" *ngIf="scaStatus && !showScaModal" role="status">{{ scaStatus }}</p>
@@ -244,50 +248,33 @@
         </div>
         <app-approval-switch *ngIf="approval.canSwitch" [mode]="batchRemoteStart ? 'phone' : 'here'" [disabled]="isApproving"
                              (switchTo)="switchApproval($event)"></app-approval-switch>
+        <app-inline-alert *ngIf="approvalError" [title]="approvalError.title" actionLabel="Try again"
+                          (action)="retryApproval()">{{ approvalError.message }}</app-inline-alert>
       </div>
       <div class="actions">
         <button mat-flat-button type="button" class="fintech-btn secondary" (click)="declineApproval()" [disabled]="isApproving">Cancel</button>
         <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!batchRemoteStart" (click)="confirmApproval()" [disabled]="isApproving" cdkFocusInitial>
           <mat-spinner diameter="20" *ngIf="isApproving" aria-hidden="true"></mat-spinner>
-          {{ isApproving ? 'Approving...' : 'Approve' }}
+          {{ isApproving ? 'Sending…' : 'Approve and send' }}
         </button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== VoP MODALS ==================== -->
-  <div class="modal-overlay" *ngIf="showExactMatchModal" (keydown.escape)="modifyInfo()">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="batch-vop-match-title" cdkTrapFocus cdkTrapFocusAutoCapture>
-      <div class="modal-header">
-        <h3 id="batch-vop-match-title" class="title-success">
-          <mat-icon aria-hidden="true">check_circle</mat-icon>
-          Name verified
-        </h3>
-      </div>
-      <div class="modal-body">
-        <p>The beneficiary name matches the account details.</p>
-        <p>Name confirmed: <strong>{{ transferForm.value.counterpartyName }}</strong></p>
-      </div>
-      <div class="actions">
-        <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()">Edit details</button>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="proceedAfterExactMatch()" cdkFocusInitial>Continue</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- ==================== VoP MODALS: only the results that need a decision ==================== -->
   <div class="modal-overlay" *ngIf="showPartialMatchModal" (keydown.escape)="modifyInfo()">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="batch-vop-partial-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
         <h3 id="batch-vop-partial-title" class="title-warning">
           <mat-icon aria-hidden="true">warning_amber</mat-icon>
-          Name close match
+          The name is a close match
         </h3>
       </div>
       <div class="modal-body">
         <p>The name on the account is slightly different from the one you entered.</p>
         <p>You entered: <br><strong>{{ transferForm.value.counterpartyName }}</strong></p>
         <p>Name on the account: <br><strong>{{ suggestedName }}</strong></p>
-        <p class="modal-note">Use the name on the account, edit your details, or cancel.</p>
+        <p class="modal-note">Use the name on the account, edit the details, or cancel.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="acceptSuggestedName()" cdkFocusInitial>Use the name on the account</button>
@@ -304,7 +291,7 @@
       <div class="modal-header">
         <h3 id="batch-vop-nomatch-title" class="title-danger">
           <mat-icon aria-hidden="true">error</mat-icon>
-          Name doesn't match
+          The name doesn't match
         </h3>
       </div>
       <div class="modal-body">
@@ -312,7 +299,7 @@
         <p class="modal-note">Sending money to the wrong account can result in loss of funds. Only continue if you are sure the details are correct.</p>
       </div>
       <div class="actions stacked">
-        <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Continue at my own risk</button>
+        <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Add to batch anyway</button>
         <div class="actions">
           <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()" cdkFocusInitial>Edit details</button>
           <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>

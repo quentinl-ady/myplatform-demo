@@ -7,14 +7,14 @@
 
   <mat-card class="state-card" *ngIf="userLoading()" role="status">
     <mat-spinner diameter="32"></mat-spinner>
-    <p>Loading your account…</p>
+    <p>Loading account…</p>
   </mat-card>
 
   <mat-card class="state-card" *ngIf="!userLoading() && userError() as error" role="alert">
     <mat-icon class="state-icon danger" aria-hidden="true">error_outline</mat-icon>
-    <h2 class="mat-h3">Your account could not be loaded</h2>
+    <h2 class="mat-h3">Unable to load account</h2>
     <p>{{ error }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadUser()">Retry</button>
+    <button mat-flat-button type="button" class="fintech-btn secondary" (click)="loadUser()">Try again</button>
   </mat-card>
 
   <ng-container *ngIf="user() as u">
@@ -91,29 +91,22 @@
 
       <div class="inline-state" *ngIf="!status() && loading()" role="status">
         <mat-spinner diameter="20"></mat-spinner>
-        <span>Checking your verification status…</span>
+        <span>Checking verification status…</span>
       </div>
 
-      <div class="alert danger" *ngIf="!loading() && kycError() as error" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span class="alert-text">{{ error }}</span>
-        <button mat-button type="button" (click)="checkOnboarding()">Retry</button>
-      </div>
+      <app-inline-alert class="alert" *ngIf="!loading() && kycError() as error" title="Unable to load verification status"
+                        actionLabel="Try again" (action)="checkOnboarding()">{{ error }}</app-inline-alert>
 
       <ng-container *ngIf="status()">
-        <div class="alert success" *ngIf="allValid(); else notAllValid">
-          <mat-icon aria-hidden="true">check_circle</mat-icon>
-          <span class="alert-text">All set. Every product on your account is verified and active.</span>
-        </div>
+        <app-inline-alert class="alert" kind="success" [live]="false" *ngIf="allValid(); else notAllValid">
+          All set. Every product on the account is verified and active.
+        </app-inline-alert>
         <ng-template #notAllValid>
-          <div class="alert warning">
-            <mat-icon aria-hidden="true">info_outline</mat-icon>
-            <span class="alert-text">
-              {{ pendingCapabilities().length }} of {{ capabilities().length }}
-              {{ pendingCapabilities().length === 1 ? 'product is' : 'products are' }} not active yet:
-              {{ pendingLabels() }}.
-            </span>
-          </div>
+          <app-inline-alert class="alert" kind="warning" [live]="false">
+            {{ pendingCapabilities().length }} of {{ capabilities().length }}
+            {{ pendingCapabilities().length === 1 ? 'product is' : 'products are' }} not active yet:
+            {{ pendingLabels() }}.
+          </app-inline-alert>
         </ng-template>
 
         <ul class="status-list">
@@ -146,6 +139,9 @@
           <span class="cdk-visually-hidden">(opens in a new tab)</span>
         </button>
       </div>
+      <app-inline-alert class="alert-after" *ngIf="onboardingLinkError() as error" title="Unable to open onboarding"
+                        actionLabel="Try again" (action)="openHostedOnboarding()" [dismissible]="true"
+                        (dismiss)="onboardingLinkError.set(null)">{{ error }}</app-inline-alert>
     </mat-card>
 
     <!-- Business bank account -->
@@ -160,14 +156,11 @@
 
       <div class="inline-state" *ngIf="!bankStatus() && !bankStatusError()" role="status">
         <mat-spinner diameter="20"></mat-spinner>
-        <span>Checking your bank account…</span>
+        <span>Checking bank account…</span>
       </div>
 
-      <div class="alert danger" *ngIf="!bankStatus() && bankStatusError() as error" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span class="alert-text">{{ error }}</span>
-        <button mat-button type="button" (click)="retryBankAccountStatus()">Retry</button>
-      </div>
+      <app-inline-alert class="alert" *ngIf="!bankStatus() && bankStatusError() as error" title="Unable to load bank account"
+                        actionLabel="Try again" (action)="retryBankAccountStatus()">{{ error }}</app-inline-alert>
 
       <ng-container *ngIf="bankStatus() as bs">
         <div class="bank-active" *ngIf="bs.bankAccountCreated; else notCreated">
@@ -183,7 +176,7 @@
           </div>
           <a class="bank-cta-btn" [routerLink]="['/', userId, 'business-account']">
             <mat-icon aria-hidden="true">account_balance_wallet</mat-icon>
-            <span>Go to Business Account</span>
+            <span>Go to business account</span>
             <mat-icon class="cta-arrow" aria-hidden="true">arrow_forward</mat-icon>
           </a>
         </div>
@@ -197,7 +190,7 @@
               <h3 class="mat-h4">{{ bs.bankingAllowed ? 'Ready to create' : 'Not available yet' }}</h3>
               <p id="bank-provision-help">
                 {{ bs.bankingAllowed
-                  ? 'Banking is enabled on your account. You can create your business bank account now.'
+                  ? 'Banking is enabled on the account. The business bank account can be created now.'
                   : 'Adyen enables banking once your verification is complete. This card updates automatically.' }}
               </p>
               <p class="bank-capability" *ngIf="!bs.bankingAllowed && status()?.bankingStatus as banking">
@@ -205,10 +198,7 @@
               </p>
             </div>
 
-            <div class="alert danger full" *ngIf="bankCreateError() as error" role="alert">
-              <mat-icon aria-hidden="true">error_outline</mat-icon>
-              <span class="alert-text">{{ error }}</span>
-            </div>
+            <app-inline-alert class="alert-full" *ngIf="bankCreateError() as error" title="Unable to create the bank account">{{ error }}</app-inline-alert>
 
             <button type="button" class="bank-create-btn"
                     [disabled]="!bs.bankingAllowed || creatingBankAccount()"
@@ -216,7 +206,7 @@
                     (click)="createBankAccount()">
               <mat-spinner *ngIf="creatingBankAccount()" diameter="18"></mat-spinner>
               <mat-icon *ngIf="!creatingBankAccount()" aria-hidden="true">{{ bs.bankingAllowed ? (bankCreateError() ? 'refresh' : 'add') : 'lock_outline' }}</mat-icon>
-              <span>{{ creatingBankAccount() ? 'Creating your account…' : (bankCreateError() ? 'Try again' : 'Create business bank account') }}</span>
+              <span>{{ creatingBankAccount() ? 'Creating account…' : (bankCreateError() ? 'Try again' : 'Create business bank account') }}</span>
             </button>
           </div>
         </ng-template>
@@ -227,11 +217,8 @@
     <mat-card class="business-card" *ngIf="u.activityReason === 'embeddedPayment'" aria-labelledby="business-title">
       <h2 class="mat-h3 card-title" id="business-title">What do you sell?</h2>
 
-      <div class="alert danger" *ngIf="businessLinesError() as error" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span class="alert-text">{{ error }}</span>
-        <button mat-button type="button" (click)="loadBusinessLines()">Retry</button>
-      </div>
+      <app-inline-alert class="alert" *ngIf="businessLinesError() as error" title="Unable to load business activities"
+                        actionLabel="Try again" (action)="loadBusinessLines()">{{ error }}</app-inline-alert>
 
       <ul class="business-lines-container" *ngIf="businessLines().length; else noBusinessLines">
         <li *ngFor="let bl of businessLines()" class="business-line-item">
@@ -267,14 +254,21 @@
           <mat-hint>Select an industry from the list.</mat-hint>
         </mat-form-field>
 
-        <fieldset class="form-group">
+        <fieldset class="form-group" [attr.aria-describedby]="salesChannelError() ? 'sales-channel-error' : null"
+                  [attr.aria-invalid]="salesChannelError() ? true : null">
           <legend>Sales channels</legend>
           <div class="checkbox-group">
             <mat-checkbox formControlName="pos" color="primary">POS</mat-checkbox>
             <mat-checkbox formControlName="eCommerce" color="primary">Ecommerce</mat-checkbox>
             <mat-checkbox formControlName="payByLink" color="primary">Pay by Link</mat-checkbox>
           </div>
+          <p class="field-error" id="sales-channel-error" *ngIf="salesChannelError() as error" role="alert">
+            <mat-icon aria-hidden="true">error_outline</mat-icon>{{ error }}
+          </p>
         </fieldset>
+
+        <app-inline-alert class="alert" *ngIf="addBusinessLineError() as error" title="Unable to add the activity"
+                          [dismissible]="true" (dismiss)="addBusinessLineError.set(null)">{{ error }}</app-inline-alert>
 
         <button mat-flat-button class="fintech-btn primary full-width" type="submit" [disabled]="businessForm.invalid || submitting">
           <mat-spinner *ngIf="submitting" diameter="20"></mat-spinner>
@@ -293,7 +287,8 @@
         <p class="banking-subtitle">Bank accounts linked to your legal entity to receive payouts.</p>
       </div>
 
-      <div id="ti-management-container"></div>
+      <!-- Adyen KYC components only ship light styles. -->
+      <div id="ti-management-container" class="fintech-light-island adyen-island"></div>
     </mat-card>
 
     <!-- Developer tool -->
@@ -308,6 +303,9 @@
           {{ loadingKyc() ? 'Validating…' : 'Validate KYC' }}
         </button>
       </div>
+      <app-inline-alert class="alert-after" *ngIf="validateKycError() as error" title="KYC not validated"
+                        actionLabel="Try again" (action)="validateKyc(userId)" [dismissible]="true"
+                        (dismiss)="validateKycError.set(null)">{{ error }}</app-inline-alert>
     </mat-card>
 
   </ng-container>

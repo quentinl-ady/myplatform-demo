@@ -7,29 +7,32 @@
     </div>
     <div class="header-actions">
       <span class="last-updated-label" *ngIf="lastUpdated && !isLoading">{{ getLastUpdatedLabel() }}</span>
-      <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading">
+      <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="refresh()" [disabled]="isLoading">
         <mat-icon aria-hidden="true">refresh</mat-icon>
         Refresh
       </button>
     </div>
   </div>
 
+  <app-inline-alert *ngIf="countryError" title="Unable to load payment methods" actionLabel="Try again"
+                    (action)="loadUserCountry()">{{ countryError }}</app-inline-alert>
+
   <!-- Stores: loading / error / list / empty -->
   <mat-card class="state-card" *ngIf="isLoading && !stores().length" role="status">
     <mat-spinner diameter="36"></mat-spinner>
-    <p>Loading your stores…</p>
+    <p>Loading stores…</p>
   </mat-card>
 
-  <mat-card class="state-card error" *ngIf="!isLoading && loadError">
+  <mat-card class="state-card error" *ngIf="!isLoading && loadError" role="alert">
     <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
-    <h2>Could not load your stores</h2>
+    <h2>Unable to load stores</h2>
     <p>{{ loadError }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadStores()">Retry</button>
+    <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="loadStores()">Try again</button>
   </mat-card>
 
   <ng-container *ngIf="!loadError && !(isLoading && !stores().length)">
     <section class="stores-list-container" *ngIf="stores().length; else noStores" aria-labelledby="stores-title">
-      <h2 class="section-title" id="stores-title">Your stores ({{ stores().length }})</h2>
+      <h2 class="section-title" id="stores-title">Stores ({{ stores().length }})</h2>
 
       <mat-card *ngFor="let s of stores()" class="store-card">
         <div class="store-card-header">
@@ -81,7 +84,7 @@
                       <mat-icon class="pm-status-icon" aria-hidden="true">{{ st.icon }}</mat-icon>
                       {{ st.label }}
                     </span>
-                    <span class="pm-off-label" *ngIf="!pm.enabled">· Off</span>
+                    <span class="pm-off-label" *ngIf="!pm.enabled">Off</span>
                   </span>
                 </ng-container>
                 <mat-slide-toggle
@@ -94,6 +97,9 @@
                 </mat-slide-toggle>
               </li>
             </ul>
+
+            <app-inline-alert *ngIf="toggleError?.storeId === s.storeId" class="section-alert" title="Payment method not updated"
+                              [dismissible]="true" (dismiss)="toggleError = null">{{ toggleError?.message }}</app-inline-alert>
           </div>
 
           <!-- Add payment method inline panel -->
@@ -104,7 +110,7 @@
                 <mat-icon aria-hidden="true">close</mat-icon>
               </button>
             </div>
-            <p class="helper-text">Methods already on this store are greyed out.</p>
+            <p class="helper-text">Methods already on this store can't be selected again.</p>
             <form [formGroup]="addPmForm" (ngSubmit)="submitAddPm()">
               <div class="checkbox-grid">
                 <div class="pm-checkbox-card" *ngFor="let p of getAllPaymentMethods()">
@@ -115,6 +121,8 @@
                   </mat-checkbox>
                 </div>
               </div>
+              <app-inline-alert *ngIf="addPmError" class="section-alert" title="Unable to add payment methods" actionLabel="Try again"
+                                (action)="submitAddPm()" [dismissible]="true" (dismiss)="addPmError = null">{{ addPmError }}</app-inline-alert>
               <div class="add-pm-actions">
                 <span class="submit-hint" *ngIf="!addPmHasSelection() && !addPmLoading">Select at least one payment method.</span>
                 <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="closeAddPm()">Cancel</button>
@@ -143,16 +151,10 @@
   <mat-card class="add-store-card">
     <h2 class="card-title">Add a new store</h2>
 
-    <div class="success-banner" *ngIf="lastCreatedStore as created" role="status">
-      <mat-icon aria-hidden="true">check_circle</mat-icon>
-      <div class="success-text">
-        <strong>Store {{ created.storeRef }} created</strong>
-        <span>{{ created.city }}, {{ created.country }} · {{ created.paymentMethods.length }} payment method{{ created.paymentMethods.length === 1 ? '' : 's' }} requested. Verification can take a few minutes; select Refresh to see the latest status.</span>
-      </div>
-      <button mat-icon-button type="button" (click)="lastCreatedStore = null" aria-label="Dismiss confirmation">
-        <mat-icon aria-hidden="true">close</mat-icon>
-      </button>
-    </div>
+    <app-inline-alert *ngIf="lastCreatedStore as created" kind="success" class="success-banner"
+                      [title]="'Store ' + created.storeRef + ' created'" [dismissible]="true" (dismiss)="lastCreatedStore = null">
+      {{ created.city }}, {{ created.country }} · {{ created.paymentMethods.length }} payment method{{ created.paymentMethods.length === 1 ? '' : 's' }} requested. Verification can take a few minutes; select Refresh to see the latest status.
+    </app-inline-alert>
 
     <mat-vertical-stepper [linear]="true" #stepper class="fintech-stepper">
 
@@ -211,7 +213,7 @@
               </select>
               <span class="field-error" *ngIf="balanceAccountsError" role="alert">
                 {{ balanceAccountsError }}
-                <button type="button" class="link-btn" (click)="loadBalanceAccounts()">Retry</button>
+                <button type="button" class="link-btn" (click)="loadBalanceAccounts()">Try again</button>
               </span>
             </div>
           </div>
@@ -229,18 +231,19 @@
         <form [formGroup]="activityForm">
           <ng-template matStepLabel>Business activity</ng-template>
 
-          <div class="form-group">
-            <label for="store-business-lines">Business activity profiles</label>
-            <select id="store-business-lines" multiple class="fintech-input multiple-select" formControlName="businessLineIds"
-                    aria-describedby="store-business-lines-help">
-              <option *ngFor="let bl of businessLines()" [value]="bl.id">
-                {{ getIndustryLabel(bl.industryCode) }} ({{ bl.salesChannels.join(', ') }})
-              </option>
-            </select>
-            <span class="helper-text" id="store-business-lines-help">Hold Ctrl (or Cmd) to select multiple activities.</span>
+          <div class="form-group activity-group">
+            <mat-form-field appearance="outline" class="activity-field" subscriptSizing="dynamic">
+              <mat-label>Business activity profiles</mat-label>
+              <mat-select formControlName="businessLineIds" multiple>
+                <mat-option *ngFor="let bl of businessLines()" [value]="bl.id">
+                  {{ getIndustryLabel(bl.industryCode) }} ({{ bl.salesChannels.join(', ') }})
+                </mat-option>
+              </mat-select>
+              <mat-hint>Select one or more activities.</mat-hint>
+            </mat-form-field>
             <span class="field-error" *ngIf="businessLinesError" role="alert">
               {{ businessLinesError }}
-              <button type="button" class="link-btn" (click)="loadBusinessLines()">Retry</button>
+              <button type="button" class="link-btn" (click)="loadBusinessLines()">Try again</button>
             </span>
           </div>
 
@@ -273,6 +276,9 @@
               </div>
             </div>
           </fieldset>
+
+          <app-inline-alert *ngIf="createError" class="section-alert" title="Unable to create the store" actionLabel="Try again"
+                            (action)="submitCreate(stepper)" [dismissible]="true" (dismiss)="createError = null">{{ createError }}</app-inline-alert>
 
           <div class="stepper-actions split">
             <button mat-stroked-button type="button" class="fintech-btn secondary" matStepperPrevious>Back</button>

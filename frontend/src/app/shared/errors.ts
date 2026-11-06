@@ -67,7 +67,7 @@ const WEBAUTHN_MESSAGES: Record<string, string> = {
   InvalidStateError: 'A passkey for this account is already registered on this device.',
   NotSupportedError: 'This browser or device does not support passkeys.',
   SecurityError: 'Passkeys are blocked on this page. Open the app on its HTTPS address and try again.',
-  AbortError: 'Authentication was interrupted. Please try again.',
+  AbortError: 'Authentication was interrupted. Try again.',
 };
 
 /**
@@ -83,7 +83,7 @@ export function scaErrorMessage(err: unknown, fallback: string): string {
     return WEBAUTHN_MESSAGES[name];
   }
   if ((err as { message?: unknown } | null)?.message === 'TIMEOUT') {
-    return 'Authentication timed out. Please try again.';
+    return 'Authentication timed out. Try again.';
   }
   if ((err as { code?: unknown } | null)?.code === 'SCA_UNAVAILABLE') {
     return "This browser can't use passkeys. Approve from the browser where you registered your trusted device, or add your phone in Trusted devices.";

@@ -35,11 +35,8 @@
       </div>
     </mat-card>
 
-    <div class="inline-alert error" *ngIf="countriesError" role="alert">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <span>{{ countriesError }}</span>
-      <button type="button" class="link-btn" (click)="loadRecipientCountries()">Retry</button>
-    </div>
+    <app-inline-alert *ngIf="countriesError" title="Unable to load the recipient countries"
+                      actionLabel="Try again" (action)="loadRecipientCountries()">{{ countriesError }}</app-inline-alert>
 
     <!-- ==================== TABS ==================== -->
     <mat-tab-group class="transfer-tabs" [preserveContent]="true" (selectedIndexChange)="onTabChange($event)" animationDuration="200ms">
@@ -53,7 +50,7 @@
             <mat-icon>check_circle</mat-icon>
           </div>
           <h2>Transfer sent</h2>
-          <p class="success-lead">{{ recap.amount | money:recap.currency }} is on its way to {{ recap.beneficiary }}.</p>
+          <p class="success-lead">{{ recap.amount | money:recap.currency }} sent to {{ recap.beneficiary }}.</p>
 
           <dl class="recap-list">
             <div class="recap-row"><dt>Amount</dt><dd>{{ recap.amount | money:recap.currency }}</dd></div>
@@ -94,8 +91,9 @@
               <div class="form-group">
                 <label for="oneshot-name">Beneficiary name</label>
                 <input id="oneshot-name" type="text" class="fintech-input" formControlName="accountHolderName"
-                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" />
-                <span class="hint-text">The name of the account holder, as known by their bank.</span>
+                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" aria-describedby="oneshot-name-hint oneshot-name-check" />
+                <span class="hint-text" id="oneshot-name-hint">The name of the account holder, as known by their bank.</span>
+                <p class="name-match" id="oneshot-name-check" role="status"><ng-container *ngIf="nameMatches('oneshot')"><mat-icon aria-hidden="true">check_circle</mat-icon>Name matches</ng-container></p>
               </div>
 
               <div class="form-group">
@@ -128,6 +126,10 @@
               </div>
             </div>
 
+            <app-inline-alert *ngIf="oneshotError && !showOneshotScaModal" class="form-alert" [title]="oneshotError.title"
+                              actionLabel="Try again" (action)="retryOneshot()" [dismissible]="true"
+                              (dismiss)="oneshotError = null">{{ oneshotError.message }}</app-inline-alert>
+
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
                     [disabled]="!!oneshotBlockReason || isOneshotProcessing" aria-describedby="oneshot-submit-hint">
               <span *ngIf="!isOneshotProcessing">Review transfer</span>
@@ -147,7 +149,7 @@
           <div class="card-header">
             <div>
               <h2>Scheduled transfers</h2>
-              <p class="subtitle">Manage your recurring transfers</p>
+              <p class="subtitle">Recurring transfers sent automatically</p>
             </div>
             <button mat-flat-button type="button" class="fintech-btn primary" (click)="showSoCreate()">
               <mat-icon aria-hidden="true">add</mat-icon>
@@ -155,16 +157,16 @@
             </button>
           </div>
 
+          <app-inline-alert *ngIf="soActionError" class="list-alert" [title]="soActionError.title" actionLabel="Try again"
+                            (action)="retrySoAction()" [dismissible]="true" (dismiss)="soActionError = null">{{ soActionError.message }}</app-inline-alert>
+
           <div class="loading-state" *ngIf="soLoading" role="status">
             <mat-spinner diameter="32" aria-hidden="true"></mat-spinner>
-            <span>Loading scheduled transfers...</span>
+            <span>Loading scheduled transfers…</span>
           </div>
 
-          <div class="error-state" *ngIf="soError && !soLoading" role="alert">
-            <mat-icon aria-hidden="true">error_outline</mat-icon>
-            <span>{{ soError }}</span>
-            <button type="button" class="link-btn" (click)="loadStandingOrders()">Retry</button>
-          </div>
+          <app-inline-alert *ngIf="soError && !soLoading" title="Unable to load the scheduled transfers"
+                            actionLabel="Try again" (action)="loadStandingOrders()">{{ soError }}</app-inline-alert>
 
           <div class="empty-state" *ngIf="!soLoading && !soError && standingOrders.length === 0">
             <div class="empty-icon-wrapper" aria-hidden="true">
@@ -200,7 +202,7 @@
                   <button mat-icon-button type="button" matTooltip="Delete" [attr.aria-label]="'Delete the scheduled transfer to ' + soBeneficiary(so)"
                           (click)="onDeleteSo(so)" [disabled]="!!deletingSoId">
                     <mat-icon *ngIf="deletingSoId !== so.id" aria-hidden="true">delete_outline</mat-icon>
-                    <mat-spinner *ngIf="deletingSoId === so.id" diameter="18"></mat-spinner>
+                    <mat-spinner *ngIf="deletingSoId === so.id" diameter="18" aria-label="Deleting"></mat-spinner>
                   </button>
                 </div>
               </div>
@@ -244,8 +246,9 @@
               <div class="form-group">
                 <label for="so-name">Beneficiary name</label>
                 <input id="so-name" type="text" class="fintech-input" formControlName="counterpartyName"
-                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" />
-                <span class="hint-text">The name of the account holder, as known by their bank.</span>
+                       placeholder="e.g. John Doe or Acme Corp" autocomplete="off" aria-describedby="so-name-hint so-name-check" />
+                <span class="hint-text" id="so-name-hint">The name of the account holder, as known by their bank.</span>
+                <p class="name-match" id="so-name-check" role="status"><ng-container *ngIf="nameMatches('standing')"><mat-icon aria-hidden="true">check_circle</mat-icon>Name matches</ng-container></p>
               </div>
 
               <div class="form-group">
@@ -260,10 +263,10 @@
               <div class="form-group">
                 <label for="so-schedule">Schedule</label>
                 <select id="so-schedule" class="fintech-input" formControlName="schedule">
-                  <option value="daily">Every day</option>
-                  <option value="weekdays">Every weekday</option>
-                  <option value="weekly">Every week, on the first business day</option>
                   <option value="monthly">Every month, on the first business day</option>
+                  <option value="weekly">Every week, on the first business day</option>
+                  <option value="weekdays">Every weekday</option>
+                  <option value="daily">Every day</option>
                 </select>
               </div>
 
@@ -289,9 +292,13 @@
 
             </div>
 
+            <app-inline-alert *ngIf="soCreateError && !showSoScaModal" class="form-alert" [title]="soCreateError.title"
+                              actionLabel="Try again" (action)="retrySoCreate()" [dismissible]="true"
+                              (dismiss)="soCreateError = null">{{ soCreateError.message }}</app-inline-alert>
+
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
                     [disabled]="!!createBlockReason || isCreating" aria-describedby="so-submit-hint">
-              <span *ngIf="!isCreating">Create scheduled transfer</span>
+              <span *ngIf="!isCreating">Review transfer</span>
               <mat-spinner *ngIf="isCreating" diameter="24" color="accent" aria-label="Processing"></mat-spinner>
             </button>
             <p class="submit-hint" id="so-submit-hint">{{ isCreating ? '' : createBlockReason }}</p>
@@ -370,6 +377,9 @@
               </div>
             </div>
 
+            <app-inline-alert *ngIf="editError" class="form-alert" [title]="editError.title" actionLabel="Try again"
+                              (action)="onSaveEdit()" [dismissible]="true" (dismiss)="editError = null">{{ editError.message }}</app-inline-alert>
+
             <button mat-flat-button class="fintech-btn primary full-width" type="submit"
                     [disabled]="isSaving || editForm.invalid || editForm.pristine" aria-describedby="edit-submit-hint">
               <span *ngIf="!isSaving">Save changes</span>
@@ -387,39 +397,20 @@
 
   </ng-container>
 
-  <!-- ==================== VoP MODALS (shared) ==================== -->
-  <div class="modal-overlay" *ngIf="showExactMatchModal" (keydown.escape)="modifyInfo()">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="vop-match-title" cdkTrapFocus cdkTrapFocusAutoCapture>
-      <div class="modal-header">
-        <h3 id="vop-match-title" class="title-success">
-          <mat-icon aria-hidden="true">check_circle</mat-icon>
-          Name verified
-        </h3>
-      </div>
-      <div class="modal-body">
-        <p>The beneficiary name matches the account details.</p>
-        <p>Name confirmed: <strong>{{ vopBeneficiaryName }}</strong></p>
-      </div>
-      <div class="actions">
-        <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()">Edit details</button>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="proceedAfterExactMatch()" cdkFocusInitial>Continue</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- ==================== VoP MODALS (shared): only the results that need a decision ==================== -->
   <div class="modal-overlay" *ngIf="showPartialMatchModal" (keydown.escape)="modifyInfo()">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="vop-partial-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
         <h3 id="vop-partial-title" class="title-warning">
           <mat-icon aria-hidden="true">warning_amber</mat-icon>
-          Name close match
+          The name is a close match
         </h3>
       </div>
       <div class="modal-body">
         <p>The name on the account is slightly different from the one you entered.</p>
         <p>You entered: <br><strong>{{ vopBeneficiaryName }}</strong></p>
         <p>Name on the account: <br><strong>{{ suggestedName }}</strong></p>
-        <p class="modal-note">Use the name on the account, edit your details, or cancel.</p>
+        <p class="modal-note">Use the name on the account, edit the details, or cancel.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="acceptSuggestedName()" cdkFocusInitial>Use the name on the account</button>
@@ -436,7 +427,7 @@
       <div class="modal-header">
         <h3 id="vop-nomatch-title" class="title-danger">
           <mat-icon aria-hidden="true">error</mat-icon>
-          Name doesn't match
+          The name doesn't match
         </h3>
       </div>
       <div class="modal-body">
@@ -444,7 +435,7 @@
         <p class="modal-note">Sending money to the wrong account can result in loss of funds. Only continue if you are sure the details are correct.</p>
       </div>
       <div class="actions stacked">
-        <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Continue at my own risk</button>
+        <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Continue anyway</button>
         <div class="actions">
           <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="modifyInfo()" cdkFocusInitial>Edit details</button>
           <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelVop()">Cancel</button>
@@ -457,7 +448,7 @@
   <div class="modal-overlay" *ngIf="showOneshotScaModal && oneshotDraft as draft" (keydown.escape)="declineOneshot()">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="oneshot-sca-title" cdkTrapFocus cdkTrapFocusAutoCapture>
       <div class="modal-header">
-        <h3 id="oneshot-sca-title">Confirm transfer</h3>
+        <h3 id="oneshot-sca-title">Approve the transfer</h3>
       </div>
 
       <div class="modal-body">
@@ -476,13 +467,15 @@
                                   (completed)="onOneshotApprovedOnPhone()"></app-remote-session-panel>
         <app-approval-switch *ngIf="approval.canSwitch" [mode]="oneshotRemoteStart ? 'phone' : 'here'" [disabled]="isOneshotProcessing"
                              (switchTo)="switchOneshotApproval($event)"></app-approval-switch>
+        <app-inline-alert *ngIf="oneshotError" [title]="oneshotError.title" actionLabel="Try again"
+                          (action)="retryOneshot()">{{ oneshotError.message }}</app-inline-alert>
       </div>
 
       <div class="actions">
         <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="declineOneshot()" [disabled]="isOneshotProcessing">Cancel</button>
         <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!oneshotRemoteStart" (click)="approveOneshot()" [disabled]="isOneshotProcessing" cdkFocusInitial>
-          <span *ngIf="!isOneshotProcessing">Approve</span>
-          <mat-spinner *ngIf="isOneshotProcessing" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
+          <span *ngIf="!isOneshotProcessing">Approve and send</span>
+          <mat-spinner *ngIf="isOneshotProcessing" diameter="20" color="accent" aria-label="Sending"></mat-spinner>
         </button>
       </div>
     </div>
@@ -510,12 +503,14 @@
         </div>
         <app-approval-switch *ngIf="approval.canSwitch" [mode]="soRemoteStart ? 'phone' : 'here'" [disabled]="isCreating"
                              (switchTo)="switchSoApproval($event)"></app-approval-switch>
+        <app-inline-alert *ngIf="soCreateError" [title]="soCreateError.title" actionLabel="Try again"
+                          (action)="retrySoCreate()">{{ soCreateError.message }}</app-inline-alert>
       </div>
       <div class="actions">
         <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelSoSca()" [disabled]="isCreating">Cancel</button>
         <button mat-flat-button type="button" class="fintech-btn primary" *ngIf="!soRemoteStart" (click)="approveSoScaChallenge()" [disabled]="isCreating" cdkFocusInitial>
-          <span *ngIf="!isCreating">Approve</span>
-          <mat-spinner *ngIf="isCreating" diameter="20" color="accent" aria-label="Approving"></mat-spinner>
+          <span *ngIf="!isCreating">Approve and schedule</span>
+          <mat-spinner *ngIf="isCreating" diameter="20" color="accent" aria-label="Scheduling"></mat-spinner>
         </button>
       </div>
     </div>

@@ -149,7 +149,7 @@ export class BankDetailsCheck {
   /** Why these bank details block the submit button, if they do. */
   get blockReason(): string {
     if (!this.format) return 'Choose the recipient country to continue.';
-    if (this.checking) return 'Checking the bank details...';
+    if (this.checking) return 'Checking the bank details…';
     if (!this.valid) return this.error ? 'Correct the bank details to continue.' : 'Enter the bank details to continue.';
     return '';
   }

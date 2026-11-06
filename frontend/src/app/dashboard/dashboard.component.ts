@@ -5,7 +5,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, FormsModule, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 
 import { OnboardingPart, OnboardingResponse, User, BankAccountStatus, BusinessLine, WebhookEvent } from '../models';
@@ -14,7 +13,7 @@ import {
 } from '../services';
 import { MaterialModule } from '../material.module';
 import { INDUSTRY_CODES } from '../industry-codes';
-import { httpErrorMessage } from '../shared';
+import { InlineAlertComponent, NotifyService, httpErrorMessage } from '../shared';
 import '@adyen/kyc-components/transfer-instrument-management';
 import '@adyen/kyc-components/transfer-instrument-configuration';
 
@@ -51,9 +50,6 @@ export interface QuickAction {
   link: string[];
 }
 
-const SNACK_ERROR = { duration: 5000, panelClass: 'fintech-snack-error' };
-const SNACK_SUCCESS = { duration: 4000, panelClass: 'fintech-snack-success' };
-
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -63,7 +59,8 @@ const SNACK_SUCCESS = { duration: 4000, panelClass: 'fintech-snack-success' };
     MaterialModule,
     ReactiveFormsModule,
     FormsModule,
-    RouterLink
+    RouterLink,
+    InlineAlertComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
@@ -80,7 +77,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private issuingService = inject(IssuingService);
   private webhookService = inject(WebhookService);
   private route = inject(ActivatedRoute);
-  private matSnackBar = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private fb = inject(FormBuilder);
   private destroyRef = inject(DestroyRef);
 
@@ -93,6 +90,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly kycError = signal<string | null>(null);
   readonly openingOnboarding = signal(false);
+  readonly onboardingLinkError = signal<string | null>(null);
   private awaitingOnboardingReturn = false;
 
   readonly bankStatus = signal<BankAccountStatus | null>(null);
@@ -107,6 +105,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly businessLines = signal<BusinessLine[]>([]);
   readonly businessLinesError = signal<string | null>(null);
   readonly loadingKyc = signal(false);
+  readonly validateKycError = signal<string | null>(null);
+  readonly salesChannelError = signal<string | null>(null);
+  readonly addBusinessLineError = signal<string | null>(null);
   submitting = false;
 
   readonly INDUSTRY_CODES = INDUSTRY_CODES;
@@ -149,16 +150,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!u) return [];
     const id = this.userId;
     const actions: QuickAction[] = [
-      { label: 'Transactions', description: 'Review your payments', icon: 'receipt_long', link: ['/', id, 'transactions'] },
+      { label: 'Transactions', description: 'Review payments', icon: 'receipt_long', link: ['/', id, 'transactions'] },
       { label: 'Checkout', description: 'Make a test payment', icon: 'shopping_cart', link: ['/', id, 'checkout'] },
       { label: 'Reports', description: 'Download financial reports', icon: 'description', link: ['/', id, 'report'] },
       { label: 'Notifications', description: 'See events from Adyen', icon: 'notifications', link: ['/', id, 'notifications'] }
     ];
     if (u.bank && this.bankStatus()?.bankAccountCreated) {
-      actions.push({ label: 'Business Account', description: 'Balance and transfers', icon: 'account_balance', link: ['/', id, 'business-account'] });
+      actions.push({ label: 'Business account', description: 'Balance and transfers', icon: 'account_balance', link: ['/', id, 'business-account'] });
     }
     if (u.issuing) {
-      actions.push({ label: 'My Cards', description: 'Manage issued cards', icon: 'credit_card', link: ['/', id, 'cards'] });
+      actions.push({ label: 'Cards', description: 'Manage issued cards', icon: 'credit_card', link: ['/', id, 'cards'] });
     }
     if (u.capital) {
       actions.push({ label: 'Loans', description: 'Business financing', icon: 'savings', link: ['/', id, 'businessloans'] });
@@ -173,6 +174,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       pos: [false],
       eCommerce: [false],
       payByLink: [false]
+    });
+    this.businessForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (this.salesChannelError() && this.selectedSalesChannels().length) this.salesChannelError.set(null);
     });
   }
 
@@ -237,7 +241,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.userLoading.set(false);
-        this.userError.set(httpErrorMessage(err, 'We could not load your account.'));
+        this.userError.set(httpErrorMessage(err, 'Unable to load the account. Check the connection and try again.'));
       }
     });
   }
@@ -247,6 +251,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     // Opened synchronously so the browser keeps the click as the trigger and does not block the popup.
     const popup = window.open('', '_blank');
     this.openingOnboarding.set(true);
+    this.onboardingLinkError.set(null);
     this.onboardingService.getOnboardingLink(this.userId).subscribe({
       next: (res) => {
         this.openingOnboarding.set(false);
@@ -261,7 +266,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.openingOnboarding.set(false);
         popup?.close();
-        this.matSnackBar.open(httpErrorMessage(err, 'We could not open the onboarding page. Please try again.'), 'Close', SNACK_ERROR);
+        this.onboardingLinkError.set(httpErrorMessage(err, 'Unable to open the onboarding page. Try again.'));
       }
     });
   }
@@ -277,7 +282,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading.set(false);
-        this.kycError.set(httpErrorMessage(err, 'We could not load your verification status.'));
+        this.kycError.set(httpErrorMessage(err, 'Unable to load the verification status. Try again.'));
       }
     });
   }
@@ -311,13 +316,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         return { label: 'In review', description: 'Adyen is verifying your information.', tone: 'warning', icon: 'schedule' };
       case 'rejected':
       case 'reject':
-        return { label: 'Rejected', description: 'Verification was rejected. Please contact support.', tone: 'danger', icon: 'block' };
+        return { label: 'Rejected', description: 'Verification was rejected. Contact support to find out why.', tone: 'danger', icon: 'block' };
       case 'valid':
         return part.allowed
           ? { label: 'Active', description: 'Verified and ready to use.', tone: 'success', icon: 'check_circle' }
           : { label: 'Verified, not allowed yet', description: 'Verification is complete. Adyen has not enabled this capability yet.', tone: 'warning', icon: 'hourglass_empty' };
       default:
-        return { label: 'Unknown', description: `Unexpected status "${part.verificationStatus}".`, tone: 'neutral', icon: 'help_outline' };
+        return { label: 'Unknown', description: 'Adyen returned a status this page does not recognize. Refresh to check again.', tone: 'neutral', icon: 'help_outline' };
     }
   }
 
@@ -325,14 +330,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const base = {
       id: 'verification',
       title: 'Complete verification',
-      description: 'Provide your business details so we can verify your account (KYC).'
+      description: 'Provide your business details to verify your account (KYC).'
     };
     const continueAction = { label: 'Continue onboarding', run: () => this.openHostedOnboarding() };
     const s = this.status();
 
     if (!s) {
       if (this.kycError()) {
-        return { ...base, state: 'todo', statusLabel: 'Status unavailable', action: { label: 'Retry', run: () => this.checkOnboarding() } };
+        return { ...base, state: 'todo', statusLabel: 'Status unavailable', action: { label: 'Try again', run: () => this.checkOnboarding() } };
       }
       return { ...base, state: 'loading', statusLabel: 'Checking status…' };
     }
@@ -352,13 +357,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private bankAccountStep(): ChecklistItem {
     const base = {
       id: 'bank-account',
-      title: 'Create your business bank account',
+      title: 'Create a business bank account',
       description: 'Get a dedicated account to receive funds and make transfers.'
     };
     const bs = this.bankStatus();
     if (!bs) {
       return this.bankStatusError()
-        ? { ...base, state: 'todo', statusLabel: 'Status unavailable', action: { label: 'Retry', run: () => this.retryBankAccountStatus() } }
+        ? { ...base, state: 'todo', statusLabel: 'Status unavailable', action: { label: 'Try again', run: () => this.retryBankAccountStatus() } }
         : { ...base, state: 'loading', statusLabel: 'Checking status…' };
     }
     if (bs.bankAccountCreated) {
@@ -398,7 +403,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const link = ['/', this.userId, 'checkout'];
     return this.paymentReceived()
       ? { ...base, state: 'done', statusLabel: 'Payment received', action: { label: 'View transactions', link: ['/', this.userId, 'transactions'] } }
-      : { ...base, state: 'todo', statusLabel: 'To do', action: { label: 'Go to Checkout', link } };
+      : { ...base, state: 'todo', statusLabel: 'To do', action: { label: 'Go to checkout', link } };
   }
 
   private cardStep(): ChecklistItem {
@@ -488,7 +493,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.businessLinesError.set(null);
     this.activityService.getBusinessLines(this.userId).subscribe({
       next: (res) => this.businessLines.set(res),
-      error: (err) => this.businessLinesError.set(httpErrorMessage(err, 'We could not load your business activities.'))
+      error: (err) => this.businessLinesError.set(httpErrorMessage(err, 'Unable to load business activities. Try again.'))
     });
   }
 
@@ -498,32 +503,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const { industryCode, pos, eCommerce, payByLink } = this.businessForm.value;
-    const salesChannels: string[] = [];
-    if (pos) salesChannels.push('pos');
-    if (eCommerce) salesChannels.push('eCommerce');
-    if (payByLink) salesChannels.push('payByLink');
+    const { industryCode } = this.businessForm.value;
+    const salesChannels = this.selectedSalesChannels();
 
     if (!salesChannels.length) {
-      this.matSnackBar.open('Select at least one sales channel.', 'Close', SNACK_ERROR);
+      this.salesChannelError.set('Select at least one sales channel.');
       return;
     }
 
     this.submitting = true;
+    this.addBusinessLineError.set(null);
     this.activityService.addBusinessLine(this.userId, { industryCode, salesChannels }).subscribe({
       next: (res) => {
         this.businessLines.set([...this.businessLines(), res]);
-        this.matSnackBar.open('Business activity added.', 'Close', SNACK_SUCCESS);
+        this.notify.success('Business activity added.');
         this.businessForm.reset({ industryCode: '', pos: false, eCommerce: false, payByLink: false });
         this.industrySearch = '';
         this.filteredIndustries = [...INDUSTRY_CODES];
         this.submitting = false;
       },
       error: (err) => {
-        this.matSnackBar.open(httpErrorMessage(err, 'We could not add this business activity.'), 'Close', SNACK_ERROR);
+        this.addBusinessLineError.set(httpErrorMessage(err, 'Unable to add this business activity. Try again.'));
         this.submitting = false;
       }
     });
+  }
+
+  private selectedSalesChannels(): string[] {
+    const { pos, eCommerce, payByLink } = this.businessForm.value;
+    const channels: string[] = [];
+    if (pos) channels.push('pos');
+    if (eCommerce) channels.push('eCommerce');
+    if (payByLink) channels.push('payByLink');
+    return channels;
   }
 
   private tiLegalEntityId = '';
@@ -600,7 +612,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         if (!this.bankStatus()) {
-          this.bankStatusError.set(httpErrorMessage(err, 'We could not load your bank account status.'));
+          this.bankStatusError.set(httpErrorMessage(err, 'Unable to load the bank account status. Try again.'));
         }
       }
     });
@@ -641,11 +653,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.stopBankStatusPolling();
         this.loadBankAccountStatus();
         this.accountService.notifyBankAccountCreated();
-        this.matSnackBar.open(`Business bank account created: ${res.bankAccountNumber}`, 'Close', SNACK_SUCCESS);
+        this.notify.success(`Business bank account created: ${res.bankAccountNumber}`);
       },
       error: (err) => {
         this.creatingBankAccount.set(false);
-        this.bankCreateError.set(httpErrorMessage(err, 'We could not create your bank account. Please try again.'));
+        this.bankCreateError.set(httpErrorMessage(err, 'Unable to create the bank account. Try again.'));
       }
     });
   }
@@ -654,17 +666,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!userId || this.loadingKyc()) return;
 
     this.loadingKyc.set(true);
+    this.validateKycError.set(null);
 
     this.onboardingService.validateKyc(userId).subscribe({
       next: () => {
         this.loadingKyc.set(false);
-        this.matSnackBar.open('KYC validated. Refreshing your status…', 'Close', SNACK_SUCCESS);
+        this.notify.success('KYC validated. Refreshing the status…');
         this.checkOnboarding();
         if (this.user()?.bank) this.loadBankAccountStatus();
       },
       error: (err) => {
         this.loadingKyc.set(false);
-        this.matSnackBar.open(httpErrorMessage(err, 'We could not validate KYC.'), 'Close', SNACK_ERROR);
+        this.validateKycError.set(httpErrorMessage(err, 'Unable to validate KYC. Try again.'));
       }
     });
   }

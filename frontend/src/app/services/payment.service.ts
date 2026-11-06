@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {GooglePayJwtResponse, PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse} from '../models';
+import {GooglePayJwtResponse, PosAbortRequest, PosPaymentRequest, PosPaymentResponse, SendPaymentPayload, SendPaymentResponse, StoredPaymentMethod, TokenPaymentPayload, TokenPaymentResponse} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class PaymentService {
@@ -33,6 +33,11 @@ export class PaymentService {
     return this.http.post<PosPaymentResponse>(`${this.baseUrl}/api/pos/pay`, payload, {
       responseType: 'json'
     });
+  }
+
+  /** Asks the terminal to cancel a pending payment; the pending makePosPayment call then returns the result. */
+  abortPosPayment(payload: PosAbortRequest): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/api/pos/abort`, payload);
   }
 
   createTokenizationSession(payload: SendPaymentPayload): Observable<SendPaymentResponse> {

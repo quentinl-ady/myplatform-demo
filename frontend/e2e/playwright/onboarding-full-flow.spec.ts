@@ -248,8 +248,8 @@ for (const variant of variants) {
       await expect(page.locator('.success-details .detail-row .value', { hasText: 'E2E Test Cardholder' }))
         .toBeVisible();
 
-      // Verify we can navigate to "View my cards"
-      const viewCardsBtn = page.locator('button', { hasText: 'View my cards' });
+      // Verify we can navigate to "View cards"
+      const viewCardsBtn = page.locator('button', { hasText: 'View cards' });
       await expect(viewCardsBtn).toBeVisible();
       await viewCardsBtn.click();
 

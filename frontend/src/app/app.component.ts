@@ -38,18 +38,19 @@ import { MatIconModule } from '@angular/material/icon';
       justify-content: center;
       gap: 8px;
       padding: 6px 16px;
-      background: #fff8e1;
-      color: #8a4b00;
-      border-bottom: 1px solid #f0c050;
-      font-size: 13px;
+      background: var(--fintech-warning-bg);
+      color: var(--fintech-text);
+      border-bottom: 1px solid var(--fintech-warning-border);
+      font-size: 0.8125rem;
       line-height: 1.4;
       text-align: center;
     }
     .demo-banner mat-icon {
       flex: none;
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+      font-size: 1.125rem;
+      width: 1.125rem;
+      height: 1.125rem;
+      color: var(--fintech-warning);
     }
 
     .app-page {
@@ -60,7 +61,7 @@ import { MatIconModule } from '@angular/material/icon';
 
     @media (max-width: 599.98px) {
       .demo-banner {
-        font-size: 12px;
+        font-size: 0.75rem;
       }
     }
   `],

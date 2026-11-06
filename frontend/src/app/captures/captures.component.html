@@ -25,12 +25,8 @@
       <span class="cdk-visually-hidden">Loading payments</span>
     </div>
 
-    <div *ngIf="!loading() && loadError() as error" class="empty-state" role="alert">
-      <mat-icon class="empty-icon error-icon" aria-hidden="true">error_outline</mat-icon>
-      <p>Payments could not be loaded</p>
-      <span class="empty-hint">{{ error }}</span>
-      <button mat-flat-button type="button" class="fintech-btn" (click)="load()">Retry</button>
-    </div>
+    <app-inline-alert *ngIf="!loading() && loadError() as error" class="load-error" title="Unable to load payments"
+                      actionLabel="Try again" (action)="load()">{{ error }}</app-inline-alert>
 
     <ng-container *ngIf="!loading() && !loadError() && visiblePayments().length === 0">
       <div class="empty-state" *ngIf="payments().length === 0; else nothingOpen">
@@ -83,14 +79,18 @@
                     [attr.aria-label]="'Capture ' + p.merchantReference">
               Capture
             </button>
-            <button mat-stroked-button type="button" class="action-btn" *ngIf="p.canCancel"
+            <button mat-stroked-button type="button" class="action-btn danger" *ngIf="p.canCancel"
                     [disabled]="cancellingId() === p.id" (click)="cancel(p)"
-                    [attr.aria-label]="'Cancel ' + p.merchantReference">
+                    [attr.aria-label]="'Cancel payment ' + p.merchantReference">
               <mat-spinner *ngIf="cancellingId() === p.id" diameter="16" aria-hidden="true"></mat-spinner>
-              {{ cancellingId() === p.id ? 'Cancelling…' : 'Cancel' }}
+              {{ cancellingId() === p.id ? 'Cancelling…' : 'Cancel payment' }}
             </button>
           </div>
         </div>
+
+        <app-inline-alert *ngIf="rowError()?.id === p.id" class="row-error" title="Unable to cancel the payment"
+                          [actionLabel]="p.canCancel ? 'Try again' : ''" (action)="cancel(p)"
+                          [dismissible]="true" (dismiss)="rowError.set(null)">{{ rowError()?.message }}</app-inline-alert>
 
         <div class="payment-detail" *ngIf="expandedId() === p.id" [id]="'payment-detail-' + p.id">
           <dl class="detail-grid">
@@ -129,13 +129,13 @@
           </dl>
 
           <p class="detail-note" *ngIf="p.state === 'PENDING_AUTHORISATION'">
-            The payment is pending. Adyen sends the final result with the AUTHORISATION webhook.
+            The payment is pending. Adyen sends the final result with the authorisation webhook.
           </p>
           <p class="detail-note" *ngIf="p.releasedAmount > 0">
             Adyen released the remaining {{ p.releasedAmount | money:p.currency }} after the first partial capture, because multiple partial captures aren't enabled on the merchant account.
           </p>
           <p class="detail-note" *ngIf="p.state === 'AUTO_CAPTURED'">
-            The capture delay is over, so Adyen has captured the payment. Adyen only sends a CAPTURE webhook for it when <strong>Delayed Capture</strong> is turned on in the webhook settings.
+            The capture delay is over, so Adyen has captured the payment. Adyen only sends a capture webhook for it when <strong>Delayed Capture</strong> is turned on in the webhook settings.
           </p>
 
           <section class="detail-section" *ngIf="p.splits.length">

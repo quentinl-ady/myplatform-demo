@@ -1,11 +1,10 @@
 import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { ApiLogService } from '../services';
 import { ApiLog } from '../models';
-import { ConfirmService, httpErrorMessage, parseServerDate } from '../shared';
+import { ConfirmService, InlineAlertComponent, NotifyService, httpErrorMessage, parseServerDate } from '../shared';
 
 const LIVE_REFRESH_MS = 5000;
 
@@ -23,14 +22,14 @@ const DATE_FORMAT = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 's
 @Component({
   selector: 'app-api-logs',
   standalone: true,
-  imports: [CommonModule, MaterialModule, FormsModule],
+  imports: [CommonModule, MaterialModule, FormsModule, InlineAlertComponent],
   templateUrl: './api-logs.component.html',
   styleUrl: './api-logs.component.css'
 })
 export class ApiLogsComponent implements OnInit, OnDestroy {
   private apiLogService = inject(ApiLogService);
   private confirmService = inject(ConfirmService);
-  private snackBar = inject(MatSnackBar);
+  private notify = inject(NotifyService);
 
   @Input() userId?: string;
   @Output() closed = new EventEmitter<void>();
@@ -44,6 +43,9 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
   refreshing = signal(false);
   clearing = signal(false);
   loadError = signal<string | null>(null);
+  clearError = signal<string | null>(null);
+  /** Id of the body whose copy failed ('req-12', 'res-12'). */
+  copyErrorId = signal<string | null>(null);
   expandedLogId: number | null = null;
   activeTab: 'request' | 'response' = 'request';
   copiedId: string | null = null;
@@ -83,7 +85,7 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.loading.set(false);
         this.refreshing.set(false);
-        this.loadError.set(httpErrorMessage(err, 'We couldn\'t load the API calls.'));
+        this.loadError.set(httpErrorMessage(err, 'Unable to load the API calls. Try again.'));
         // Live mode would keep hitting a failing endpoint.
         if (this.autoRefresh) {
           this.autoRefresh = false;
@@ -146,6 +148,7 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
   }
 
   toggleExpand(log: ApiLog) {
+    this.copyErrorId.set(null);
     if (this.expandedLogId === log.id) {
       this.expandedLogId = null;
     } else {
@@ -160,26 +163,26 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
 
   async clearLogs() {
     const confirmed = await this.confirmService.confirm({
-      title: 'Clear API calls?',
-      message: 'All recorded API calls for this account are deleted. This can\'t be undone.',
-      confirmText: 'Clear calls',
+      title: 'Clear all API calls?',
+      message: 'The log of API calls is deleted for this account. This can\'t be undone.',
+      confirmText: 'Clear API calls',
+      cancelText: 'Cancel',
       danger: true
     });
     if (!confirmed) return;
     this.clearing.set(true);
+    this.clearError.set(null);
     this.apiLogService.clearLogs(this.userId).subscribe({
       next: () => {
         this.logs = [];
         this.filteredLogs = [];
         this.expandedLogId = null;
         this.clearing.set(false);
+        this.notify.success('API calls cleared.');
       },
       error: (err) => {
         this.clearing.set(false);
-        this.snackBar.open(httpErrorMessage(err, 'We couldn\'t clear the API calls. Please try again.'), 'Close', {
-          duration: 6000,
-          panelClass: 'fintech-snack-error'
-        });
+        this.clearError.set(httpErrorMessage(err, 'The API calls are still there. Try again.'));
       }
     });
   }
@@ -256,8 +259,9 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
 
   copyBody(raw: string, id: string) {
     const text = this.formatJson(raw) || raw || '';
+    this.copyErrorId.set(null);
     if (!navigator.clipboard) {
-      this.showCopyError();
+      this.copyErrorId.set(id);
       return;
     }
     navigator.clipboard.writeText(text).then(
@@ -265,16 +269,10 @@ export class ApiLogsComponent implements OnInit, OnDestroy {
         this.copiedId = id;
         clearTimeout(this.copiedTimeout);
         this.copiedTimeout = setTimeout(() => { this.copiedId = null; }, 1500);
+        this.notify.success(id.startsWith('req-') ? 'Request body copied.' : 'Response body copied.');
       },
-      () => this.showCopyError()
+      () => this.copyErrorId.set(id)
     );
-  }
-
-  private showCopyError() {
-    this.snackBar.open('Couldn\'t copy to the clipboard. Select the text and copy it manually.', 'Close', {
-      duration: 5000,
-      panelClass: 'fintech-snack-error'
-    });
   }
 
   close() {

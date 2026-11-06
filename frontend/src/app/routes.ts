@@ -5,7 +5,7 @@ const routeConfig: Routes = [
   {
     path: '',
     loadComponent: () => import('./main/main.component').then(m => m.MainComponent),
-    title: 'Log in'
+    title: 'Sign in'
   },
   {
     path: 'result/:status',
@@ -110,7 +110,7 @@ const routeConfig: Routes = [
       {
         path: 'cards',
         loadComponent: () => import('./card-list/card-list.component').then(m => m.CardListComponent),
-        title: 'My cards'
+        title: 'Cards'
       },
       {
         path: 'card-create',

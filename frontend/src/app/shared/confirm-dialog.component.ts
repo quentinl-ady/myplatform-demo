@@ -13,6 +13,7 @@ export interface ConfirmDialogData {
   message?: string;
   /** Optional recap rows (amount, beneficiary...) shown under the message. */
   details?: ConfirmDialogDetail[];
+  /** Verb that names the result, for example "Delete rule" or "Send €120.00". */
   confirmText?: string;
   cancelText?: string;
   /** Destructive action: red confirm button and initial focus on Cancel. */
@@ -84,6 +85,7 @@ export interface ConfirmDialogData {
       padding: 8px 24px 20px;
     }
     .confirm-btn {
+      min-height: 40px;
       border: none;
       border-radius: 24px;
       padding: 10px 24px;
@@ -91,14 +93,21 @@ export interface ConfirmDialogData {
       font-weight: 600;
       cursor: pointer;
       background: var(--fintech-primary);
-      color: #fff;
+      color: var(--fintech-on-primary);
     }
     .confirm-btn.secondary {
-      background: var(--fintech-bg);
+      background: var(--fintech-surface-muted);
       color: var(--fintech-text);
     }
     .confirm-btn.danger {
       background: var(--fintech-danger);
+      color: var(--fintech-on-danger);
+    }
+    @media (pointer: coarse) {
+      .confirm-btn { min-height: 44px; }
+    }
+    @media (forced-colors: active) {
+      .confirm-btn { border: 1px solid ButtonText; }
     }
   `]
 })

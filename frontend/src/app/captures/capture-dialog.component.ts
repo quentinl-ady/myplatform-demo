@@ -7,7 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { CapturePayload, CheckoutPayment } from '../models';
 import { CaptureService } from '../services';
-import { MoneyPipe, formatMoney, fromMinorUnits, httpErrorMessage, toMinorUnits } from '../shared';
+import { InlineAlertComponent, MoneyPipe, formatMoney, fromMinorUnits, httpErrorMessage, toMinorUnits } from '../shared';
 import {
   commissionWithinAmount,
   createSplitForm,
@@ -36,6 +36,7 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     MoneyPipe,
+    InlineAlertComponent,
     SplitFieldsComponent,
     SplitPreviewComponent,
   ],
@@ -69,7 +70,7 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
                    formControlName="amount" min="0.01" [max]="maxAmount" step="0.01"
                    [attr.aria-invalid]="!!amountError"
                    [attr.aria-describedby]="amountError ? 'capture-amount-error' : 'capture-amount-help'" />
-            <button type="button" class="text-btn" *ngIf="!isFullAmount" (click)="useFullAmount()">Full amount</button>
+            <button type="button" class="text-btn" *ngIf="!isFullAmount" (click)="useFullAmount()">Use full amount</button>
           </div>
           <span class="helper-text error" id="capture-amount-error" *ngIf="amountError as error">{{ error }}</span>
           <span class="helper-text" id="capture-amount-help" *ngIf="!amountError">{{ amountHelp }}</span>
@@ -88,11 +89,12 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
                             [amount]="captureAmount" idPrefix="capture-split"></app-split-fields>
         </fieldset>
 
-        <p class="dialog-error" role="alert" *ngIf="error() as message">{{ message }}</p>
+        <app-inline-alert *ngIf="error() as message" title="Unable to capture the payment"
+                          [dismissible]="true" (dismiss)="error.set(null)">{{ message }}</app-inline-alert>
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end" class="dialog-actions">
-      <button type="button" class="dialog-btn secondary" mat-dialog-close [disabled]="submitting()">Close</button>
+      <button type="button" class="dialog-btn secondary" mat-dialog-close [disabled]="submitting()">Cancel</button>
       <button type="submit" form="capture-form" class="dialog-btn primary" [disabled]="submitting()">
         <mat-spinner *ngIf="submitting()" diameter="16" aria-hidden="true"></mat-spinner>
         <span>{{ submitting() ? 'Capturing…' : submitLabel }}</span>
@@ -118,20 +120,22 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
       justify-content: space-between;
       gap: 16px;
       padding: 6px 0;
-      font-size: 14px;
+      font-size: 0.875rem;
     }
     .recap-row + .recap-row { border-top: 1px solid var(--fintech-border); }
     .recap-row dt { color: var(--fintech-text-secondary); }
     .recap-row dd { margin: 0; font-weight: 600; color: var(--fintech-text); text-align: right; word-break: break-all; }
-    .recap-row dd.mono { font-family: var(--fintech-font-mono); font-size: 13px; }
-    .amount-row { display: flex; align-items: center; gap: 12px; width: 100%; }
-    .amount-row .fintech-input { max-width: 200px; }
+    .recap-row dd.mono { font-family: var(--fintech-font-mono); font-size: 0.8125rem; }
+    .amount-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; width: 100%; }
+    .amount-row .fintech-input { max-width: 12.5rem; }
     .text-btn {
+      min-height: 32px;
       border: none;
       background: none;
-      padding: 4px 0;
+      padding: 4px 4px;
+      border-radius: 6px;
       font: inherit;
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 600;
       color: var(--fintech-text);
       text-decoration: underline;
@@ -152,27 +156,17 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
       width: 100%;
       padding: 0;
       margin-bottom: 4px;
-      font-size: 12px;
+      font-size: 0.875rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      color: var(--fintech-text-secondary);
+      color: var(--fintech-text);
     }
     .split-section .helper-text { margin: 0; }
-    .dialog-error {
-      margin: 0;
-      padding: 10px 14px;
-      border-radius: 10px;
-      background: var(--fintech-danger-bg);
-      color: #a32020;
-      font-size: 13px;
-      line-height: 1.45;
-    }
     .dialog-actions { gap: 8px; padding: 8px 24px 20px; }
     .dialog-btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      min-height: 40px;
       border: none;
       border-radius: 24px;
       padding: 10px 24px;
@@ -180,10 +174,17 @@ const TWO_DECIMALS = /^\d+(\.\d{1,2})?$/;
       font-weight: 600;
       cursor: pointer;
       background: var(--fintech-primary);
-      color: #fff;
+      color: var(--fintech-on-primary);
     }
-    .dialog-btn.secondary { background: var(--fintech-bg); color: var(--fintech-text); }
-    .dialog-btn:disabled { opacity: 0.6; cursor: default; }
+    .dialog-btn.secondary { background: var(--fintech-surface-muted); color: var(--fintech-text); }
+    .dialog-btn:disabled { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); cursor: default; }
+    @media (pointer: coarse) {
+      .dialog-btn,
+      .text-btn { min-height: 44px; }
+    }
+    @media (forced-colors: active) {
+      .dialog-btn { border: 1px solid ButtonText; }
+    }
     .dialog-btn mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
   `]
 })
@@ -293,7 +294,7 @@ export class CaptureDialogComponent {
     this.captureService.capture(this.payment.id, payload).subscribe({
       next: (updated) => this.dialogRef.close(updated),
       error: (err) => {
-        this.error.set(httpErrorMessage(err, "Couldn't capture the payment. Try again."));
+        this.error.set(httpErrorMessage(err, "Unable to capture the payment. Try again."));
         this.submitting.set(false);
         this.dialogRef.disableClose = false;
       }

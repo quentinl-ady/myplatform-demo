@@ -10,29 +10,18 @@
     <span>Loading checkout…</span>
   </div>
 
-  <mat-card class="error-state" *ngIf="!loading() && loadError()">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <p>{{ loadError() }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadUserAndMaybeStores()">Retry</button>
-  </mat-card>
+  <app-inline-alert *ngIf="!loading() && loadError()" title="Unable to load checkout"
+                    actionLabel="Try again" (action)="loadUserAndMaybeStores()">{{ loadError() }}</app-inline-alert>
 
   <div *ngIf="!loading() && !loadError()">
 
-    <div class="tab-bar" role="tablist" aria-label="Checkout mode">
-      <button type="button" role="tab" id="tab-payment" class="tab-btn" aria-controls="panel-payment"
-              [class.active]="activeTab() === 'payment'" [attr.aria-selected]="activeTab() === 'payment'"
-              (click)="switchTab('payment')">
-        <mat-icon aria-hidden="true">shopping_cart</mat-icon> Payment
-      </button>
-      <button type="button" role="tab" id="tab-tokenize" class="tab-btn" aria-controls="panel-tokenize"
-              [class.active]="activeTab() === 'tokenize'" [attr.aria-selected]="activeTab() === 'tokenize'"
-              (click)="switchTab('tokenize')">
-        <mat-icon aria-hidden="true">credit_card</mat-icon> Save a card
-      </button>
-      <button type="button" role="tab" id="tab-token-payment" class="tab-btn" aria-controls="panel-token-payment"
-              [class.active]="activeTab() === 'token-payment'" [attr.aria-selected]="activeTab() === 'token-payment'"
-              (click)="switchTab('token-payment')">
-        <mat-icon aria-hidden="true">replay</mat-icon> Pay with saved card
+    <div class="tab-bar" role="tablist" aria-label="Checkout mode" (keydown)="onTabKeydown($event)">
+      <button *ngFor="let tab of tabs" type="button" role="tab" class="tab-btn"
+              [id]="'tab-' + tab.id" [attr.aria-controls]="'panel-' + tab.id"
+              [class.active]="activeTab() === tab.id" [attr.aria-selected]="activeTab() === tab.id"
+              [attr.tabindex]="activeTab() === tab.id ? 0 : -1"
+              (click)="switchTab(tab.id)">
+        <mat-icon aria-hidden="true">{{ tab.icon }}</mat-icon> {{ tab.label }}
       </button>
     </div>
 
@@ -98,6 +87,9 @@
             <span *ngIf="!submitting()">{{ dropinActive() ? 'Restart with these details' : 'Continue to payment' }}</span>
           </button>
           <span id="pay-submit-hint" class="helper-text submit-hint" *ngIf="!submitting() && submitHint(checkoutForm) as hint">{{ hint }}</span>
+          <app-inline-alert *ngIf="paymentError() as error" title="Unable to start the payment"
+                            actionLabel="Try again" (action)="onSubmit()"
+                            [dismissible]="true" (dismiss)="paymentError.set(null)">{{ error }}</app-inline-alert>
         </form>
       </mat-card>
 
@@ -122,7 +114,7 @@
 
         <div class="dropin-wrapper" [hidden]="!dropinActive()">
           <h2 class="mat-h3 card-title dropin-title">Complete payment</h2>
-          <div id="dropin-container"></div>
+          <div id="dropin-container" class="fintech-light-island dropin-island"></div>
         </div>
       </mat-card>
 
@@ -134,7 +126,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Save a card (zero-amount authorisation)</h2>
-        <p class="section-desc">Store a card for future payments with a zero-amount authorisation. The card is saved as <strong>UnscheduledCardOnFile</strong>.</p>
+        <p class="section-desc">Store a card for future payments with a zero-amount authorisation. The card is saved for unscheduled card-on-file payments.</p>
 
         <form [formGroup]="tokenizeForm" (ngSubmit)="onTokenizeSubmit()" class="fintech-form" novalidate>
 
@@ -173,6 +165,9 @@
             <span *ngIf="!submittingTokenize()">{{ tokenizeDropinActive() ? 'Restart with these details' : 'Continue to card details' }}</span>
           </button>
           <span id="tok-submit-hint" class="helper-text submit-hint" *ngIf="!submittingTokenize() && submitHint(tokenizeForm) as hint">{{ hint }}</span>
+          <app-inline-alert *ngIf="tokenizeError() as error" title="Unable to load the card form"
+                            actionLabel="Try again" (action)="onTokenizeSubmit()"
+                            [dismissible]="true" (dismiss)="tokenizeError.set(null)">{{ error }}</app-inline-alert>
         </form>
       </mat-card>
 
@@ -197,7 +192,7 @@
 
         <div class="dropin-wrapper" [hidden]="!tokenizeDropinActive()">
           <h2 class="mat-h3 card-title dropin-title">Enter card details</h2>
-          <div id="tokenize-dropin-container"></div>
+          <div id="tokenize-dropin-container" class="fintech-light-island dropin-island"></div>
         </div>
       </mat-card>
 
@@ -209,7 +204,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Saved cards</h2>
-        <p class="section-desc">Select a saved card and charge it from the server (<strong>ContAuth / UnscheduledCardOnFile</strong>).</p>
+        <p class="section-desc">Select a saved card and charge it from the server as an unscheduled card-on-file payment, without the shopper.</p>
 
         <form [formGroup]="tokenPaymentForm" *ngIf="isEmbeddedPayment" novalidate>
           <div class="form-group">
@@ -237,11 +232,11 @@
             <span>Loading saved cards…</span>
           </div>
 
-          <div class="empty-stored error" *ngIf="!loadingStoredMethods() && storedMethodsError()">
-            <mat-icon aria-hidden="true">error_outline</mat-icon>
-            <p>{{ storedMethodsError() }}</p>
-            <button mat-stroked-button type="button" class="fintech-btn secondary mt-8" (click)="loadStoredPaymentMethods()">Retry</button>
-          </div>
+          <app-inline-alert *ngIf="!loadingStoredMethods() && storedMethodsError()" title="Unable to load saved cards"
+                            actionLabel="Try again" (action)="loadStoredPaymentMethods()">{{ storedMethodsError() }}</app-inline-alert>
+
+          <app-inline-alert *ngIf="deleteError() as error" class="mb-12" title="Unable to delete the card"
+                            [dismissible]="true" (dismiss)="deleteError.set(null)">{{ error }}</app-inline-alert>
 
           <div *ngIf="!loadingStoredMethods() && !storedMethodsError() && storedMethods().length === 0" class="empty-stored">
             <mat-icon aria-hidden="true">credit_card_off</mat-icon>
@@ -249,30 +244,24 @@
             <button mat-stroked-button type="button" class="fintech-btn secondary mt-8" (click)="switchTab('tokenize')">Save a card</button>
           </div>
 
-          <div class="stored-card-list" role="radiogroup" aria-labelledby="saved-cards-title"
+          <div class="stored-card-list" role="group" aria-labelledby="saved-cards-title"
                *ngIf="!loadingStoredMethods() && !storedMethodsError() && storedMethods().length > 0">
-            <div class="stored-card-item" *ngFor="let m of storedMethods()"
-                 role="radio" tabindex="0"
-                 [attr.aria-checked]="isSelected(m)"
-                 [attr.aria-label]="cardLabel(m) + ', expires ' + m.expiryMonth + '/' + m.expiryYear"
-                 [class.selected]="isSelected(m)"
-                 (click)="selectStoredMethod(m)"
-                 (keydown.enter)="selectStoredMethod(m)"
-                 (keydown.space)="$event.preventDefault(); selectStoredMethod(m)">
-              <div class="card-brand-icon">
-                <mat-icon aria-hidden="true">credit_card</mat-icon>
-              </div>
-              <div class="card-info">
-                <span class="card-brand">{{ m.cardBrand | uppercase }}</span>
-                <span class="card-number">•••• {{ m.cardSummary }}</span>
-                <span class="card-expiry">Expires {{ m.expiryMonth }}/{{ m.expiryYear }}</span>
-              </div>
-              <div class="card-holder">{{ m.holderName }}</div>
-              <mat-icon class="check-icon" aria-hidden="true" *ngIf="isSelected(m)">check_circle</mat-icon>
+            <div class="stored-card-row" *ngFor="let m of storedMethods()" [class.selected]="isSelected(m)">
+              <input type="radio" class="cdk-visually-hidden" name="checkout-saved-card"
+                     [id]="'saved-card-' + m.recurringDetailReference" [value]="m.recurringDetailReference"
+                     [checked]="isSelected(m)" (change)="selectStoredMethod(m)" />
+              <label class="stored-card-item" [for]="'saved-card-' + m.recurringDetailReference">
+                <mat-icon class="card-brand-icon" aria-hidden="true">credit_card</mat-icon>
+                <span class="card-info">
+                  <span class="card-brand">{{ brandLabel(m) }}</span>
+                  <span class="card-number">•••• {{ m.cardSummary }}</span>
+                  <span class="card-expiry">Expires {{ m.expiryMonth }}/{{ m.expiryYear }}</span>
+                </span>
+                <span class="card-holder" *ngIf="m.holderName">{{ m.holderName }}</span>
+                <mat-icon class="check-icon" aria-hidden="true">{{ isSelected(m) ? 'check_circle' : 'radio_button_unchecked' }}</mat-icon>
+              </label>
               <button mat-icon-button type="button" class="delete-token-btn"
-                      (click)="deleteStoredMethod($event, m)"
-                      (keydown.enter)="$event.stopPropagation()"
-                      (keydown.space)="$event.stopPropagation()"
+                      (click)="deleteStoredMethod(m)"
                       [disabled]="deletingToken() === m.recurringDetailReference"
                       [attr.aria-label]="'Delete saved card ' + cardLabel(m)" matTooltip="Delete saved card">
                 <mat-spinner *ngIf="deletingToken() === m.recurringDetailReference" diameter="18"></mat-spinner>
@@ -344,7 +333,7 @@
             <button mat-flat-button class="fintech-btn primary full-width mt-16" type="submit"
                     [disabled]="tokenPaymentForm.invalid || submittingTokenPayment()" aria-describedby="tp-submit-hint">
               <mat-spinner *ngIf="submittingTokenPayment()" diameter="20" aria-label="Charging saved card"></mat-spinner>
-              <span *ngIf="!submittingTokenPayment()">Charge saved card</span>
+              <span *ngIf="!submittingTokenPayment()">{{ chargeLabel() }}</span>
             </button>
             <span id="tp-submit-hint" class="helper-text submit-hint" *ngIf="!submittingTokenPayment() && submitHint(tokenPaymentForm) as hint">{{ hint }}</span>
           </form>

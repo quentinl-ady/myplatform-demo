@@ -10,7 +10,7 @@ import { ApprovalMode, currentDeviceKind } from '../shared';
   template: `
     <button type="button" class="switch-btn" [disabled]="disabled" (click)="switchTo.emit(other)">
       <mat-icon aria-hidden="true">{{ other === 'phone' ? 'smartphone' : 'fingerprint' }}</mat-icon>
-      {{ other === 'phone' ? 'Approve on my phone instead' : 'Approve on this ' + thisName + ' instead' }}
+      {{ other === 'phone' ? 'Approve on your phone instead' : 'Approve on this ' + thisName + ' instead' }}
     </button>
   `,
   styles: [`
@@ -27,14 +27,17 @@ import { ApprovalMode, currentDeviceKind } from '../shared';
       background: none;
       padding: 4px 8px;
       font: inherit;
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--fintech-text-secondary);
       cursor: pointer;
       border-radius: 8px;
     }
     .switch-btn:hover:not(:disabled) { color: var(--fintech-text); background: var(--fintech-bg); }
-    .switch-btn:disabled { cursor: not-allowed; opacity: 0.6; }
-    .switch-btn mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .switch-btn:disabled { cursor: not-allowed; color: var(--fintech-text-tertiary); }
+    .switch-btn mat-icon { font-size: 1rem; width: 1rem; height: 1rem; flex-shrink: 0; }
+    @media (pointer: coarse) {
+      .switch-btn { min-height: 44px; }
+    }
   `]
 })
 export class ApprovalSwitchComponent {

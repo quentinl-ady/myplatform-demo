@@ -16,7 +16,7 @@
   gap: 16px;
 }
 .notif-header h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--fintech-text);
   margin: 0;
@@ -24,7 +24,7 @@
 }
 .notif-subtitle {
   color: var(--fintech-text-secondary);
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 4px 0 0 0;
 }
 .notif-header-right {
@@ -41,13 +41,14 @@
 
 .fintech-btn {
   background-color: var(--fintech-primary) !important;
-  color: #fff !important;
+  color: var(--fintech-on-primary) !important;
   border-radius: 24px !important;
   padding: 0 20px !important;
   font-weight: 600 !important;
 }
 .fintech-btn:disabled {
-  opacity: 0.5;
+  background-color: var(--fintech-surface-muted) !important;
+  color: var(--fintech-text-secondary) !important;
 }
 .fintech-btn mat-spinner {
   display: inline-block;
@@ -64,11 +65,14 @@ mat-card {
   overflow: hidden;
 }
 
-/* ── Loading / Empty ── */
+/* ── Loading / empty ── */
 .loading-spinner {
   display: flex;
   justify-content: center;
   padding: 48px 0;
+}
+.state-alert {
+  padding: 20px;
 }
 .empty-state {
   display: flex;
@@ -81,31 +85,27 @@ mat-card {
 .empty-state button {
   margin-top: 20px;
 }
-.empty-icon.error-icon {
-  color: var(--fintech-danger);
-  opacity: 1;
-}
 .empty-icon {
-  font-size: 56px;
-  width: 56px;
-  height: 56px;
+  font-size: 3.5rem;
+  width: 3.5rem;
+  height: 3.5rem;
   margin-bottom: 16px;
-  opacity: 0.25;
+  color: var(--fintech-text-tertiary);
 }
 .empty-state p {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 500;
   margin: 0 0 4px 0;
   color: var(--fintech-text);
 }
 .empty-hint {
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--fintech-text-secondary);
   max-width: 420px;
   line-height: 1.5;
 }
 
-/* ── Notification List ── */
+/* ── Notification list ── */
 .notif-list {
   display: flex;
   flex-direction: column;
@@ -117,19 +117,12 @@ mat-card {
 .notif-item {
   padding: 16px 20px;
   transition: background 0.12s;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--fintech-border);
 }
 .notif-item:last-child { border-bottom: none; }
-.notif-item:hover { background: #fafafa; }
-
-.notif-item.unread {
-  background: #f7fcf9;
-}
-.notif-item.unread:hover { background: #eef8f2; }
-
-.notif-item.expanded {
-  background: #fafafa;
-}
+.notif-item:hover,
+.notif-item.expanded { background: var(--fintech-surface-subtle); }
+.notif-item.unread { background: var(--fintech-info-bg); }
 
 /* ── Row ── */
 .notif-row {
@@ -143,12 +136,19 @@ mat-card {
   display: flex;
   align-items: flex-start;
   gap: 14px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
   border-radius: 10px;
 }
 .notif-chevron {
   flex-shrink: 0;
-  color: #9e9e9e;
+  color: var(--fintech-text-tertiary);
   margin-top: 10px;
 }
 
@@ -156,29 +156,30 @@ mat-card {
 .notif-icon-wrapper {
   position: relative;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f0f0;
-  color: #666;
   margin-top: 2px;
 }
-.notif-icon-wrapper[data-type="configuration"] { background: #e8eaf6; color: #3949ab; }
-.notif-icon-wrapper[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
-.notif-icon-wrapper[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
-.notif-icon-wrapper[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
-.notif-icon-wrapper[data-type="report"]        { background: #e0f2f1; color: #00695c; }
+/* Category colors are a supplement: every row also shows the category name. */
+.notif-icon-wrapper,
+.notif-category { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+[data-type="configuration"] { background: var(--fintech-purple-bg); color: var(--fintech-purple); }
+[data-type="transfer"] { background: var(--fintech-info-bg); color: var(--fintech-info); }
+[data-type="transaction"] { background: var(--fintech-pink-bg); color: var(--fintech-pink); }
+[data-type="standard"] { background: var(--fintech-teal-bg); color: var(--fintech-teal); }
 
+/* Unread marker: blue like other unread badges; green stays for success and live states. */
 .notif-dot {
   position: absolute;
   top: -2px;
   right: -2px;
   width: 10px;
   height: 10px;
-  background: var(--fintech-accent);
+  background: var(--fintech-info);
   border-radius: 50%;
   border: 2px solid var(--fintech-surface);
 }
@@ -188,15 +189,19 @@ mat-card {
   flex: 1;
   min-width: 0;
 }
+.notif-title,
+.notif-description {
+  display: block;
+}
 .notif-title {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--fintech-text);
   margin-bottom: 2px;
   line-height: 1.3;
 }
 .notif-description {
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--fintech-text-secondary);
   line-height: 1.4;
   margin-bottom: 6px;
@@ -207,7 +212,7 @@ mat-card {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
 }
 .notif-category {
@@ -215,17 +220,8 @@ mat-card {
   padding: 1px 7px;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  background: #eee;
-  color: #666;
+  font-size: 0.75rem;
 }
-.notif-category[data-type="configuration"] { background: #e8eaf6; color: #3949ab; }
-.notif-category[data-type="transfer"]      { background: #e3f2fd; color: #1565c0; }
-.notif-category[data-type="transaction"]   { background: #fff3e0; color: #e65100; }
-.notif-category[data-type="standard"]      { background: #e8f5e9; color: #2e7d32; }
-.notif-category[data-type="report"]        { background: #e0f2f1; color: #00695c; }
 .notif-time {
   white-space: nowrap;
 }
@@ -241,27 +237,30 @@ mat-card {
   color: var(--fintech-text-secondary);
   transition: color 0.15s;
 }
-.notif-ack-btn:hover { color: var(--fintech-accent); }
+.notif-ack-btn:hover { color: var(--fintech-text); }
 .notif-ack-btn mat-spinner { margin: auto; }
 .notif-read-label {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
   padding: 10px 8px;
 }
 .notif-read-label mat-icon {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+}
+.row-alert {
+  margin-top: 12px;
 }
 
-/* ── Expanded Detail ── */
+/* ── Expanded detail ── */
 .notif-detail {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--fintech-border);
   user-select: text;
 }
 .notif-detail-grid {
@@ -280,38 +279,35 @@ mat-card {
   gap: 2px;
 }
 .detail-key {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
-  font-weight: 500;
+  font-weight: 600;
 }
 .detail-value {
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--fintech-text);
 }
 .detail-value.mono {
   font-family: var(--fintech-font-mono);
-  font-size: 12px;
+  font-size: 0.8125rem;
   word-break: break-all;
 }
 .raw-json-toggle {
-  font-size: 12px;
   margin-bottom: 10px;
 }
 .raw-json-toggle mat-icon {
   margin-right: 6px;
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
 }
 .json-preview {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--fintech-code-bg);
+  color: var(--fintech-code-text);
   padding: 16px;
   border-radius: 10px;
   font-family: var(--fintech-font-mono);
-  font-size: 12px;
+  font-size: 0.8125rem;
   line-height: 1.5;
   overflow: auto;
   max-height: 400px;
@@ -323,20 +319,20 @@ mat-card {
   cursor: text;
 }
 
-/* ── Dev Tools ── */
+/* ── Dev tools ── */
 .devtools-section {
   margin-top: 8px;
 }
 .devtools-toggle {
   color: var(--fintech-text-secondary);
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 500;
 }
 .devtools-toggle mat-icon {
   margin-right: 6px;
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 .devtools-card {
   padding: 20px !important;
@@ -344,13 +340,13 @@ mat-card {
 }
 .devtools-label {
   display: block;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--fintech-text);
   margin-bottom: 4px;
 }
 .devtools-hint {
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--fintech-text-secondary);
   margin: 0 0 12px 0;
 }
@@ -359,18 +355,36 @@ mat-card {
   min-height: 180px;
   padding: 14px;
   font-family: var(--fintech-font-mono);
-  font-size: 12px;
+  font-size: max(1rem, 16px);
   line-height: 1.5;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
+  background: var(--fintech-surface-subtle);
+  border: 1px solid var(--fintech-border-strong);
   border-radius: 10px;
   color: var(--fintech-text);
   resize: vertical;
-  outline: none;
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
+.json-editor::placeholder { color: var(--fintech-text-secondary); }
 .json-editor:focus { border-color: var(--fintech-primary); }
+.json-editor[aria-invalid="true"] { border-color: var(--fintech-danger); }
+.field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: var(--fintech-danger);
+}
+.field-error mat-icon {
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.send-alert {
+  margin-top: 12px;
+}
 .devtools-actions {
   display: flex;
   justify-content: flex-end;
@@ -395,9 +409,9 @@ mat-card {
     grid-template-columns: 1fr;
   }
   .json-preview {
-    font-size: 11px;
     padding: 12px;
     max-height: 60vh;
+    max-height: 60dvh;
   }
 }
 

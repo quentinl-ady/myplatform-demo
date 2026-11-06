@@ -1,6 +1,5 @@
 import { Component, OnInit, OnDestroy, signal, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MaterialModule } from '../material.module';
 import { CommonModule } from '@angular/common';
@@ -8,12 +7,12 @@ import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { WebhookService } from '../services';
 import { WebhookEvent } from '../models';
-import { formatDateTime, formatTimeAgo, httpErrorMessage } from '../shared';
+import { InlineAlertComponent, NotifyService, formatDateTime, formatTimeAgo, httpErrorMessage } from '../shared';
 
 @Component({
   selector: 'app-webhooks',
   standalone: true,
-  imports: [CommonModule, MaterialModule, FormsModule],
+  imports: [CommonModule, MaterialModule, FormsModule, InlineAlertComponent],
   templateUrl: './webhooks.component.html',
   styleUrl: './webhooks.component.css'
 })
@@ -22,7 +21,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
 
   private route = inject(ActivatedRoute);
   private webhookService = inject(WebhookService);
-  private snackBar = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private liveAnnouncer = inject(LiveAnnouncer);
 
   userId = '';
@@ -32,6 +31,12 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   readonly pushing = signal(false);
   readonly acknowledgingAll = signal(false);
   readonly acknowledgingIds = signal<ReadonlySet<number>>(new Set());
+  /** Field error of the payload editor (invalid JSON). */
+  jsonError = '';
+  sendError = '';
+  ackAllError = '';
+  /** Failed "Mark as read" on a single row, shown under that row. */
+  ackError: { id: number; message: string } | null = null;
   expandedEventId: number | null = null;
   showRawJsonId: number | null = null;
   filter: 'all' | 'unread' = 'all';
@@ -117,7 +122,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       },
       error: err => {
         if (isFullLoad || !this.initialLoadDone) {
-          this.loadError.set(httpErrorMessage(err, 'We could not load your notifications.'));
+          this.loadError.set(httpErrorMessage(err, 'Unable to load the notifications. Try again.'));
         }
         this.loading.set(false);
       }
@@ -145,31 +150,36 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     }
   }
 
+  onJsonInputChange() {
+    this.jsonError = '';
+  }
+
   pushEvent() {
+    if (this.pushing()) return;
+    this.sendError = '';
     try {
       JSON.parse(this.jsonInput);
     } catch {
-      this.snackBar.open('The payload is not valid JSON.', 'Close', { duration: 4000, panelClass: 'fintech-snack-error' });
+      this.jsonError = 'The payload isn\'t valid JSON. Check the brackets and quotes.';
+      // After the error renders, so aria-describedby already includes it when focus lands.
+      setTimeout(() => document.getElementById('webhook-json')?.focus());
       return;
     }
 
     this.pushing.set(true);
     this.webhookService.pushWebhook(this.jsonInput).subscribe({
       next: event => {
-        this.snackBar.open(
+        this.notify.success(
           event.userId
             ? `Test event received and matched to user ${event.userId}.`
-            : 'Test event received, but it did not match any user.',
-          'Close', { duration: 4000, panelClass: 'fintech-snack-success' }
+            : 'Test event received. It doesn\'t match any user.'
         );
         this.pushing.set(false);
         this.webhookService.notifyWebhookReceived();
         this.loadEvents();
       },
       error: err => {
-        this.snackBar.open(httpErrorMessage(err, 'The test event could not be sent.'), 'Close', {
-          duration: 5000, panelClass: 'fintech-snack-error'
-        });
+        this.sendError = httpErrorMessage(err, 'Check the payload, then try again.');
         this.pushing.set(false);
       }
     });
@@ -188,6 +198,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
   acknowledgeEvent(event: WebhookEvent) {
     if (this.isAcknowledging(event)) return;
     this.setAcknowledging(event.id, true);
+    if (this.ackError?.id === event.id) this.ackError = null;
     this.webhookService.acknowledgeEvent(event.id).subscribe({
       next: () => {
         event.acknowledged = true;
@@ -197,9 +208,7 @@ export class WebhooksComponent implements OnInit, OnDestroy {
       },
       error: err => {
         this.setAcknowledging(event.id, false);
-        this.snackBar.open(httpErrorMessage(err, 'The notification could not be marked as read.'), 'Close', {
-          duration: 5000, panelClass: 'fintech-snack-error'
-        });
+        this.ackError = { id: event.id, message: httpErrorMessage(err, 'The notification is still unread. Try again.') };
       }
     });
   }
@@ -208,21 +217,17 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     const count = this.unreadCount;
     if (!count || this.acknowledgingAll()) return;
     this.acknowledgingAll.set(true);
+    this.ackAllError = '';
     this.webhookService.acknowledgeAll(this.userId).subscribe({
       next: () => {
         this.events.forEach(ev => ev.acknowledged = true);
         this.acknowledgingAll.set(false);
         this.webhookService.notifyWebhookReceived();
-        this.snackBar.open(
-          count === 1 ? '1 notification marked as read.' : `${count} notifications marked as read.`,
-          'Close', { duration: 3000, panelClass: 'fintech-snack-success' }
-        );
+        this.notify.success(count === 1 ? '1 notification marked as read.' : `${count} notifications marked as read.`);
       },
       error: err => {
         this.acknowledgingAll.set(false);
-        this.snackBar.open(httpErrorMessage(err, 'Notifications could not be marked as read.'), 'Close', {
-          duration: 5000, panelClass: 'fintech-snack-error'
-        });
+        this.ackAllError = httpErrorMessage(err, 'The notifications are still unread. Try again.');
       }
     });
   }
@@ -232,11 +237,6 @@ export class WebhooksComponent implements OnInit, OnDestroy {
     if (selection && selection.toString().length > 0) {
       return;
     }
-    this.toggleExpand(event);
-  }
-
-  onRowKeydown(event: WebhookEvent, e: Event) {
-    e.preventDefault();
     this.toggleExpand(event);
   }
 

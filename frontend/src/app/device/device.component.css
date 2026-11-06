@@ -7,7 +7,7 @@
 }
 
 .header-section h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--fintech-text);
   margin: 0 0 8px 0;
@@ -15,7 +15,7 @@
 }
 .header-section p {
   color: var(--fintech-text-secondary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin: 0;
 }
 
@@ -28,7 +28,7 @@ mat-card {
 
 /* Device List */
 .section-title {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--fintech-text);
   margin: 8px 0 4px 0;
@@ -53,8 +53,8 @@ mat-card {
   min-width: 0;
 }
 .device-icon {
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   background: var(--fintech-bg);
   border-radius: 12px;
   display: flex;
@@ -71,12 +71,12 @@ mat-card {
 }
 .device-details h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--fintech-text);
 }
 .device-meta {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
   overflow-wrap: anywhere;
 }
@@ -85,15 +85,15 @@ mat-card {
   align-items: flex-start;
   gap: 6px;
   margin: 2px 0 4px;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 0.8125rem;
+  line-height: 1.4;
   color: var(--fintech-text);
 }
 .device-approval mat-icon {
   flex-shrink: 0;
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
   color: var(--fintech-text-secondary);
 }
 .mono {
@@ -120,8 +120,8 @@ mat-card {
   align-items: center;
 }
 .empty-icon-wrapper {
-  width: 64px;
-  height: 64px;
+  width: 4rem;
+  height: 4rem;
   background: var(--fintech-bg);
   color: var(--fintech-text-secondary);
   border-radius: 50%;
@@ -131,18 +131,18 @@ mat-card {
   margin-bottom: 20px;
 }
 .empty-icon-wrapper mat-icon {
-  font-size: 32px;
-  width: 32px;
-  height: 32px;
+  font-size: 2rem;
+  width: 2rem;
+  height: 2rem;
 }
 .empty-state h2 {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   margin: 0 0 8px 0;
   color: var(--fintech-text);
 }
 .empty-state p {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--fintech-text-secondary);
   margin: 0;
   max-width: 320px;

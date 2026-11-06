@@ -20,7 +20,7 @@ export class BusinessLoansComponent extends PlatformExperiencePage {
   readonly pageDescription = 'See your business financing offers and follow your active loans.';
   readonly itemLabel = 'loans';
   readonly containerId = 'capital-overview-container';
-  protected readonly errorFallback = 'We could not open a loans session with Adyen. Please try again.';
+  protected readonly errorFallback = 'Unable to open a loans session with Adyen. Try again.';
 
   protected requestSession(userId: string) {
     return this.sessionService.getBusinessLoans(userId);

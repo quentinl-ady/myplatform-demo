@@ -32,7 +32,7 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
 
       <div class="remote-state" *ngIf="creating()" role="status">
         <mat-spinner diameter="28" aria-hidden="true"></mat-spinner>
-        <p class="state-text">Preparing the QR code...</p>
+        <p class="state-text">Preparing the QR code…</p>
       </div>
 
       <ng-container *ngIf="!creating() && createError()">
@@ -40,7 +40,7 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
           <mat-icon aria-hidden="true">error_outline</mat-icon>
           <span>{{ createError() }}</span>
         </div>
-        <button type="button" class="remote-btn" (click)="again()">Try again</button>
+        <button type="button" class="remote-btn secondary" (click)="again()">Try again</button>
       </ng-container>
 
       <ng-container *ngIf="!creating() && current() as s">
@@ -51,6 +51,7 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
             <span>{{ linkProblem }}</span>
           </div>
           <div class="qr-block">
+            <!-- Dark modules on a white quiet zone in both color schemes: scanners need it. -->
             <svg *ngIf="qr() as code" class="qr" [attr.viewBox]="'0 0 ' + code.size + ' ' + code.size"
                  role="img" aria-label="QR code to scan with your phone" shape-rendering="crispEdges">
               <rect [attr.width]="code.size" [attr.height]="code.size" fill="#fff"></rect>
@@ -96,7 +97,7 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
           <div class="state-icon" aria-hidden="true"><mat-icon>{{ s.status === 'declined' ? 'block' : 'timer_off' }}</mat-icon></div>
           <p class="state-title">{{ endTitle(s) }}</p>
           <p class="state-text">{{ endText(s) }}</p>
-          <button type="button" class="remote-btn" (click)="again()">Show a new QR code</button>
+          <button type="button" class="remote-btn secondary" (click)="again()">Show a new QR code</button>
         </div>
 
       </ng-container>
@@ -123,12 +124,13 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
       padding: 6px;
       border: 1px solid var(--fintech-border);
       border-radius: 12px;
-      background: #fff;
+      /* Stays white in dark mode: QR scanners need a light quiet zone. */
+      background: #ffffff;
     }
     .qr-text, .state-text {
       margin: 0;
       max-width: 340px;
-      font-size: 13px;
+      font-size: 0.8125rem;
       line-height: 1.5;
       color: var(--fintech-text-secondary);
     }
@@ -140,8 +142,8 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
       padding: 8px 0;
     }
     .state-icon {
-      width: 48px;
-      height: 48px;
+      width: 3rem;
+      height: 3rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -152,13 +154,13 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
     .state-icon.done { background: var(--fintech-success-bg); color: var(--fintech-success); }
     .state-title {
       margin: 0;
-      font-size: 15px;
+      font-size: 0.9375rem;
       font-weight: 600;
       color: var(--fintech-text);
     }
     .countdown {
       margin: 0;
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--fintech-text-secondary);
       font-variant-numeric: tabular-nums;
     }
@@ -172,23 +174,28 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
       border-radius: 10px;
       background: var(--fintech-warning-bg);
       color: var(--fintech-text);
-      font-size: 13px;
+      font-size: 0.8125rem;
       line-height: 1.4;
       text-align: left;
     }
-    .remote-alert mat-icon { color: var(--fintech-warning); font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+    .remote-alert mat-icon { color: var(--fintech-warning); font-size: 1.125rem; width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
     .remote-alert.error { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
     .remote-alert.error mat-icon { color: var(--fintech-danger); }
     .remote-btn {
+      min-height: 40px;
       border: none;
       border-radius: 24px;
       padding: 8px 20px;
       font: inherit;
-      font-size: 14px;
+      font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
       background: var(--fintech-primary);
-      color: #fff;
+      color: var(--fintech-on-primary);
+    }
+    .remote-btn.secondary {
+      background: var(--fintech-surface-muted);
+      color: var(--fintech-text);
     }
     .link-btn {
       display: inline-flex;
@@ -198,13 +205,17 @@ export function isRemoteSessionActive(session: RemoteSession | null | undefined)
       background: none;
       padding: 4px 8px;
       font: inherit;
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--fintech-text-secondary);
       cursor: pointer;
       border-radius: 8px;
     }
     .link-btn:hover { color: var(--fintech-text); background: var(--fintech-bg); }
-    .link-btn mat-icon { font-size: 16px; width: 16px; height: 16px; }
+    .link-btn mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+    @media (pointer: coarse) {
+      .remote-btn,
+      .link-btn { min-height: 44px; }
+    }
   `]
 })
 export class RemoteSessionPanelComponent implements OnInit, OnChanges, OnDestroy {
@@ -325,7 +336,7 @@ export class RemoteSessionPanelComponent implements OnInit, OnChanges, OnDestroy
       },
       error: (err) => {
         this.creating.set(false);
-        this.createError.set(httpErrorMessage(err, "Couldn't prepare the QR code. Try again."));
+        this.createError.set(httpErrorMessage(err, "Unable to prepare the QR code. Try again."));
       }
     });
   }

@@ -1,9 +1,8 @@
 import { Component, OnDestroy, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import * as forge from 'node-forge';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -16,12 +15,15 @@ import {
   AddTransactionRuleRequest
 } from '../models';
 import { IssuingService } from '../services';
-import { ConfirmService, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
+import { ConfirmService, InlineAlertComponent, NotifyService, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 import { FormatCardNumberPipe } from './format-card-number.pipe';
 import { MCC_CODES } from '../industry-codes';
 
 type Mcc = { code: string; label: string; risky?: boolean };
 type CardAction = 'suspend' | 'activate' | 'close';
+type PageError = { title: string; message: string; retry?: () => void };
+
+const STATUS_LABELS: Record<string, string> = { active: 'Active', suspended: 'Suspended', closed: 'Closed' };
 
 const REVEAL_DURATION_MS = 30000;
 
@@ -35,6 +37,8 @@ const REVEAL_DURATION_MS = 30000;
     MatMenuModule,
     MatAutocompleteModule,
     A11yModule,
+    RouterLink,
+    InlineAlertComponent,
     FormatCardNumberPipe
   ],
   templateUrl: './card-list.component.html',
@@ -42,9 +46,8 @@ const REVEAL_DURATION_MS = 30000;
 })
 export class CardListComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
   private issuingService = inject(IssuingService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
   private confirmService = inject(ConfirmService);
@@ -71,6 +74,12 @@ export class CardListComponent implements OnInit, OnDestroy {
   /** Card currently being updated, so its actions can show a spinner and be disabled. */
   busyCard: { id: string; action: CardAction } | null = null;
   busyRuleId: string | null = null;
+
+  /** A failed card action, shown under the card it is about. */
+  cardError: (PageError & { id: string }) | null = null;
+  /** A failed rule update or refresh, shown at the top of the rules panel. */
+  rulesError: PageError | null = null;
+  addRuleError: string | null = null;
 
   revealedCardId?: string;
   revealedData?: { pan: string; cvc: string; expiryMonth: string; expiryYear: string };
@@ -126,7 +135,7 @@ export class CardListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isLoadingActive = false;
-        this.loadError = httpErrorMessage(err, "Couldn't load your cards. Try again.");
+        this.loadError = httpErrorMessage(err, "The cards couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -145,7 +154,7 @@ export class CardListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isLoadingClosed = false;
-        this.closedCardsError = httpErrorMessage(err, "Couldn't load closed cards. Try again.");
+        this.closedCardsError = httpErrorMessage(err, "The closed cards couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -192,14 +201,6 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  navigateToCreate() {
-    this.router.navigate(['/', this.userId, 'card-create']);
-  }
-
-  viewTransactions() {
-    this.router.navigate(['/', this.userId, 'card-transactions']);
-  }
-
   isSelected(card: CardResponse): boolean {
     return this.selectedCard?.paymentInstrumentId === card.paymentInstrumentId;
   }
@@ -218,6 +219,10 @@ export class CardListComponent implements OnInit, OnDestroy {
     return year === null || year === undefined ? '' : String(year).slice(-2);
   }
 
+  statusLabel(status: string | undefined): string {
+    return STATUS_LABELS[status || ''] ?? 'Unknown status';
+  }
+
   brandLabel(card: CardResponse): string {
     return card.brand === 'visa' ? 'Visa' : card.brand === 'mc' ? 'Mastercard' : (card.brand || 'Card');
   }
@@ -233,6 +238,7 @@ export class CardListComponent implements OnInit, OnDestroy {
     }
 
     this.hideRevealedData();
+    this.cardError = null;
     this.isRevealing = true;
     this.cdr.detectChanges();
 
@@ -281,7 +287,7 @@ export class CardListComponent implements OnInit, OnDestroy {
       }, REVEAL_DURATION_MS);
     } catch (error) {
       this.isRevealing = false;
-      this.showError(httpErrorMessage(error, "Couldn't reveal the card details. Try again."));
+      this.showCardError(card, 'Unable to reveal the card details', httpErrorMessage(error, "The card details couldn't be revealed. Try again."), () => this.revealCardDetails(card));
       this.cdr.detectChanges();
     }
   }
@@ -299,18 +305,23 @@ export class CardListComponent implements OnInit, OnDestroy {
     const text = `${this.revealedData.pan}\t${expiry}\t${this.revealedData.cvc}\t${card.cardholderName}`;
     try {
       await navigator.clipboard.writeText(text);
-      this.snack.open('Card details copied', 'Close', { duration: 2000, panelClass: 'fintech-snack-success' });
+      this.notify.success('Card details copied');
     } catch {
-      this.showError("Couldn't copy to the clipboard. Copy the details manually.");
+      this.showCardError(card, 'Unable to copy the card details', 'The clipboard is not available. Copy the details from the card manually.');
     }
   }
 
+  /** Suspending is reversible, so it is confirmed with an Undo action rather than a dialog. */
   suspendCard(card: CardResponse) {
-    this.updateStatus(card, 'suspend', 'suspended', 'Card suspended', "Couldn't suspend the card. Try again.");
+    this.updateStatus(card, 'suspend', 'suspended', "The card couldn't be suspended. Try again.", updated => {
+      this.notify.undoable(`Card ending ${card.lastFour} suspended`, () => this.activateCard(updated));
+    });
   }
 
   activateCard(card: CardResponse) {
-    this.updateStatus(card, 'activate', 'active', 'Card reactivated', "Couldn't reactivate the card. Try again.");
+    this.updateStatus(card, 'activate', 'active', "The card couldn't be reactivated. Try again.", () => {
+      this.notify.success(`Card ending ${card.lastFour} reactivated`);
+    });
   }
 
   async closeCard(card: CardResponse) {
@@ -322,15 +333,20 @@ export class CardListComponent implements OnInit, OnDestroy {
         { label: 'Cardholder', value: card.cardholderName }
       ],
       confirmText: 'Close card',
+      cancelText: 'Cancel',
       danger: true
     });
     if (!confirmed) return;
-    this.updateStatus(card, 'close', 'closed', 'Card closed', "Couldn't close the card. Try again.");
+    this.updateStatus(card, 'close', 'closed', "The card couldn't be closed. Try again.", () => {
+      this.notify.success(`Card ending ${card.lastFour} closed`);
+    });
   }
 
-  private updateStatus(card: CardResponse, action: CardAction, status: string, successMessage: string, errorFallback: string) {
+  private updateStatus(card: CardResponse, action: CardAction, status: string, errorFallback: string,
+                       onSuccess: (updated: CardResponse) => void) {
     if (this.busyCard) return;
     this.busyCard = { id: card.paymentInstrumentId, action };
+    if (this.cardError?.id === card.paymentInstrumentId) this.cardError = null;
     this.cdr.detectChanges();
 
     this.issuingService.updateCardStatus(card.paymentInstrumentId, status).subscribe({
@@ -353,12 +369,18 @@ export class CardListComponent implements OnInit, OnDestroy {
         }
         this.busyCard = null;
         this.filterCards(this.searchControl.value || '');
-        this.snack.open(successMessage, 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        onSuccess(updated);
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.busyCard = null;
-        this.showError(httpErrorMessage(err, errorFallback));
+        const titles: Record<CardAction, string> = {
+          suspend: 'Unable to suspend the card',
+          activate: 'Unable to reactivate the card',
+          close: 'Unable to close the card'
+        };
+        const retry = action === 'close' ? undefined : () => this.updateStatus(card, action, status, errorFallback, onSuccess);
+        this.showCardError(card, titles[action], httpErrorMessage(err, errorFallback), retry);
         this.cdr.detectChanges();
       }
     });
@@ -368,6 +390,7 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.rulesPanelOpener = (event?.currentTarget as HTMLElement | null) ?? (document.activeElement as HTMLElement | null);
     this.selectedCard = card;
     this.resetRuleForm();
+    this.rulesError = null;
     this.showRulesPanel = true;
     this.cdr.detectChanges();
   }
@@ -468,17 +491,18 @@ export class CardListComponent implements OnInit, OnDestroy {
     }
 
     this.isAddingRule = true;
+    this.addRuleError = null;
     this.cdr.detectChanges();
     this.issuingService.addTransactionRule(request).subscribe({
       next: () => {
-        this.snack.open('Rule added', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Rule added');
         this.isAddingRule = false;
         this.resetRuleForm(type);
         this.refreshCardRules();
       },
       error: (err) => {
         this.isAddingRule = false;
-        this.showError(httpErrorMessage(err, "Couldn't add the rule. Try again."));
+        this.addRuleError = httpErrorMessage(err, "The rule couldn't be added. Check the value and try again.");
         this.cdr.detectChanges();
       }
     });
@@ -488,17 +512,22 @@ export class CardListComponent implements OnInit, OnDestroy {
     if (this.busyRuleId) return;
     const newStatus = rule.status === 'active' ? 'inactive' : 'active';
     this.busyRuleId = rule.id;
+    this.rulesError = null;
     this.cdr.detectChanges();
     this.issuingService.updateTransactionRule(rule.id, newStatus).subscribe({
       next: () => {
         rule.status = newStatus;
         this.busyRuleId = null;
-        this.snack.open(newStatus === 'active' ? 'Rule enabled' : 'Rule disabled', 'Close', { duration: 2000, panelClass: 'fintech-snack-success' });
+        this.notify.success(newStatus === 'active' ? 'Rule enabled' : 'Rule disabled');
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.busyRuleId = null;
-        this.showError(httpErrorMessage(err, "Couldn't update the rule. Try again."));
+        this.rulesError = {
+          title: 'Unable to update the rule',
+          message: httpErrorMessage(err, "The rule couldn't be updated. Try again."),
+          retry: () => this.toggleRuleStatus(rule)
+        };
         this.cdr.detectChanges();
       }
     });
@@ -520,21 +549,26 @@ export class CardListComponent implements OnInit, OnDestroy {
         ...(this.selectedCard ? [{ label: 'Card', value: `•••• ${this.selectedCard.lastFour}` }] : [])
       ],
       confirmText: 'Delete rule',
+      cancelText: 'Cancel',
       danger: true
     });
     if (!confirmed) return;
 
     this.busyRuleId = rule.id;
+    this.rulesError = null;
     this.cdr.detectChanges();
     this.issuingService.deleteTransactionRule(rule.id).subscribe({
       next: () => {
         this.busyRuleId = null;
-        this.snack.open('Rule deleted', 'Close', { duration: 2000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Rule deleted');
         this.refreshCardRules();
       },
       error: (err) => {
         this.busyRuleId = null;
-        this.showError(httpErrorMessage(err, "Couldn't delete the rule. Try again."));
+        this.rulesError = {
+          title: 'Unable to delete the rule',
+          message: httpErrorMessage(err, "The rule couldn't be deleted. Try again.")
+        };
         this.cdr.detectChanges();
       }
     });
@@ -558,7 +592,11 @@ export class CardListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isRefreshingRules = false;
-        this.showError(httpErrorMessage(err, "Couldn't refresh the card rules. Try again."));
+        this.rulesError = {
+          title: 'Unable to refresh the rules',
+          message: httpErrorMessage(err, "The card rules couldn't be refreshed. Try again."),
+          retry: () => this.refreshCardRules()
+        };
         this.cdr.detectChanges();
       }
     });
@@ -569,6 +607,7 @@ export class CardListComponent implements OnInit, OnDestroy {
   }
 
   private resetRuleForm(type: string = 'maxAmountPerTransaction') {
+    this.addRuleError = null;
     const value = this.ruleForm.get('value')!;
     value.setValidators(type === 'maxTransactions'
       ? [Validators.required, Validators.min(1), Validators.pattern(/^\d+$/)]
@@ -603,7 +642,19 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  private showError(message: string) {
-    this.snack.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
+  retryCardError() {
+    const retry = this.cardError?.retry;
+    this.cardError = null;
+    retry?.();
+  }
+
+  retryRulesError() {
+    const retry = this.rulesError?.retry;
+    this.rulesError = null;
+    retry?.();
+  }
+
+  private showCardError(card: CardResponse, title: string, message: string, retry?: () => void) {
+    this.cardError = { id: card.paymentInstrumentId, title, message, retry };
   }
 }

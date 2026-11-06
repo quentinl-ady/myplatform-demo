@@ -17,7 +17,7 @@ import { Router } from '@angular/router';
 import { MaterialModule } from '../material.module';
 import { AuthService } from '../services';
 import { INDUSTRY_CODES } from '../industry-codes';
-import { httpErrorMessage, httpStatus } from '../shared';
+import { InlineAlertComponent, httpErrorMessage, httpStatus } from '../shared';
 
 const EXTRA_OPTION_CONTROLS = ['capital', 'bank', 'issuing'] as const;
 
@@ -37,6 +37,7 @@ const FIELD_LABELS: Record<string, string> = {
         ReactiveFormsModule,
         FormsModule,
         MaterialModule,
+        InlineAlertComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './signup.component.html',
@@ -248,6 +249,11 @@ export class SignupComponent {
         return ind ? ind.label : code;
     }
 
+    dismissError() {
+        this.error = null;
+        this.cdr.markForCheck();
+    }
+
     togglePassword() {
         this.showPassword = !this.showPassword;
     }
@@ -314,7 +320,7 @@ export class SignupComponent {
                     this.signupSuccess.emit(res);
                 } else {
                     this.loading = false;
-                    this.error = 'We couldn\'t create your account. Please try again.';
+                    this.error = 'Unable to create the account. Try again.';
                 }
                 this.cdr.markForCheck();
             },
@@ -325,11 +331,11 @@ export class SignupComponent {
                     || body === 'ErrorEmailAlreadyExists'
                     || body?.error === 'ErrorEmailAlreadyExists';
                 if (emailTaken) {
-                    this.error = 'An account with this email address already exists. Log in instead or use another email.';
+                    this.error = 'An account with this email address already exists. Sign in instead or use another email.';
                 } else if (httpStatus(err) === 400) {
                     this.error = httpErrorMessage(err, 'Some details are invalid. Check the form and try again.');
                 } else {
-                    this.error = httpErrorMessage(err, 'We couldn\'t create your account. Please try again.');
+                    this.error = httpErrorMessage(err, 'Unable to create the account. Try again.');
                 }
                 this.cdr.markForCheck();
             },

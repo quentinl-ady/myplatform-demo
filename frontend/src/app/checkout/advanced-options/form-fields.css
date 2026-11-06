@@ -8,25 +8,25 @@
 .field label,
 .field-label {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--fintech-text-secondary);
   margin-bottom: 8px;
 }
 .fintech-input {
   width: 100%;
+  min-height: 44px;
   padding: 10px 14px;
-  border: 1px solid var(--fintech-border);
+  border: 1px solid var(--fintech-border-strong);
   border-radius: 10px;
   font: inherit;
-  font-size: 15px;
+  font-size: max(1rem, 16px);
   box-sizing: border-box;
   background: var(--fintech-surface);
   color: var(--fintech-text);
   transition: border-color 0.2s;
 }
 .fintech-input:focus {
-  outline: none;
   border-color: var(--fintech-primary);
 }
 .fintech-input[aria-invalid="true"] {
@@ -36,15 +36,21 @@
   max-width: 100%;
   flex-wrap: wrap;
 }
-.choice-toggle ::ng-deep .mat-button-toggle-label-content {
-  line-height: 36px;
-  padding: 0 14px;
-  font-size: 13px;
+:host .choice-toggle ::ng-deep .mat-button-toggle-label-content {
+  line-height: 1.4;
+  padding: 9px 14px;
+  font-size: 0.8125rem;
+}
+@media (pointer: coarse) {
+  :host .choice-toggle ::ng-deep .mat-button-toggle-label-content {
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
 }
 .helper-text {
   display: block;
   margin: 6px 0 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.45;
   color: var(--fintech-text-secondary);
 }

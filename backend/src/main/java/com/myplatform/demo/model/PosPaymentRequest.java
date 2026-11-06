@@ -11,4 +11,6 @@ public class PosPaymentRequest {
     Long amount;
     String currency;
     String terminalId;
+    /** Optional Nexo ServiceID chosen by the client so it can abort this payment later (1-10 alphanumeric characters). */
+    String serviceId;
 }

@@ -55,7 +55,7 @@ const FIELDS: Record<BankAccountFormat, FieldMeta[]> = {
       <div class="validation-status" role="status" *ngIf="check.checking || check.valid || check.error">
         <ng-container *ngIf="check.checking">
           <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
-          <span class="pending-text">Checking the bank details...</span>
+          <span class="pending-text">Checking the bank details…</span>
         </ng-container>
         <ng-container *ngIf="!check.checking && check.valid">
           <mat-icon class="status-icon success" aria-hidden="true">check_circle</mat-icon>
@@ -70,18 +70,21 @@ const FIELDS: Record<BankAccountFormat, FieldMeta[]> = {
   `,
   styles: [`
     .bank-fields { display: flex; flex-direction: column; gap: 16px; }
-    .test-account-btn { align-self: flex-start; border-radius: 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; background: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
-    .form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--fintech-text-secondary); margin-bottom: 6px; }
-    .fintech-input { width: 100%; padding: 14px 16px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface); transition: border-color 0.2s; font-family: var(--fintech-font-mono); }
-    .fintech-input:focus { outline: none; border-color: var(--fintech-primary); }
+    .test-account-btn { align-self: flex-start; border-radius: 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; background: var(--fintech-surface-muted) !important; color: var(--fintech-text) !important; border: none !important; }
+    .form-group label { display: block; font-size: 0.8125rem; font-weight: 500; color: var(--fintech-text-secondary); margin-bottom: 6px; }
+    .fintech-input { width: 100%; padding: 14px 16px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: max(1rem, 16px); box-sizing: border-box; background: var(--fintech-surface); color: var(--fintech-text); transition: border-color 0.2s; font-family: var(--fintech-font-mono); }
+    .fintech-input:focus { border-color: var(--fintech-primary); }
     .fintech-input[aria-invalid="true"] { border-color: var(--fintech-danger); }
-    .field-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--fintech-text-secondary); }
+    .field-hint { display: block; margin-top: 6px; font-size: 0.75rem; color: var(--fintech-text-secondary); }
     .field-hint.field-error { color: var(--fintech-danger); }
-    .validation-status { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; margin-top: -4px; }
-    .status-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
-    .status-icon.success, .success-text { color: #0a8f3f; }
+    .validation-status { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; font-weight: 500; margin-top: -4px; }
+    .status-icon { font-size: 1.125rem; width: 1.125rem; height: 1.125rem; flex-shrink: 0; }
+    .status-icon.success, .success-text { color: var(--fintech-success); }
     .status-icon.error, .error-text { color: var(--fintech-danger); }
     .pending-text { color: var(--fintech-text-secondary); }
+    @media (pointer: coarse) {
+      .test-account-btn { min-height: 44px; }
+    }
   `]
 })
 export class BankDetailsFieldsComponent {

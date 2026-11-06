@@ -2,7 +2,6 @@ import { Component, OnInit, OnDestroy, inject, ChangeDetectorRef, NgZone } from 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from "@angular/common";
 import { A11yModule } from '@angular/cdk/a11y';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatMenuModule } from '@angular/material/menu';
 import { Observable, Subscription } from 'rxjs';
 import { MaterialModule } from '../material.module';
@@ -15,11 +14,36 @@ import ScaWebauthn from '@adyen/bpscaweb';
 import { AccountStatement, BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
 import { AccountService, RemoteSessionService, TransferService } from "../services";
 import {
-  ApprovalChoice, ApprovalMode, MoneyPipe, approvalChoice, blobHttpErrorMessage, httpErrorMessage, saveApprovalMode,
-  scaErrorMessage
+  ApprovalChoice, ApprovalMode, InlineAlertComponent, MoneyPipe, NotifyService, approvalChoice, blobHttpErrorMessage,
+  httpErrorMessage, saveApprovalMode, scaErrorMessage
 } from '../shared';
 import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
 import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
+
+const STATUS_LABELS: Record<string, string> = {
+  booked: 'Booked',
+  pending: 'Pending',
+  received: 'Received',
+  authorised: 'Authorized',
+  refused: 'Refused',
+  failed: 'Failed',
+  transferred: 'Transferred',
+  returned: 'Returned',
+  captured: 'Captured',
+  expired: 'Expired',
+  cancelled: 'Cancelled'
+};
+
+/** "bankTransfer" or "BANK_TRANSFER" -> "Bank transfer", for values the backend sends as identifiers. */
+export function readableLabel(value: string | null | undefined): string {
+  if (!value) return '—';
+  const words = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function statusLabel(status: string | null | undefined): string {
+  return (status && STATUS_LABELS[status]) || readableLabel(status);
+}
 
 @Component({
   selector: 'app-transfer',
@@ -31,6 +55,7 @@ import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
     MaterialModule,
     MatMenuModule,
     MoneyPipe,
+    InlineAlertComponent,
     DeviceRegistrationComponent,
     AccountSetupStateComponent,
     RemoteSessionPanelComponent,
@@ -45,7 +70,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   private accountService = inject(AccountService);
   private transferService = inject(TransferService);
   private remoteSessions = inject(RemoteSessionService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private cdr = inject(ChangeDetectorRef);
   private ngZone = inject(NgZone);
 
@@ -57,6 +82,8 @@ export class TransferComponent implements OnInit, OnDestroy {
   statementsState: 'loading' | 'ready' | 'error' = 'loading';
   /** File name of the statement being downloaded. */
   downloadingStatement: string | null = null;
+  statementError = '';
+  private failedStatement: AccountStatement | null = null;
   private statementsRequest?: Subscription;
 
   accountState: LoadState = 'loading';
@@ -75,6 +102,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   transferDetail?: TransferDetail;
   isLoadingDetail = false;
   detailError = '';
+  private detailTransaction: BankTransaction | null = null;
 
   lastUpdated: number | null = null;
   private lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
@@ -82,6 +110,8 @@ export class TransferComponent implements OnInit, OnDestroy {
   readonly formatDate = formatDate;
   readonly formatDateTime = formatDateTime;
   readonly speedLabel = speedLabel;
+  readonly statusLabel = statusLabel;
+  readonly readableLabel = readableLabel;
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -118,7 +148,7 @@ export class TransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.accountState = failedLoadState(err);
-        this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your account. Try again.");
+        this.loadErrorMessage = httpErrorMessage(err, "The account couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -142,7 +172,7 @@ export class TransferComponent implements OnInit, OnDestroy {
           this.loadTransactions();
         } else {
           this.devicesState = failedLoadState(err);
-          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+          this.loadErrorMessage = httpErrorMessage(err, "The trusted devices couldn't be loaded. Try again.");
         }
         this.cdr.detectChanges();
       }
@@ -151,7 +181,7 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   onDeviceRegistered() {
     this.hasDevices = true;
-    this.snack.open('Device registered. You can now view your transactions.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
+    this.notify.success('Device registered. You can now view your transactions.');
     this.checkDevices(true);
     this.cdr.detectChanges();
   }
@@ -193,16 +223,16 @@ export class TransferComponent implements OnInit, OnDestroy {
             } else if (res.status === 'sca_required') {
               this.handleScaChallenge(res.authParam1, res.createdSince, res.createdUntil);
             } else {
-              this.failTransactions("Couldn't load your transactions: unexpected response. Try again.");
+              this.failTransactions("The transactions couldn't be loaded because of an unexpected response. Try again.");
             }
           });
         },
         error: (err) => {
-          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "Couldn't load your transactions. Try again.")));
+          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "The transactions couldn't be loaded. Try again.")));
         }
       });
     } catch (e) {
-      this.ngZone.run(() => this.failTransactions(scaErrorMessage(e, "Couldn't start the authentication. Try again.")));
+      this.ngZone.run(() => this.failTransactions(scaErrorMessage(e, "The authentication couldn't be started. Try again.")));
     }
   }
 
@@ -216,7 +246,7 @@ export class TransferComponent implements OnInit, OnDestroy {
           this.ngZone.run(() => this.onTransactionsLoaded(res.transactions));
         },
         error: (err) => {
-          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "Couldn't load your transactions. Try again.")));
+          this.ngZone.run(() => this.failTransactions(httpErrorMessage(err, "The transactions couldn't be loaded. Try again.")));
         }
       });
     } catch (e) {
@@ -258,11 +288,13 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.loadTransactions(true);
   }
 
+  /** Rows without a transfer are not buttons: the list says that no details are available for them. */
   openDetail(tx: BankTransaction) {
     if (!tx.transferId) {
-      this.snack.open('No transfer details are available for this transaction.', 'Close', { duration: 3000 });
+      this.notify.info('No transfer details are available for this transaction.');
       return;
     }
+    this.detailTransaction = tx;
     this.transferDetail = undefined;
     this.detailError = '';
     this.isLoadingDetail = true;
@@ -276,13 +308,18 @@ export class TransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isLoadingDetail = false;
-        this.detailError = httpErrorMessage(err, "Couldn't load the transfer details. Try again.");
+        this.detailError = httpErrorMessage(err, "The transfer details couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
   }
 
+  retryDetail() {
+    if (this.detailTransaction) this.openDetail(this.detailTransaction);
+  }
+
   closeDetail() {
+    this.detailTransaction = null;
     this.transferDetail = undefined;
     this.detailError = '';
     this.isLoadingDetail = false;
@@ -313,6 +350,8 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   downloadStatement(statement: AccountStatement) {
     this.downloadingStatement = statement.fileName;
+    this.statementError = '';
+    this.failedStatement = null;
     this.cdr.detectChanges();
     this.accountService.downloadStatement(this.userId, statement.fileName).subscribe({
       next: (blob) => {
@@ -321,12 +360,21 @@ export class TransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: async (err) => {
-        const message = await blobHttpErrorMessage(err, "Couldn't download the statement. Try again.");
+        this.statementError = await blobHttpErrorMessage(err, "The statement couldn't be downloaded. Try again.");
+        this.failedStatement = statement;
         this.downloadingStatement = null;
-        this.snack.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
         this.cdr.detectChanges();
       }
     });
+  }
+
+  retryStatement() {
+    if (this.failedStatement) this.downloadStatement(this.failedStatement);
+  }
+
+  dismissStatementError() {
+    this.statementError = '';
+    this.failedStatement = null;
   }
 
   /** "19 Oct 2026" for a daily statement, "1 Oct 2026 – 31 Oct 2026" for a longer period. */

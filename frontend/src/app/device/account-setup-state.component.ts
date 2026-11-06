@@ -32,16 +32,16 @@ export function combineLoadStates(...states: LoadState[]): LoadState {
 
     <div class="state-card" *ngIf="state === 'missing'">
       <div class="state-icon" aria-hidden="true"><mat-icon>account_balance</mat-icon></div>
-      <h2 class="state-title">Your business bank account isn't set up yet</h2>
+      <h2 class="state-title">Business bank account isn't set up yet</h2>
       <p class="state-text">Create it from the Onboarding page, then come back here to {{ purpose }}.</p>
-      <a class="state-btn" [routerLink]="['/', userId, 'dashboard']">Go to Onboarding</a>
+      <a class="state-btn" [routerLink]="['/', userId, 'dashboard']">Go to onboarding</a>
     </div>
 
     <div class="state-card" *ngIf="state === 'error'" role="alert">
       <div class="state-icon error" aria-hidden="true"><mat-icon>error_outline</mat-icon></div>
-      <h2 class="state-title">Couldn't load your account</h2>
+      <h2 class="state-title">Unable to load account</h2>
       <p class="state-text">{{ message || 'Something went wrong. Try again.' }}</p>
-      <button type="button" class="state-btn" (click)="retry.emit()">Retry</button>
+      <button type="button" class="state-btn secondary" (click)="retry.emit()">Try again</button>
     </div>
   `,
   styles: [`
@@ -58,8 +58,8 @@ export function combineLoadStates(...states: LoadState[]): LoadState {
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
     }
     .state-icon {
-      width: 64px;
-      height: 64px;
+      width: 4rem;
+      height: 4rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -68,10 +68,15 @@ export function combineLoadStates(...states: LoadState[]): LoadState {
       color: var(--fintech-text-secondary);
     }
     .state-icon.error { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
-    .state-icon mat-icon { font-size: 32px; width: 32px; height: 32px; }
-    .state-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--fintech-text); }
-    .state-text { margin: 0; max-width: 420px; font-size: 14px; line-height: 1.5; color: var(--fintech-text-secondary); }
+    .state-icon mat-icon { font-size: 2rem; width: 2rem; height: 2rem; }
+    .state-title { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--fintech-text); }
+    .state-text { margin: 0; max-width: 420px; font-size: 0.875rem; line-height: 1.5; color: var(--fintech-text-secondary); }
     .state-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      box-sizing: border-box;
       margin-top: 8px;
       border: none;
       border-radius: 24px;
@@ -81,7 +86,11 @@ export function combineLoadStates(...states: LoadState[]): LoadState {
       text-decoration: none;
       cursor: pointer;
       background: var(--fintech-primary);
-      color: #fff;
+      color: var(--fintech-on-primary);
+    }
+    .state-btn.secondary {
+      background: var(--fintech-surface-muted);
+      color: var(--fintech-text);
     }
   `]
 })
@@ -89,7 +98,7 @@ export class AccountSetupStateComponent {
   @Input() state: LoadState = 'loading';
   @Input() userId = '';
   @Input() message = '';
-  @Input() loadingText = 'Loading your account...';
+  @Input() loadingText = 'Loading account…';
   /** End of "come back here to …", e.g. "make transfers". */
   @Input() purpose = 'use this page';
   @Output() retry = new EventEmitter<void>();

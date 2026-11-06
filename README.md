@@ -22,7 +22,7 @@ MyPlatform Demo simulates a **marketplace / SaaS platform** that onboards sub-me
 |--------|-----------|
 | **Onboarding & KYC** | Legal Entity creation (Individual / Organization / Sole Proprietorship) · Hosted Onboarding Page · Capability tracking · Automated KYC dev-tool (doc upload, ToS, PCI) · Business Lines |
 | **Payments** | Store creation with split config · Payment method setup (Visa, MC, CB, Amex) · Checkout sessions with redirect · Tokenization (zero-auth) · Token payments (ContAuth) · Token deletion · Pay By Link · POS via Terminal API (Cloud) |
-| **Banking** | Bank account provisioning (IBAN / Account Number) · Balance display · Transfers (Regular & Instant) with country-aware format detection, async validation, Confirmation of Payee, SCA via WebAuthn · Auto-sweep (cron) · RIB PDF download (iText) |
+| **Banking** | Bank account provisioning (IBAN / Account Number) · Balance display · Transfers (Regular & Instant) with country-aware format detection, async validation, Confirmation of Payee, SCA via WebAuthn · Auto-sweep (cron) |
 | **Issuing** | Virtual card creation (Visa / MC) · Lifecycle mgmt (active / suspended / closed) · Card data reveal (RSA/AES) · Transaction rules (max txns, max amount, total cap, MCC blocking) · Transaction history · **Test Issued Cards** checkout (Visa/MC only, dedicated issuing credentials) |
 | **Capital** | Loan offers display & management via Adyen Capital component |
 | **Payouts** | Sweep/payout config to external bank accounts · Regular & instant |
@@ -265,9 +265,10 @@ Edit `backend/src/main/resources/application.properties`:
 | `adyen.merchantAccount` | Merchant account name |
 | `adyen.clientKey` | Client key for the frontend SDK |
 | `adyen.lemVersion` | LEM API version (default `v4`) |
-| `adyen.issuing.country` | Issuing country (e.g. `FR`) |
-| `adyen.issuing.visa.subvariant` | Visa brand variant |
-| `adyen.issuing.mastercard.subvariant` | Mastercard brand variant |
+| `adyen.issuing.card-ranges` | Card ranges (BINs) of the platform, in order of preference: `brandVariant:issuingCountryCode:currency`, comma-separated (e.g. `visa_debit_f:FR:EUR,mc_credit_mco:GB:GBP`). A card uses the first range of its network in the currency of its balance account, preferring the account holder's country. Networks without a range for that currency are greyed out on Create card |
+| `adyen.issuing.country` | Issuing country (e.g. `FR`), used when `adyen.issuing.card-ranges` is empty |
+| `adyen.issuing.visa.subvariant` | Visa brand variant, used when `adyen.issuing.card-ranges` is empty |
+| `adyen.issuing.mastercard.subvariant` | Mastercard brand variant, used when `adyen.issuing.card-ranges` is empty |
 | `adyen.issuing.pspApiKey` | PSP API key for issuing card payments |
 | `adyen.issuing.merchantAccount` | Merchant account for issuing payments |
 | `adyen.issuing.clientKey` | Client key for issuing checkout frontend |

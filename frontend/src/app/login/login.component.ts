@@ -4,12 +4,14 @@ import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MaterialModule } from '../material.module';
 import { AuthService } from '../services';
-import { httpErrorMessage, httpStatus } from '../shared';
+import { InlineAlertComponent, httpErrorMessage, httpStatus } from '../shared';
+
+const SIGN_IN_FAILED = 'Unable to sign in. Check your email and password, then try again.';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MaterialModule],
+  imports: [CommonModule, ReactiveFormsModule, MaterialModule, InlineAlertComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
@@ -41,6 +43,11 @@ export class LoginComponent {
     return !!c && c.invalid && (c.dirty || c.touched);
   }
 
+  dismissError() {
+    this.error = null;
+    this.cdr.markForCheck();
+  }
+
   togglePassword() {
     this.showPassword = !this.showPassword;
   }
@@ -61,15 +68,15 @@ export class LoginComponent {
           this.router.navigate([`/${res.id}/dashboard`]);
         } else {
           this.loading = false;
-          this.error = 'We couldn\'t log you in. Please try again.';
+          this.error = SIGN_IN_FAILED;
         }
         this.cdr.markForCheck();
       },
       error: (err) => {
         this.loading = false;
         this.error = httpStatus(err) === 401
-          ? 'Incorrect email or password'
-          : httpErrorMessage(err, 'We couldn\'t log you in. Please try again.');
+          ? 'Incorrect email or password. Check them and try again.'
+          : httpErrorMessage(err, SIGN_IN_FAILED);
         this.cdr.markForCheck();
       }
     });

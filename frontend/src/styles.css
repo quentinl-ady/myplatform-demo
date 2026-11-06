@@ -1,30 +1,153 @@
 /* Design tokens shared by every page. Components may still override them on
    :host, but overlays (dialogs, menus, snack bars) render outside component
-   hosts and rely on these global values. */
-:root {
+   hosts and rely on these global values.
+
+   Every color has a light, dark and increased-contrast value, so component
+   styles use these tokens rather than hex values. Text tokens keep at least
+   4.5:1 against --fintech-bg, --fintech-surface and their own -bg tint.
+   --fintech-text-tertiary reaches only 3:1: keep it for icons, chevrons and
+   large placeholders, never for text people need to read.
+
+   .fintech-light-island keeps the light values in dark mode: Adyen components
+   (Drop-in, KYC, platform experience) only ship light styles, so their
+   container stays light for their text to keep its contrast. */
+:root,
+.fintech-light-island {
+  color-scheme: light dark;
+
   --fintech-primary: #000000;
+  --fintech-on-primary: #ffffff;
   --fintech-bg: #f5f6f8;
   --fintech-surface: #ffffff;
+  --fintech-surface-subtle: #fafafa;
+  --fintech-surface-muted: #f0f0f0;
   --fintech-text: #1a1a1a;
-  --fintech-text-secondary: #737373;
+  --fintech-text-secondary: #666666;
+  --fintech-text-tertiary: #858585;
   --fintech-border: #e5e5e5;
+  --fintech-border-strong: #c7c7c7;
+  --fintech-overlay: rgba(0, 0, 0, 0.5);
   --fintech-radius: 16px;
-  --fintech-accent: #0abf53;
-  --fintech-success: #0abf53;
+
+  --fintech-success: #087a35;
   --fintech-success-bg: #e7f8ee;
-  --fintech-warning: #f57c00;
+  --fintech-success-border: #a5d6a7;
+  --fintech-warning: #b45309;
   --fintech-warning-bg: #fff3e0;
-  --fintech-danger: #d32f2f;
+  --fintech-warning-border: #f0c050;
+  --fintech-danger: #b71c1c;
   --fintech-danger-bg: #fdecea;
-  --fintech-info: #2563eb;
-  --fintech-info-bg: #eff6ff;
+  --fintech-danger-bg-subtle: #fff7f7;
+  --fintech-danger-border: #f5c2c0;
+  --fintech-info: #1d5fd1;
+  --fintech-info-bg: #eaf2ff;
+  --fintech-info-border: #bfdbfe;
+  --fintech-purple: #7e22ce;
+  --fintech-purple-bg: #f5edff;
+  --fintech-pink: #a3134f;
+  --fintech-pink-bg: #fdeaf2;
+  --fintech-teal: #0f6e66;
+  --fintech-teal-bg: #e3f5f2;
+
+  /* Bright fills for decoration only (live dot, progress, accent borders):
+     they fail text contrast, so never put text on them or use them as text. */
+  --fintech-success-fill: #0abf53;
+  --fintech-warning-fill: #f59e0b;
+  --fintech-accent: var(--fintech-success-fill);
+
+  /* Text and icons drawn on a solid primary or status fill
+     (for example background: var(--fintech-danger)). */
+  --fintech-on-success: var(--fintech-on-primary);
+  --fintech-on-warning: var(--fintech-on-primary);
+  --fintech-on-danger: var(--fintech-on-primary);
+  --fintech-on-info: var(--fintech-on-primary);
+
+  /* Code and JSON blocks stay dark in both appearances. */
+  --fintech-code-bg: #1e1e1e;
+  --fintech-code-text: #d4d4d4;
+
   --fintech-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --fintech-font-mono: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fintech-primary: #ffffff;
+    --fintech-on-primary: #000000;
+    --fintech-bg: #0f0f10;
+    --fintech-surface: #1c1c1e;
+    --fintech-surface-subtle: #232325;
+    --fintech-surface-muted: #2c2c2e;
+    --fintech-text: #f5f5f7;
+    --fintech-text-secondary: #a1a1a6;
+    --fintech-text-tertiary: #8e8e93;
+    --fintech-border: #38383a;
+    --fintech-border-strong: #545456;
+    --fintech-overlay: rgba(0, 0, 0, 0.7);
+
+    --fintech-success: #3ddc84;
+    --fintech-success-bg: #12301f;
+    --fintech-success-border: #1f5c38;
+    --fintech-warning: #ffb547;
+    --fintech-warning-bg: #3a2a12;
+    --fintech-warning-border: #6b5220;
+    --fintech-danger: #ff7b72;
+    --fintech-danger-bg: #3b1a1a;
+    --fintech-danger-bg-subtle: #2a1717;
+    --fintech-danger-border: #6b2a2a;
+    --fintech-info: #6cb1ff;
+    --fintech-info-bg: #132a47;
+    --fintech-info-border: #23446e;
+    --fintech-purple: #cf9bff;
+    --fintech-purple-bg: #2f1d47;
+    --fintech-pink: #ff8cc6;
+    --fintech-pink-bg: #3d1b2e;
+    --fintech-teal: #4fd1c5;
+    --fintech-teal-bg: #10302d;
+
+    --fintech-success-fill: #3ddc84;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  .fintech-light-island {
+    --fintech-text-secondary: #404040;
+    --fintech-text-tertiary: #595959;
+    --fintech-border: #8c8c8c;
+    --fintech-border-strong: #595959;
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --fintech-text-secondary: #d1d1d6;
+    --fintech-text-tertiary: #aeaeb2;
+    --fintech-border: #8e8e93;
+    --fintech-border-strong: #aeaeb2;
+  }
+}
+
+.fintech-light-island {
+  color-scheme: light;
+  background-color: var(--fintech-surface);
+  color: var(--fintech-text);
+}
+
+/* Every component size is in rem, so text follows the browser's font-size
+   setting instead of a fixed 16px. */
 html {
   height: 100%;
+  font-size: 100%;
   -webkit-text-size-adjust: 100%;
+}
+
+/* iOS Safari only: start from the system text size, so the Dynamic Type
+   setting resizes the whole interface. */
+@supports (font: -apple-system-body) and (-webkit-touch-callout: none) {
+  html {
+    font: -apple-system-body;
+  }
 }
 
 body {
@@ -33,19 +156,91 @@ body {
   background: var(--fintech-bg);
   color: var(--fintech-text);
   font-family: var(--fintech-font);
+  accent-color: var(--fintech-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Browsers default to a lighter gray that fails text contrast, mostly in
+   dark mode. */
+::placeholder {
+  color: var(--fintech-text-secondary);
+  opacity: 1;
+}
+
+/* Material gives every icon a fixed 24px box: an icon sized in rem would be
+   clipped at larger text sizes, and flex rows would squeeze it. */
+mat-icon.mat-icon {
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Text fields reach the 44pt minimum hit target. */
+.fintech-input {
+  min-height: 44px;
+}
+
+@media (pointer: coarse) {
+  /* Tab scroll arrows are 32px wide by default. */
+  .mat-mdc-tab-header .mat-mdc-tab-header-pagination {
+    min-width: 44px;
+  }
+
+  /* Material's switch is 36 × 14px and has no touch target of its own. */
+  .mat-mdc-slide-toggle .mdc-switch::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* Visible focus for keyboard users. :where() keeps specificity at zero so
-   component styles can still refine it. */
-:where(a, button, input, select, textarea, [role="button"], [role="tab"], [tabindex]):focus-visible {
+   component styles can still refine it; components must not remove it. */
+:where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"], [tabindex]):focus-visible {
   outline: 2px solid var(--fintech-primary);
   outline-offset: 2px;
 }
 
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"], [tabindex]):focus-visible {
+    outline-color: Highlight;
+  }
+
+  /* Forced colors drop gradient backgrounds, so custom selects get their native arrow back. */
+  select {
+    appearance: auto !important;
+  }
+}
+
+/* Reduce Motion: no animated transitions. Components replace their slide
+   animations with fades in their own styles, and app.config.ts switches
+   Angular animations off. Spinners keep turning: they show progress. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .mat-mdc-dialog-container {
   --mdc-dialog-container-shape: var(--fintech-radius);
+}
+
+/* Snack bars carry confirmations. Errors belong next to the control that
+   failed; when one must use a snack bar, open it without a duration so it
+   stays until dismissed. */
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: #323232;
+  --mdc-snackbar-supporting-text-color: #ffffff;
+  --mat-snack-bar-button-color: #ffffff;
 }
 
 .mat-mdc-snack-bar-container.fintech-snack-error {

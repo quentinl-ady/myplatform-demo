@@ -10,12 +10,12 @@ import {
 } from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
 import {SessionService} from "../services";
-import {httpErrorMessage} from '../shared';
+import {InlineAlertComponent, httpErrorMessage} from '../shared';
 
 @Component({
     selector: 'app-payment',
     standalone: true,
-    imports: [CommonModule, MaterialModule],
+    imports: [CommonModule, MaterialModule, InlineAlertComponent],
     template: `
     <div class="fintech-wrapper">
       <div class="header-section">
@@ -31,19 +31,15 @@ import {httpErrorMessage} from '../shared';
         </div>
       </div>
 
-      <mat-card class="state-card" *ngIf="loadError() as error" role="alert">
-        <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
-        <h2>Could not load transactions</h2>
-        <p>{{ error }}</p>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="refreshing()">Retry</button>
-      </mat-card>
+      <app-inline-alert *ngIf="loadError() as error" title="Unable to load transactions"
+                        actionLabel="Try again" (action)="refresh()">{{ error }}</app-inline-alert>
 
       <mat-card class="component-card" [hidden]="!!loadError()" [attr.aria-busy]="refreshing()">
         <div class="loading-state" *ngIf="refreshing()" role="status">
           <mat-spinner diameter="32"></mat-spinner>
           <span>Loading transactions…</span>
         </div>
-        <div id="transactions-overview-container"></div>
+        <div id="transactions-overview-container" class="fintech-light-island component-island"></div>
       </mat-card>
     </div>
   `,
@@ -57,7 +53,7 @@ import {httpErrorMessage} from '../shared';
         gap: 24px;
       }
       .header-section h1 {
-        font-size: 28px;
+        font-size: 1.75rem;
         font-weight: 700;
         color: var(--fintech-text);
         margin: 0 0 8px 0;
@@ -65,7 +61,7 @@ import {httpErrorMessage} from '../shared';
       }
       .header-section p {
         color: var(--fintech-text-secondary);
-        font-size: 15px;
+        font-size: 0.9375rem;
         margin: 0;
       }
       .header-row {
@@ -86,13 +82,10 @@ import {httpErrorMessage} from '../shared';
         padding: 24px;
       }
       .component-card[hidden] { display: none !important; }
-      .state-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 48px 24px; }
-      .state-card h2 { margin: 0; font-size: 18px; font-weight: 600; }
-      .state-card p { margin: 0; font-size: 14px; color: var(--fintech-text-secondary); max-width: 480px; }
-      .state-icon { font-size: 40px; width: 40px; height: 40px; color: var(--fintech-danger); }
-      .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; color: var(--fintech-text-secondary); font-size: 14px; }
-      .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; }
-      .fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
+      /* Adyen components only ship light styles: they sit on a light panel in dark mode too. */
+      .component-island { border-radius: 12px; padding: 16px; }
+      .component-island:empty { display: none; }
+      .loading-state { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 16px 0; color: var(--fintech-text-secondary); font-size: 0.875rem; }
       .spinning { animation: spin 1s linear infinite; }
       @keyframes spin { 100% { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
@@ -129,7 +122,7 @@ export class PaymentComponent implements OnInit, OnDestroy {
         try {
             await this.initAdyenComponents();
         } catch (err) {
-            this.loadError.set(httpErrorMessage(err, 'The transactions component could not be started.'));
+            this.loadError.set(httpErrorMessage(err, 'Unable to start the transactions component. Try again.'));
         } finally {
             this.refreshing.set(false);
         }
@@ -156,7 +149,7 @@ export class PaymentComponent implements OnInit, OnDestroy {
                     };
                 } catch (err) {
                     // The component requests sessions lazily, after refresh() has returned.
-                    this.loadError.set(httpErrorMessage(err, 'Could not start a transactions session.'));
+                    this.loadError.set(httpErrorMessage(err, 'Unable to start a transactions session. Try again.'));
                     throw err;
                 }
             }

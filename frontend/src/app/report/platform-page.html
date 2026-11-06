@@ -10,7 +10,8 @@
     </button>
   </header>
 
-  <mat-card class="component-card" [attr.aria-busy]="loading()">
+  <!-- Adyen platform experience components only ship light styles. -->
+  <mat-card class="component-card fintech-light-island" [attr.aria-busy]="loading()">
     <div class="page-state" *ngIf="loading()" role="status">
       <mat-spinner diameter="32"></mat-spinner>
       <p>Loading {{ itemLabel }}…</p>
@@ -18,9 +19,9 @@
 
     <div class="page-state" *ngIf="!loading() && error() as message" role="alert">
       <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
-      <h2 class="mat-h3">{{ pageTitle }} could not be loaded</h2>
+      <h2 class="mat-h3">Unable to load {{ itemLabel }}</h2>
       <p>{{ message }}</p>
-      <button mat-flat-button type="button" class="fintech-btn" (click)="refresh()">Retry</button>
+      <button mat-stroked-button type="button" class="fintech-btn-secondary" (click)="refresh()">Try again</button>
     </div>
 
     <div class="component-container" [id]="containerId" [hidden]="!!error()"></div>

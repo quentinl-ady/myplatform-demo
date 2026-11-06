@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
@@ -26,8 +26,8 @@ import {
 } from '../models';
 import { AccountService, RemoteSessionService, TransferService } from '../services';
 import {
-  ApprovalChoice, ApprovalMode, ConfirmService, MoneyPipe, approvalChoice, formatMoney, httpErrorMessage, saveApprovalMode,
-  scaErrorMessage, toMinorUnits
+  ApprovalChoice, ApprovalMode, ConfirmService, InlineAlertComponent, MoneyPipe, NotifyService, approvalChoice, formatMoney,
+  httpErrorMessage, saveApprovalMode, scaErrorMessage, toMinorUnits
 } from '../shared';
 import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
 import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
@@ -36,6 +36,14 @@ import { BankDetailsFieldsComponent } from '../banktransfer/bank-details-fields.
 import { formatDateTime } from '../banktransfer/format-date';
 
 type PageState = LoadState | 'no-device';
+
+/** A failed step, shown next to the action that failed, with the action that tries it again. */
+interface FlowError {
+  title: string;
+  message: string;
+  retry: () => void;
+  actionLabel?: string;
+}
 
 interface ApprovalRecap {
   count: number;
@@ -53,6 +61,7 @@ interface ApprovalRecap {
     A11yModule,
     MaterialModule,
     MoneyPipe,
+    InlineAlertComponent,
     DeviceRegistrationComponent,
     AccountSetupStateComponent,
     RecipientCountryPickerComponent,
@@ -71,7 +80,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   private transferService = inject(TransferService);
   private remoteSessions = inject(RemoteSessionService);
   private confirmService = inject(ConfirmService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private fb = inject(FormBuilder);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -90,11 +99,12 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   recipientCountries: RecipientCountry[] = [];
   countriesError = '';
 
-  // VoP
-  showExactMatchModal = false;
+  // VoP: an exact match is shown next to the name field, other results ask for a decision.
   showPartialMatchModal = false;
   showNoMatchModal = false;
   suggestedName = '';
+  // Payee details the bank confirmed, so an edit of any of them hides "Name matches" again.
+  private matchedPayee = '';
 
   transferForm = this.fb.group({
     amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
@@ -111,21 +121,28 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   readonly bank = new BankDetailsCheck(this.transferForm, this.transferService, () => this.cdr.detectChanges());
 
   isAdding = false;
+  addError: FlowError | null = null;
   isLoadingPending = false;
   pendingError = '';
   pendingTransfers: BatchTransferResponse[] = [];
   pendingNotFoundCount = 0;
   cancellingIds = new Set<string>();
+  pendingActionError: FlowError | null = null;
   // Cancelled or approved transfers can still be listed as pending for a while: never show them again.
   private hiddenIds = new Set<string>();
 
   isApproving = false;
+  approvalError: FlowError | null = null;
   approvalRecap: ApprovalRecap | null = null;
   showScaModal = false;
   scaStatus = '';
   batchRemoteStart: (() => Observable<RemoteSession>) | null = null;
   private approveAuthParam1 = '';
   private approvingIds: string[] = [];
+
+  constructor() {
+    this.transferForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.addError = null);
+  }
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -187,7 +204,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.countriesError = httpErrorMessage(err, "Couldn't load the recipient countries.");
+        this.countriesError = httpErrorMessage(err, "The recipient countries couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -204,7 +221,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (!refresh) {
           this.accountState = failedLoadState(err);
-          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your account. Try again.");
+          this.loadErrorMessage = httpErrorMessage(err, "Unable to load your account. Try again.");
         }
         this.cdr.detectChanges();
       }
@@ -224,7 +241,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (!refresh) {
           this.devicesState = failedLoadState(err);
-          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+          this.loadErrorMessage = httpErrorMessage(err, "Unable to load your trusted devices. Try again.");
         }
         this.cdr.detectChanges();
       }
@@ -250,7 +267,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isLoadingPending = false;
-        this.pendingError = httpErrorMessage(err, "Couldn't load the transfers waiting for approval. Try again.");
+        this.pendingError = httpErrorMessage(err, "The transfers waiting for approval couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -258,7 +275,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   onDeviceRegistered() {
     this.hasDevices = true;
-    this.snack.open('Device registered. You can now make batch transfers.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
+    this.notify.success('Device registered. You can now make batch transfers.');
     this.checkDevices(true);
     this.cdr.detectChanges();
   }
@@ -331,21 +348,9 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   // ─────────── VoP (Verification of Payee) ───────────
 
-  submitTransfer() {
-    if (this.blockReason || this.isAdding) return;
-
-    const country = this.transferForm.value.counterpartyCountry;
-
-    if (!this.findRecipientCountry(country)?.payeeVerification) {
-      this.addToBatch();
-      return;
-    }
-
-    this.isAdding = true;
-    this.cdr.detectChanges();
-
+  private verifyPayload(): VerifyCounterpartyNameRequest {
     const bank = this.bank.normalized();
-    const verifyPayload: VerifyCounterpartyNameRequest = {
+    return {
       accountHolderName: this.transferForm.value.counterpartyName || '',
       iban: bank.iban,
       reference: this.transferForm.value.reference || '',
@@ -353,8 +358,31 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       sortCode: bank.sortCode,
       accountType: this.bank.format || '',
       transferType: this.transferForm.value.transferType || '',
-      counterpartyCountry: country || ''
+      counterpartyCountry: this.transferForm.value.counterpartyCountry || ''
     };
+  }
+
+  /** The bank confirmed the beneficiary name for the details currently in the form. */
+  get nameMatches(): boolean {
+    return !!this.matchedPayee && this.matchedPayee === JSON.stringify(this.verifyPayload());
+  }
+
+  submitTransfer() {
+    if (this.blockReason || this.isAdding) return;
+    this.addError = null;
+
+    const country = this.transferForm.value.counterpartyCountry;
+
+    if (!this.findRecipientCountry(country)?.payeeVerification || this.nameMatches) {
+      this.addToBatch();
+      return;
+    }
+
+    this.isAdding = true;
+    this.cdr.detectChanges();
+
+    const verifyPayload = this.verifyPayload();
+    const payeeKey = JSON.stringify(verifyPayload);
 
     this.transferService.verifyCounterpartyName(verifyPayload).subscribe({
       next: (res) => {
@@ -362,7 +390,8 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
           this.isAdding = false;
 
           if (res.response === 'nameMatch') {
-            this.showExactMatchModal = true;
+            this.matchedPayee = payeeKey;
+            this.addToBatch();
           } else if (res.response === 'partialNameMatch') {
             this.suggestedName = res.name;
             this.showPartialMatchModal = true;
@@ -378,21 +407,21 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.ngZone.run(() => {
           this.isAdding = false;
-          this.toastError(httpErrorMessage(err, "Couldn't verify the beneficiary name. Try again."));
+          this.addError = {
+            title: 'Unable to check the beneficiary name',
+            message: httpErrorMessage(err, "The beneficiary name couldn't be checked with their bank. Try again."),
+            retry: () => this.submitTransfer()
+          };
           this.cdr.detectChanges();
         });
       }
     });
   }
 
-  proceedAfterExactMatch() {
-    this.showExactMatchModal = false;
-    this.addToBatch();
-  }
-
   acceptSuggestedName() {
     this.showPartialMatchModal = false;
     this.transferForm.patchValue({ counterpartyName: this.suggestedName });
+    this.matchedPayee = JSON.stringify(this.verifyPayload());
     this.addToBatch();
   }
 
@@ -402,7 +431,6 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   }
 
   modifyInfo() {
-    this.showExactMatchModal = false;
     this.showPartialMatchModal = false;
     this.showNoMatchModal = false;
   }
@@ -436,10 +464,8 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           this.pendingTransfers.push({ ...res, currency: res.currency || this.userCurrency });
           this.isAdding = false;
-          this.snack.open(
-            `${formatMoney(res.amount ?? request.amount, res.currency || this.userCurrency)} to ${res.counterpartyName || request.counterpartyName} added to the batch`,
-            'Close',
-            { duration: 3000, panelClass: 'fintech-snack-success' }
+          this.notify.success(
+            `${formatMoney(res.amount ?? request.amount, res.currency || this.userCurrency)} to ${res.counterpartyName || request.counterpartyName} added to the batch`
           );
           this.resetForm();
           this.cdr.detectChanges();
@@ -448,7 +474,11 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.ngZone.run(() => {
           this.isAdding = false;
-          this.toastError(httpErrorMessage(err, "Couldn't add the transfer to the batch. Try again."));
+          this.addError = {
+            title: 'Unable to add the transfer to the batch',
+            message: httpErrorMessage(err, "The transfer couldn't be added to the batch. Try again."),
+            retry: () => this.submitTransfer()
+          };
           this.cdr.detectChanges();
         });
       }
@@ -469,7 +499,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       cancelText: 'Keep it',
       danger: true
     });
-    if (confirmed) this.cancelTransfers([transfer]);
+    if (confirmed) this.ngZone.run(() => this.cancelTransfers([transfer]));
   }
 
   async clearBatch() {
@@ -486,12 +516,31 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       cancelText: 'Keep them',
       danger: true
     });
-    if (confirmed) this.cancelTransfers(transfers);
+    if (confirmed) this.ngZone.run(() => this.cancelTransfers(transfers));
+  }
+
+  retryAddTransfer() {
+    const error = this.addError;
+    this.addError = null;
+    error?.retry();
+  }
+
+  retryPendingAction() {
+    const error = this.pendingActionError;
+    this.pendingActionError = null;
+    error?.retry();
+  }
+
+  retryApproval() {
+    const error = this.approvalError;
+    this.approvalError = null;
+    error?.retry();
   }
 
   private cancelTransfers(transfers: BatchTransferResponse[]) {
     const ids = transfers.map(t => t.id);
     ids.forEach(id => this.cancellingIds.add(id));
+    this.pendingActionError = null;
     this.cdr.detectChanges();
 
     this.transferService.cancelBatchTransfers(this.userId, ids).subscribe({
@@ -502,19 +551,24 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
         this.pendingTransfers = this.pendingTransfers.filter(t => !cancelled.has(t.id));
         const notCancelled = ids.filter(id => !cancelled.has(id)).length;
         if (notCancelled > 0) {
-          this.toastError(`${notCancelled} transfer(s) couldn't be cancelled. They may already have been processed.`);
+          this.pendingActionError = {
+            title: notCancelled === 1 ? "1 transfer couldn't be cancelled" : `${notCancelled} transfers couldn't be cancelled`,
+            message: 'They may already have been processed. Refresh the list to see their current state.',
+            retry: () => this.loadPendingTransfers(),
+            actionLabel: 'Refresh'
+          };
         } else {
-          this.snack.open(
-            cancelled.size === 1 ? 'Transfer cancelled' : `${cancelled.size} transfers cancelled`,
-            'Close',
-            { duration: 3000, panelClass: 'fintech-snack-success' }
-          );
+          this.notify.success(cancelled.size === 1 ? 'Transfer cancelled' : `${cancelled.size} transfers cancelled`);
         }
         this.loadPendingTransfers();
       },
       error: (err) => {
         ids.forEach(id => this.cancellingIds.delete(id));
-        this.toastError(httpErrorMessage(err, "Couldn't cancel the transfers. Try again."));
+        this.pendingActionError = {
+          title: ids.length === 1 ? 'Unable to cancel the transfer' : 'Unable to cancel the transfers',
+          message: httpErrorMessage(err, "The transfers couldn't be cancelled. Try again."),
+          retry: () => this.cancelTransfers(transfers.filter(t => this.pendingTransfers.some(p => p.id === t.id)))
+        };
         this.cdr.detectChanges();
       }
     });
@@ -526,14 +580,34 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   // ─────────── Approval ───────────
 
-  approveAll() {
+  /** Nothing is sent and no approval is created on a phone before the person confirms this recap. */
+  async approveAll() {
     if (this.pendingTransfers.length === 0 || this.isApproving) return;
-    this.approvingIds = this.pendingTransfers.map(t => t.id);
-    if (this.approval.mode === 'phone') {
-      this.openBatchOnPhone();
-    } else {
-      this.prepareBatchHere();
-    }
+    const transfers = [...this.pendingTransfers];
+    const total = this.getBatchTotal(transfers);
+    const confirmed = await this.confirmService.confirm({
+      title: transfers.length === 1
+        ? `Send ${total} to ${transfers[0].counterpartyName || 'this beneficiary'}?`
+        : `Send ${transfers.length} transfers for ${total}?`,
+      details: [
+        ...transfers.map(t => ({ label: t.counterpartyName || 'Beneficiary', value: formatMoney(t.amount, t.currency || this.userCurrency) })),
+        { label: 'Total', value: total }
+      ],
+      confirmText: `Send ${total}`,
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+
+    this.ngZone.run(() => {
+      this.approvalError = null;
+      this.approvingIds = transfers.map(t => t.id);
+      if (this.approval.mode === 'phone') {
+        this.openBatchOnPhone();
+      } else {
+        this.prepareBatchHere();
+      }
+      this.cdr.detectChanges();
+    });
   }
 
   private openBatchOnPhone() {
@@ -549,14 +623,14 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   private async prepareBatchHere() {
     this.isApproving = true;
     this.approveAuthParam1 = '';
-    this.scaStatus = 'Checking passkey availability...';
+    this.scaStatus = 'Checking passkey availability…';
     this.cdr.detectChanges();
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.checkAvailability();
 
-      this.scaStatus = 'Preparing the approval...';
+      this.scaStatus = 'Preparing the approval…';
       this.cdr.detectChanges();
 
       this.transferService.approveTransfers(this.userId, this.approvingIds, String(sdkOutput)).subscribe({
@@ -575,10 +649,10 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => this.failBatchStart(httpErrorMessage(err, "Couldn't start the approval. Try again."))
+        error: (err) => this.failBatchStart(httpErrorMessage(err, "The approval couldn't be started. Try again."))
       });
     } catch (e) {
-      this.failBatchStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+      this.failBatchStart(scaErrorMessage(e, "The authentication couldn't be started. Try again."));
     }
   }
 
@@ -588,7 +662,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
       this.isApproving = false;
       this.scaStatus = '';
       this.showScaModal = false;
-      this.toastError(message);
+      this.approvalError = { title: 'Unable to start the approval', message, retry: () => this.approveAll() };
       this.cdr.detectChanges();
     });
   }
@@ -612,6 +686,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.batchRemoteStart = null;
     this.approveAuthParam1 = '';
     this.scaStatus = '';
+    this.approvalError = null;
   }
 
   onBatchApprovedOnPhone() {
@@ -623,14 +698,21 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     if (!this.approveAuthParam1 || this.isApproving) return;
 
     this.isApproving = true;
-    this.scaStatus = 'Waiting for your passkey...';
+    this.approvalError = null;
+    this.scaStatus = 'Waiting for your passkey…';
     this.cdr.detectChanges();
+    const fail = (message: string) => {
+      this.isApproving = false;
+      this.scaStatus = '';
+      this.approvalError = { title: 'Unable to send the transfers', message, retry: () => this.confirmApproval() };
+      this.cdr.detectChanges();
+    };
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutput = await scaWebauthn.authenticate(this.approveAuthParam1);
 
-      this.scaStatus = 'Approving the transfers...';
+      this.scaStatus = 'Sending the transfers…';
       this.cdr.detectChanges();
 
       this.transferService.finalizeApproval(this.userId, this.approvingIds, String(sdkOutput)).subscribe({
@@ -641,22 +723,10 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isApproving = false;
-            this.scaStatus = '';
-            this.toastError(httpErrorMessage(err, "Couldn't approve the transfers. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.ngZone.run(() => fail(httpErrorMessage(err, "The transfers couldn't be approved. Try again.")))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isApproving = false;
-        this.scaStatus = '';
-        this.toastError(scaErrorMessage(e, 'Authentication failed. Try again.'));
-        this.cdr.detectChanges();
-      });
+      this.ngZone.run(() => fail(scaErrorMessage(e, 'Authentication failed. Try again.')));
     }
   }
 
@@ -672,6 +742,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     approved.forEach(id => this.hiddenIds.add(id));
     this.pendingTransfers = this.pendingTransfers.filter(t => !approved.has(t.id));
     this.isApproving = false;
+    this.approvalError = null;
     this.scaStatus = '';
     this.showScaModal = false;
     this.batchRemoteStart = null;
@@ -700,7 +771,4 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.bank.restart();
   }
 
-  private toastError(message: string) {
-    this.snack.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-error' });
-  }
 }

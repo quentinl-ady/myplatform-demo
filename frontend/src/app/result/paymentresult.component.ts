@@ -38,13 +38,24 @@ const VIEWS: Record<ResultStatus, ResultView> = {
   error: {
     icon: 'error',
     title: 'Something went wrong',
-    message: 'We could not process the payment. Please try again.'
+    message: 'Unable to process the payment. Try again.'
   }
 };
 
 const SOURCES: Record<string, string> = {
-  'checkout': 'Back to Checkout',
-  'issuing-checkout': 'Back to Test Issued Cards'
+  'checkout': 'Back to checkout',
+  'issuing-checkout': 'Back to test issued cards'
+};
+
+/** Readable labels of the Adyen result codes passed in the reason query parameter. */
+const REASON_LABELS: Record<string, string> = {
+  authorised: 'Authorised',
+  partiallyauthorised: 'Partially authorised',
+  pending: 'Pending',
+  received: 'Received',
+  refused: 'Refused',
+  cancelled: 'Cancelled',
+  error: 'Error'
 };
 
 const REASON_TO_STATUS: Record<string, ResultStatus> = {
@@ -75,7 +86,7 @@ function hasKey(record: object, key: string): boolean {
 
         <dl class="result-reason" *ngIf="reason">
           <dt>Result</dt>
-          <dd>{{ reason }}</dd>
+          <dd>{{ reasonLabel }}</dd>
         </dl>
 
         <div class="result-actions">
@@ -116,8 +127,8 @@ function hasKey(record: object, key: string): boolean {
       text-align: center;
     }
     .result-icon {
-      width: 64px;
-      height: 64px;
+      width: 4rem;
+      height: 4rem;
       margin: 0 auto 20px;
       border-radius: 50%;
       display: flex;
@@ -127,23 +138,23 @@ function hasKey(record: object, key: string): boolean {
       color: var(--fintech-text);
     }
     .result-icon mat-icon {
-      font-size: 36px;
-      width: 36px;
-      height: 36px;
+      font-size: 2.25rem;
+      width: 2.25rem;
+      height: 2.25rem;
     }
     [data-status="success"] .result-icon { background: var(--fintech-success-bg); color: var(--fintech-success); }
     [data-status="pending"] .result-icon { background: var(--fintech-warning-bg); color: var(--fintech-warning); }
     [data-status="failed"] .result-icon,
     [data-status="error"] .result-icon { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
     h1 {
-      font-size: 24px;
+      font-size: 1.5rem;
       font-weight: 700;
       letter-spacing: -0.3px;
       color: var(--fintech-text);
       margin: 0 0 8px;
     }
     .result-message {
-      font-size: 15px;
+      font-size: 0.9375rem;
       line-height: 1.5;
       color: var(--fintech-text-secondary);
       margin: 0;
@@ -156,7 +167,7 @@ function hasKey(record: object, key: string): boolean {
       padding: 12px 16px;
       border-radius: 12px;
       background: var(--fintech-bg);
-      font-size: 14px;
+      font-size: 0.875rem;
       text-align: left;
     }
     .result-reason dt {
@@ -176,13 +187,17 @@ function hasKey(record: object, key: string): boolean {
       margin-top: 32px;
     }
     .result-btn {
-      display: block;
-      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      box-sizing: border-box;
+      padding: 10px 24px;
       border-radius: 24px;
-      font-size: 15px;
+      font-size: 0.9375rem;
       font-weight: 600;
       text-decoration: none;
-      border: 1px solid var(--fintech-border);
+      border: 1px solid var(--fintech-border-strong);
       background: var(--fintech-surface);
       color: var(--fintech-text);
       transition: background 0.2s;
@@ -193,10 +208,11 @@ function hasKey(record: object, key: string): boolean {
     .result-btn.primary {
       background: var(--fintech-primary);
       border-color: var(--fintech-primary);
-      color: #fff;
+      color: var(--fintech-on-primary);
     }
     .result-btn.primary:hover {
-      opacity: 0.9;
+      background: var(--fintech-primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     @media (max-width: 480px) {
       .result-card {
@@ -213,6 +229,10 @@ export class PaymentResultComponent implements OnInit {
   view: ResultView = VIEWS.error;
   reason = '';
   actions: ResultAction[] = [];
+
+  get reasonLabel(): string {
+    return REASON_LABELS[this.reason.toLowerCase()] ?? this.reason;
+  }
 
   ngOnInit(): void {
     combineLatest([this.route.paramMap, this.route.queryParamMap]).subscribe(([params, query]) => {
@@ -235,13 +255,14 @@ export class PaymentResultComponent implements OnInit {
 
   private buildActions(userId: string | null, source: string | null): ResultAction[] {
     if (!userId) {
-      return [{ label: 'Back to home', link: ['/'], primary: true }];
+      return [{ label: 'Go to home page', link: ['/'], primary: true }];
     }
+    // "Back" is a secondary action: the forward link is only filled when it is the only way on.
     const actions: ResultAction[] = [];
     if (source && hasKey(SOURCES, source)) {
-      actions.push({ label: SOURCES[source], link: ['/', userId, source], primary: true });
+      actions.push({ label: SOURCES[source], link: ['/', userId, source], primary: false });
     }
-    actions.push({ label: 'Go to Onboarding', link: ['/', userId, 'dashboard'], primary: actions.length === 0 });
+    actions.push({ label: 'Go to onboarding', link: ['/', userId, 'dashboard'], primary: actions.length === 0 });
     return actions;
   }
 }

@@ -6,16 +6,16 @@
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--fintech-text-secondary);
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  color: var(--fintech-text-tertiary);
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
   pointer-events: none;
 }
-.fintech-input { width: 100%; padding: 14px 16px 14px 44px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: 15px; box-sizing: border-box; background: var(--fintech-surface); transition: border-color 0.2s; }
-.fintech-input:focus { outline: none; border-color: var(--fintech-primary); }
+.fintech-input { width: 100%; padding: 14px 16px 14px 44px; border: 1px solid var(--fintech-border); border-radius: 10px; font-size: max(1rem, 16px); box-sizing: border-box; background: var(--fintech-surface); color: var(--fintech-text); transition: border-color 0.2s; }
+.fintech-input:focus { border-color: var(--fintech-primary); }
 
-.fintech-input:disabled { background: var(--fintech-bg); color: var(--fintech-text-secondary); cursor: not-allowed; }
+.fintech-input:disabled { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); cursor: not-allowed; }
 
 .country-option { display: flex; align-items: center; gap: 12px; }
-.country-code { font-family: var(--fintech-font-mono); font-weight: 600; background: var(--fintech-bg); padding: 2px 8px; border-radius: 4px; font-size: 13px; }
+.country-code { font-family: var(--fintech-font-mono); font-weight: 600; background: var(--fintech-surface-muted); color: var(--fintech-text); padding: 2px 8px; border-radius: 4px; font-size: 0.8125rem; }

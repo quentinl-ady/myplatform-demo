@@ -36,7 +36,7 @@ export function countryName(countryCode: string | null | undefined): string {
 }
 
 export const SPEED_LABELS: Record<string, string> = {
-  regular: 'Regular (1-2 business days)',
+  regular: 'Regular (1–2 business days)',
   fast: 'Fast (same business day)',
   instant: 'Instant (within seconds)'
 };

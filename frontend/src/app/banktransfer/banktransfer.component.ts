@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MaterialModule } from '../material.module';
 import { DeviceRegistrationComponent } from '../device/device-registration.component';
 import { AccountSetupStateComponent, LoadState, combineLoadStates, failedLoadState } from '../device/account-setup-state.component';
@@ -27,8 +27,8 @@ import {
 } from '../models';
 import { AccountService, RemoteSessionService, TransferService, StandingOrderService } from '../services';
 import {
-  ApprovalChoice, ApprovalMode, ConfirmService, MoneyPipe, approvalChoice, formatMoney, fromMinorUnits, httpErrorMessage,
-  saveApprovalMode, scaErrorMessage, toMinorUnits
+  ApprovalChoice, ApprovalMode, ConfirmDialogDetail, ConfirmService, InlineAlertComponent, MoneyPipe, NotifyService, approvalChoice,
+  formatMoney, fromMinorUnits, httpErrorMessage, saveApprovalMode, scaErrorMessage, toMinorUnits
 } from '../shared';
 import { RecipientCountryPickerComponent } from '../recipient-country-picker/recipient-country-picker.component';
 import { TransferSpeedPickerComponent } from '../transfer-speed-picker/transfer-speed-picker.component';
@@ -51,6 +51,15 @@ export interface TransferRecap {
   date: string;
 }
 
+/** A failed step, shown next to the action that failed, with the action that tries it again. */
+export interface FlowError {
+  title: string;
+  message: string;
+  retry: () => void;
+}
+
+type FlowContext = 'oneshot' | 'standing';
+
 @Component({
   selector: 'app-banktransfer',
   standalone: true,
@@ -60,6 +69,7 @@ export interface TransferRecap {
     A11yModule,
     MaterialModule,
     MoneyPipe,
+    InlineAlertComponent,
     DeviceRegistrationComponent,
     AccountSetupStateComponent,
     RecipientCountryPickerComponent,
@@ -79,7 +89,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   private soService = inject(StandingOrderService);
   private remoteSessions = inject(RemoteSessionService);
   private confirmService = inject(ConfirmService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private fb = inject(FormBuilder);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -103,12 +113,13 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   recipientCountries: RecipientCountry[] = [];
   countriesError = '';
 
-  // ─── Shared VoP modals ───
-  showExactMatchModal = false;
+  // ─── Shared VoP: an exact match is shown next to the name field, other results ask for a decision ───
   showPartialMatchModal = false;
   showNoMatchModal = false;
   suggestedName = '';
-  private vopContext: 'oneshot' | 'standing' = 'oneshot';
+  private vopContext: FlowContext = 'oneshot';
+  // Payee details the bank confirmed, so an edit of any of them hides "Name matches" again.
+  private matchedPayee: Record<FlowContext, string> = { oneshot: '', standing: '' };
 
   // ─── One-shot transfer state ───
   oneshotForm = this.fb.group({
@@ -133,6 +144,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   // Recap of the transfer being approved, then of the completed one.
   oneshotDraft: TransferRecap | null = null;
   oneshotRecap: TransferRecap | null = null;
+  oneshotError: FlowError | null = null;
 
   // ─── Standing orders state ───
   standingOrders: StandingOrder[] = [];
@@ -140,6 +152,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   soError = '';
   soView: 'list' | 'create' | 'edit' = 'list';
   deletingSoId: string | null = null;
+  soActionError: FlowError | null = null;
 
   createForm = this.fb.group({
     amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
@@ -149,7 +162,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     accountNumber: [''],
     routingNumber: [''],
     sortCode: [''],
-    schedule: ['daily', [Validators.required]],
+    schedule: ['monthly', [Validators.required]],
     priority: [null as string | null, [Validators.required]],
     reference: [''],
     description: [''],
@@ -159,6 +172,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   isCreating = false;
   scaStatus = '';
+  soCreateError: FlowError | null = null;
 
   editingOrder: StandingOrder | null = null;
   editRouteBeneficiary: TransferRouteRequest | null = null;
@@ -169,6 +183,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     priority: ['regular']
   });
   isSaving = false;
+  editError: FlowError | null = null;
 
   showSoScaModal = false;
   scaInitiateResult: StandingOrderInitiateResponse | null = null;
@@ -177,6 +192,17 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   soRemoteStart: (() => Observable<RemoteSession>) | null = null;
 
   // ─────────── Lifecycle ───────────
+
+  constructor() {
+    // An edit answers the error: it disappears as soon as the person changes the form.
+    this.oneshotForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (!this.showOneshotScaModal) this.oneshotError = null;
+    });
+    this.createForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (!this.showSoScaModal) this.soCreateError = null;
+    });
+    this.editForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.editError = null);
+  }
 
   ngOnInit() {
     this.route.parent?.paramMap.subscribe(params => {
@@ -242,7 +268,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.countriesError = httpErrorMessage(err, "Couldn't load the recipient countries.");
+        this.countriesError = httpErrorMessage(err, "The recipient countries couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -260,7 +286,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (!refresh) {
           this.accountState = failedLoadState(err);
-          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your account. Try again.");
+          this.loadErrorMessage = httpErrorMessage(err, "Unable to load your account. Try again.");
         }
         this.cdr.detectChanges();
       }
@@ -280,7 +306,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (!refresh) {
           this.devicesState = failedLoadState(err);
-          this.loadErrorMessage = httpErrorMessage(err, "Couldn't load your trusted devices. Try again.");
+          this.loadErrorMessage = httpErrorMessage(err, "Unable to load your trusted devices. Try again.");
         }
         this.cdr.detectChanges();
       }
@@ -289,7 +315,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   onDeviceRegistered() {
     this.hasDevices = true;
-    this.snack.open('Device registered. You can now make transfers.', 'Close', { duration: 4000, panelClass: 'fintech-snack-success' });
+    this.notify.success('Device registered. You can now make transfers.');
     this.checkDevices(true);
     this.cdr.detectChanges();
   }
@@ -322,37 +348,42 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       : (this.createForm.value.counterpartyName || '');
   }
 
-  proceedAfterExactMatch() {
-    this.showExactMatchModal = false;
-    if (this.vopContext === 'oneshot') {
-      this.initiateTransferFlow();
-    } else {
-      this.initiateStandingOrderFlow();
-    }
+  /** The bank confirmed the beneficiary name for the details currently in the form. */
+  nameMatches(context: FlowContext): boolean {
+    const matched = this.matchedPayee[context];
+    return !!matched && matched === this.payeeKey(context);
+  }
+
+  private payeeKey(context: FlowContext): string {
+    return JSON.stringify(this.verifyPayloadOf(context));
   }
 
   acceptSuggestedName() {
+    const context = this.vopContext;
     this.showPartialMatchModal = false;
-    if (this.vopContext === 'oneshot') {
+    if (context === 'oneshot') {
       this.oneshotForm.patchValue({ accountHolderName: this.suggestedName });
-      this.initiateTransferFlow();
     } else {
       this.createForm.patchValue({ counterpartyName: this.suggestedName });
-      this.initiateStandingOrderFlow();
     }
+    this.matchedPayee[context] = this.payeeKey(context);
+    this.review(context);
   }
 
   proceedWithRisk() {
     this.showNoMatchModal = false;
-    if (this.vopContext === 'oneshot') {
-      this.initiateTransferFlow();
+    this.review(this.vopContext, "The name on the account doesn't match the beneficiary name you entered.");
+  }
+
+  private review(context: FlowContext, warning = '') {
+    if (context === 'oneshot') {
+      this.reviewOneshot(warning);
     } else {
-      this.initiateStandingOrderFlow();
+      this.reviewStandingOrder(warning);
     }
   }
 
   modifyInfo() {
-    this.showExactMatchModal = false;
     this.showPartialMatchModal = false;
     this.showNoMatchModal = false;
   }
@@ -367,7 +398,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     }
   }
 
-  private verifyPayloadOf(context: 'oneshot' | 'standing'): VerifyCounterpartyNameRequest {
+  private verifyPayloadOf(context: FlowContext): VerifyCounterpartyNameRequest {
     const isOneshot = context === 'oneshot';
     const check = isOneshot ? this.oneshotBank : this.standingBank;
     const values = isOneshot ? this.oneshotForm.value : this.createForm.value;
@@ -384,14 +415,15 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     };
   }
 
-  /** Verification of payee, then the matching modal or the next step directly. */
-  private verifyPayee(context: 'oneshot' | 'standing', next: () => void, setBusy: (busy: boolean) => void) {
+  /** Verification of payee, then the review directly on a match, or a dialog to decide on a partial match or no match. */
+  private verifyPayee(context: FlowContext, next: () => void, setBusy: (busy: boolean) => void, setError: (error: FlowError) => void) {
     this.vopContext = context;
     const country = context === 'oneshot' ? this.oneshotForm.value.counterpartyCountry : this.createForm.value.counterpartyCountry;
-    if (!this.findRecipientCountry(country)?.payeeVerification) {
+    if (!this.findRecipientCountry(country)?.payeeVerification || this.nameMatches(context)) {
       next();
       return;
     }
+    const payeeKey = this.payeeKey(context);
 
     setBusy(true);
     this.transferService.verifyCounterpartyName(this.verifyPayloadOf(context)).subscribe({
@@ -399,7 +431,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         this.ngZone.run(() => {
           setBusy(false);
           if (res.response === 'nameMatch') {
-            this.showExactMatchModal = true;
+            this.matchedPayee[context] = payeeKey;
+            next();
           } else if (res.response === 'partialNameMatch') {
             this.suggestedName = res.name;
             this.showPartialMatchModal = true;
@@ -414,7 +447,11 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.ngZone.run(() => {
           setBusy(false);
-          this.toastError(httpErrorMessage(err, "Couldn't verify the beneficiary name. Try again."));
+          setError({
+            title: 'Unable to check the beneficiary name',
+            message: httpErrorMessage(err, "The beneficiary name couldn't be checked with their bank. Try again."),
+            retry: () => context === 'oneshot' ? this.submitOneshot() : this.onCreateSo()
+          });
           this.cdr.detectChanges();
         });
       }
@@ -444,7 +481,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     return this.oneshotBank.blockReason || speedBlockReason(controls.transferType);
   }
 
-  amountError(control: 'oneshot' | 'standing'): string {
+  amountError(control: FlowContext): string {
     const amount = control === 'oneshot' ? this.oneshotForm.controls.amount : this.createForm.controls.amount;
     if (amount.errors?.['min'] && (amount.touched || amount.dirty)) {
       return `Enter an amount of at least ${formatMoney(1, this.userCurrency)}.`;
@@ -486,7 +523,46 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   submitOneshot() {
     if (this.oneshotBlockReason || this.isOneshotProcessing) return;
-    this.verifyPayee('oneshot', () => this.initiateTransferFlow(), busy => this.isOneshotProcessing = busy);
+    this.oneshotError = null;
+    this.verifyPayee('oneshot', () => this.reviewOneshot(), busy => this.isOneshotProcessing = busy, error => this.oneshotError = error);
+  }
+
+  retryOneshot() {
+    const error = this.oneshotError;
+    this.oneshotError = null;
+    error?.retry();
+  }
+
+  /** Nothing is sent and no approval is created on a phone before the person confirms this recap. */
+  private async reviewOneshot(warning = '') {
+    const recap = this.buildOneshotRecap();
+    const amount = formatMoney(recap.amount, recap.currency);
+    const details: ConfirmDialogDetail[] = [
+      { label: 'Amount', value: amount },
+      { label: 'Beneficiary', value: recap.beneficiary },
+      ...this.nameCheckDetail('oneshot'),
+      { label: 'Country', value: recap.country },
+      ...recap.accountRows,
+      { label: 'Speed', value: recap.speed }
+    ];
+    if (recap.reference) details.push({ label: 'Reference', value: recap.reference });
+    if (recap.description) details.push({ label: 'Description', value: recap.description });
+
+    const confirmed = await this.confirmService.confirm({
+      title: `Send ${amount} to ${recap.beneficiary}?`,
+      message: warning || undefined,
+      details,
+      confirmText: `Send ${amount}`,
+      cancelText: 'Edit'
+    });
+    this.ngZone.run(() => {
+      if (confirmed) this.initiateTransferFlow();
+      this.cdr.detectChanges();
+    });
+  }
+
+  private nameCheckDetail(context: FlowContext): ConfirmDialogDetail[] {
+    return this.nameMatches(context) ? [{ label: 'Name check', value: 'Name matches' }] : [];
   }
 
   initiateTransferFlow() {
@@ -522,10 +598,10 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => this.failOneshotStart(httpErrorMessage(err, "Couldn't start the transfer. Try again."))
+        error: (err) => this.failOneshotStart(httpErrorMessage(err, "The transfer couldn't be started. Try again."))
       });
     } catch (e) {
-      this.failOneshotStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+      this.failOneshotStart(scaErrorMessage(e, "The authentication couldn't be started. Try again."));
     }
   }
 
@@ -534,7 +610,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.ngZone.run(() => {
       this.isOneshotProcessing = false;
       this.showOneshotScaModal = false;
-      this.toastError(message);
+      this.oneshotError = { title: 'Unable to start the transfer', message, retry: () => this.submitOneshot() };
       this.cdr.detectChanges();
     });
   }
@@ -571,6 +647,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   declineOneshot() {
     if (this.isOneshotProcessing) return;
+    this.oneshotError = null;
     this.showOneshotScaModal = false;
     this.oneshotRemoteStart = null;
     this.oneshotAuthParam = '';
@@ -579,7 +656,13 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   async approveOneshot() {
     if (!this.oneshotAuthParam || !this.oneshotDraft) return;
     this.isOneshotProcessing = true;
+    this.oneshotError = null;
     const draft = this.oneshotDraft;
+    const fail = (message: string) => {
+      this.isOneshotProcessing = false;
+      this.oneshotError = { title: 'Unable to send the transfer', message, retry: () => this.approveOneshot() };
+      this.cdr.detectChanges();
+    };
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
@@ -595,20 +678,10 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isOneshotProcessing = false;
-            this.toastError(httpErrorMessage(err, "Couldn't complete the transfer. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.ngZone.run(() => fail(httpErrorMessage(err, "The transfer couldn't be completed. Try again.")))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isOneshotProcessing = false;
-        this.toastError(scaErrorMessage(e, 'Authentication failed. Try again.'));
-        this.cdr.detectChanges();
-      });
+      this.ngZone.run(() => fail(scaErrorMessage(e, 'Authentication failed. Try again.')));
     }
   }
 
@@ -623,6 +696,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   resetOneshotForm() {
     this.oneshotRecap = null;
     this.oneshotDraft = null;
+    this.oneshotError = null;
+    this.matchedPayee.oneshot = '';
     this.oneshotBank.setFormat(null);
     this.oneshotForm.reset({
       amount: null,
@@ -649,7 +724,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.soError = httpErrorMessage(err, "Couldn't load your scheduled transfers. Try again.");
+        this.soError = httpErrorMessage(err, "The scheduled transfers couldn't be loaded. Try again.");
         this.standingOrders = [];
         this.soLoading = false;
         this.cdr.detectChanges();
@@ -669,12 +744,15 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   showSoCreate() {
     this.soView = 'create';
     this.scaStatus = '';
+    this.soCreateError = null;
+    this.soActionError = null;
+    this.matchedPayee.standing = '';
     this.standingBank.setFormat(null);
     this.createForm.reset({
       amount: null,
       counterpartyName: '',
       counterpartyCountry: '',
-      schedule: 'daily',
+      schedule: 'monthly',
       priority: null,
       reference: '',
       description: '',
@@ -687,6 +765,8 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.editingOrder = null;
     this.editRouteBeneficiary = null;
     this.scaStatus = '';
+    this.soCreateError = null;
+    this.editError = null;
     this.standingBank.setFormat(null);
     this.loadStandingOrders();
   }
@@ -695,6 +775,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.editingOrder = order;
     this.editRouteBeneficiary = this.routeBeneficiaryOf(order);
     this.soView = 'edit';
+    this.soActionError = null;
     this.editForm.reset({
       reference: order.reference || '',
       description: order.description || '',
@@ -769,29 +850,42 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         { label: 'Schedule', value: this.getScheduleLabel(order.schedule) }
       ],
       confirmText: 'Delete scheduled transfer',
+      cancelText: 'Keep it',
       danger: true
     });
     if (!confirmed) return;
 
     this.deletingSoId = order.id;
+    this.soActionError = null;
     this.cdr.detectChanges();
     this.soService.delete(this.userId, order.id).subscribe({
       next: () => {
         this.deletingSoId = null;
-        this.snack.open('Scheduled transfer deleted', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Scheduled transfer deleted');
         this.loadStandingOrders();
       },
       error: (err) => {
         this.deletingSoId = null;
-        this.toastError(httpErrorMessage(err, "Couldn't delete the scheduled transfer. Try again."));
+        this.soActionError = {
+          title: `Unable to delete the scheduled transfer to ${this.soBeneficiary(order)}`,
+          message: httpErrorMessage(err, "The scheduled transfer couldn't be deleted. Try again."),
+          retry: () => this.onDeleteSo(order)
+        };
         this.cdr.detectChanges();
       }
     });
   }
 
+  retrySoAction() {
+    const error = this.soActionError;
+    this.soActionError = null;
+    error?.retry();
+  }
+
   onSaveEdit() {
     if (!this.editingOrder || this.isSaving || this.editForm.invalid) return;
     this.isSaving = true;
+    this.editError = null;
 
     const patch = {
       reference: this.editForm.value.reference || '',
@@ -805,12 +899,16 @@ export class BankTransferComponent implements OnInit, OnDestroy {
         this.editingOrder = updated;
         this.isSaving = false;
         this.editForm.markAsPristine();
-        this.snack.open('Scheduled transfer updated', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Scheduled transfer updated');
         this.cdr.detectChanges();
       },
       error: (err) => {
         this.isSaving = false;
-        this.toastError(httpErrorMessage(err, "Couldn't update the scheduled transfer. Try again."));
+        this.editError = {
+          title: 'Unable to save the changes',
+          message: httpErrorMessage(err, "The scheduled transfer couldn't be updated. Try again."),
+          retry: () => this.onSaveEdit()
+        };
         this.cdr.detectChanges();
       }
     });
@@ -840,7 +938,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
           accountIdentification
         }
       },
-      schedule: f.schedule || 'daily',
+      schedule: f.schedule || 'monthly',
       priorities: [f.priority || 'regular'],
       reference: f.reference || '',
       description: f.description || '',
@@ -850,7 +948,45 @@ export class BankTransferComponent implements OnInit, OnDestroy {
 
   onCreateSo() {
     if (this.createBlockReason || this.isCreating) return;
-    this.verifyPayee('standing', () => this.initiateStandingOrderFlow(), busy => this.isCreating = busy);
+    this.soCreateError = null;
+    this.verifyPayee('standing', () => this.reviewStandingOrder(), busy => this.isCreating = busy, error => this.soCreateError = error);
+  }
+
+  retrySoCreate() {
+    const error = this.soCreateError;
+    this.soCreateError = null;
+    error?.retry();
+  }
+
+  /** Nothing is created, here or on a phone, before the person confirms this recap. */
+  private async reviewStandingOrder(warning = '') {
+    const order = this.buildCreatePayload();
+    const f = this.createForm.value;
+    const amount = formatMoney(order.amount.value, order.amount.currency);
+    const beneficiary = order.counterparty.bankAccount.accountHolder.fullName;
+    const details: ConfirmDialogDetail[] = [
+      { label: 'Amount per transfer', value: amount },
+      { label: 'Beneficiary', value: beneficiary },
+      ...this.nameCheckDetail('standing'),
+      { label: 'Country', value: countryName(f.counterpartyCountry) },
+      ...bankDetailRows(this.standingBank.normalized()),
+      { label: 'Schedule', value: this.getScheduleLabel(order.schedule) },
+      { label: 'Speed', value: speedLabel(order.priorities[0]) }
+    ];
+    if (order.reference) details.push({ label: 'Reference', value: order.reference });
+    if (order.description) details.push({ label: 'Description', value: order.description });
+
+    const confirmed = await this.confirmService.confirm({
+      title: `Schedule ${amount} to ${beneficiary}?`,
+      message: warning || undefined,
+      details,
+      confirmText: 'Schedule transfer',
+      cancelText: 'Edit'
+    });
+    this.ngZone.run(() => {
+      if (confirmed) this.initiateStandingOrderFlow();
+      this.cdr.detectChanges();
+    });
   }
 
   initiateStandingOrderFlow() {
@@ -876,12 +1012,12 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.scaInitiateResult = null;
 
     try {
-      this.scaStatus = 'Checking passkey availability...';
+      this.scaStatus = 'Checking passkey availability…';
       this.cdr.detectChanges();
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
       const sdkOutputInit = await scaWebauthn.checkAvailability();
 
-      this.scaStatus = 'Creating the scheduled transfer...';
+      this.scaStatus = 'Scheduling the transfer…';
       this.cdr.detectChanges();
 
       this.soService.initiate(this.userId, standingOrder, String(sdkOutputInit)).subscribe({
@@ -898,15 +1034,15 @@ export class BankTransferComponent implements OnInit, OnDestroy {
               this.showSoScaModal = true;
               this.isCreating = false;
             } else {
-              this.failSoStart("Couldn't create the scheduled transfer: unexpected response. Try again.");
+              this.failSoStart("The transfer couldn't be scheduled because of an unexpected response. Try again.");
             }
             this.cdr.detectChanges();
           });
         },
-        error: (err) => this.failSoStart(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."))
+        error: (err) => this.failSoStart(httpErrorMessage(err, "The transfer couldn't be scheduled. Try again."))
       });
     } catch (e) {
-      this.failSoStart(scaErrorMessage(e, "Couldn't start the authentication. Try again."));
+      this.failSoStart(scaErrorMessage(e, "The authentication couldn't be started. Try again."));
     }
   }
 
@@ -916,7 +1052,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
       this.isCreating = false;
       this.scaStatus = '';
       this.showSoScaModal = false;
-      this.toastError(message);
+      this.soCreateError = { title: 'Unable to schedule the transfer', message, retry: () => this.onCreateSo() };
       this.cdr.detectChanges();
     });
   }
@@ -937,16 +1073,23 @@ export class BankTransferComponent implements OnInit, OnDestroy {
   async approveSoScaChallenge() {
     if (!this.scaInitiateResult?.authParam1 || !this.pendingStandingOrder) return;
     this.isCreating = true;
+    this.soCreateError = null;
     const standingOrder = this.pendingStandingOrder;
+    const fail = (message: string) => {
+      this.isCreating = false;
+      this.scaStatus = '';
+      this.soCreateError = { title: 'Unable to schedule the transfer', message, retry: () => this.approveSoScaChallenge() };
+      this.cdr.detectChanges();
+    };
 
     try {
       const scaWebauthn = ScaWebauthn.create({ relyingPartyName: 'myplatform' });
-      this.scaStatus = 'Waiting for your passkey...';
+      this.scaStatus = 'Waiting for your passkey…';
       this.cdr.detectChanges();
 
       const sdkOutput = await scaWebauthn.authenticate(this.scaInitiateResult.authParam1);
 
-      this.scaStatus = 'Creating the scheduled transfer...';
+      this.scaStatus = 'Scheduling the transfer…';
       this.cdr.detectChanges();
 
       this.soService.finalize(this.userId, standingOrder, String(sdkOutput)).subscribe({
@@ -959,33 +1102,17 @@ export class BankTransferComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           });
         },
-        error: (err) => {
-          this.ngZone.run(() => {
-            this.isCreating = false;
-            this.scaStatus = '';
-            this.toastError(httpErrorMessage(err, "Couldn't create the scheduled transfer. Try again."));
-            this.cdr.detectChanges();
-          });
-        }
+        error: (err) => this.ngZone.run(() => fail(httpErrorMessage(err, "The transfer couldn't be scheduled. Try again.")))
       });
     } catch (e) {
-      this.ngZone.run(() => {
-        this.isCreating = false;
-        this.scaStatus = '';
-        this.toastError(scaErrorMessage(e, 'Authentication failed. Try again.'));
-        this.cdr.detectChanges();
-      });
+      this.ngZone.run(() => fail(scaErrorMessage(e, 'Authentication failed. Try again.')));
     }
   }
 
   private onStandingOrderCreated(order: StandingOrderCreateRequest) {
     const amount = formatMoney(order.amount.value, order.amount.currency);
     const beneficiary = order.counterparty.bankAccount.accountHolder.fullName;
-    this.snack.open(
-      `Scheduled transfer created: ${amount} to ${beneficiary}, ${this.getScheduleLabel(order.schedule).toLowerCase()}.`,
-      'Close',
-      { duration: 5000, panelClass: 'fintech-snack-success' }
-    );
+    this.notify.success(`Transfer scheduled: ${amount} to ${beneficiary}, ${this.getScheduleLabel(order.schedule).toLowerCase()}.`);
     this.pendingStandingOrder = null;
     this.scaInitiateResult = null;
     this.showSoList();
@@ -1004,6 +1131,7 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     this.showSoScaModal = false;
     this.soRemoteStart = null;
     this.scaStatus = '';
+    this.soCreateError = null;
   }
 
   /** The next operations of this page, and of the next visits in this browser, are approved the same way. */
@@ -1012,7 +1140,4 @@ export class BankTransferComponent implements OnInit, OnDestroy {
     saveApprovalMode(this.userId, mode);
   }
 
-  private toastError(message: string) {
-    this.snack.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-error' });
-  }
 }

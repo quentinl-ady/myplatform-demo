@@ -1,8 +1,7 @@
 import { Component, ElementRef, OnInit, ViewChild, inject, ChangeDetectorRef } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -17,7 +16,7 @@ import {
   TransactionRuleRequest
 } from '../models';
 import { AccountService, IssuingService } from '../services';
-import { formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
+import { InlineAlertComponent, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 // Imported directly, not through the shared barrel, so the country list stays in this page's lazy chunk.
 import {
   PHONE_COUNTRIES,
@@ -45,7 +44,9 @@ const DEFAULT_PHONE_COUNTRY = 'NL';
     CommonModule,
     ReactiveFormsModule,
     MaterialModule,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    RouterLink,
+    InlineAlertComponent
   ],
   templateUrl: './card-create.component.html',
   styleUrl: './card-create.component.css'
@@ -55,7 +56,6 @@ export class CardCreateComponent implements OnInit {
   private router = inject(Router);
   private accountService = inject(AccountService);
   private issuingService = inject(IssuingService);
-  private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
   private cdr = inject(ChangeDetectorRef);
 
@@ -68,6 +68,7 @@ export class CardCreateComponent implements OnInit {
   isLoading = true;
   loadError: string | null = null;
   isProcessing = false;
+  submitError: string | null = null;
   isSuccess = false;
   createdCard?: CardResponse;
   createdRules: TransactionRuleRequest[] = [];
@@ -145,7 +146,7 @@ export class CardCreateComponent implements OnInit {
       },
       error: (err) => {
         this.isLoading = false;
-        this.loadError = httpErrorMessage(err, "Couldn't load your account details. Try again.");
+        this.loadError = httpErrorMessage(err, "The account details couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -244,12 +245,6 @@ export class CardCreateComponent implements OnInit {
     this.selectedMccs = this.selectedMccs.filter(s => s.code !== mcc.code);
     this.filterMccs(this.mccSearchControl.value || '');
     this.cdr.detectChanges();
-  }
-
-  selectBrand(brand: string) {
-    if (this.isBrandConfigured(brand)) {
-      this.form.patchValue({ brand });
-    }
   }
 
   addRule() {
@@ -352,6 +347,7 @@ export class CardCreateComponent implements OnInit {
     };
 
     this.isProcessing = true;
+    this.submitError = null;
     this.issuingService.createCard(request).subscribe({
       next: (card) => {
         this.createdCard = card;
@@ -363,10 +359,7 @@ export class CardCreateComponent implements OnInit {
       },
       error: (err) => {
         this.isProcessing = false;
-        this.snack.open(httpErrorMessage(err, "Couldn't create the card. Try again."), 'Close', {
-          duration: 5000,
-          panelClass: 'fintech-snack-error'
-        });
+        this.submitError = httpErrorMessage(err, "The card couldn't be created. Check the details and try again.");
         this.cdr.detectChanges();
       }
     });
@@ -374,6 +367,7 @@ export class CardCreateComponent implements OnInit {
 
   createAnother() {
     this.isSuccess = false;
+    this.submitError = null;
     this.createdCard = undefined;
     this.createdRules = [];
     this.rulesArray.clear();
@@ -392,9 +386,5 @@ export class CardCreateComponent implements OnInit {
 
   viewCards() {
     this.router.navigate(['/', this.userId, 'cards']);
-  }
-
-  viewCardTransactions() {
-    this.router.navigate(['/', this.userId, 'card-transactions']);
   }
 }

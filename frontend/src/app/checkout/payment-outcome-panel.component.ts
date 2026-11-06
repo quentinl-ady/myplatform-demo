@@ -49,7 +49,8 @@ const ICONS: Record<PaymentOutcome['kind'], string> = {
         <button type="button" class="outcome-btn secondary" *ngIf="secondaryLabel" (click)="secondary.emit()">
           {{ secondaryLabel }}
         </button>
-        <button type="button" class="outcome-btn primary" (click)="primary.emit()">{{ primaryLabel }}</button>
+        <button type="button" class="outcome-btn" [class.primary]="filledPrimary" [class.secondary]="!filledPrimary"
+                (click)="primary.emit()">{{ primaryLabel }}</button>
       </div>
     </div>
   `,
@@ -61,7 +62,7 @@ const ICONS: Record<PaymentOutcome['kind'], string> = {
       text-align: center;
       padding: 8px 0;
     }
-    .outcome-icon { font-size: 56px; width: 56px; height: 56px; margin-bottom: 12px; }
+    .outcome-icon { font-size: 3.5rem; width: 3.5rem; height: 3.5rem; margin-bottom: 12px; }
     .outcome-success .outcome-icon { color: var(--fintech-success); }
     .outcome-pending .outcome-icon { color: var(--fintech-warning); }
     .outcome-refused .outcome-icon,
@@ -69,14 +70,14 @@ const ICONS: Record<PaymentOutcome['kind'], string> = {
     .outcome-cancelled .outcome-icon { color: var(--fintech-text-secondary); }
     .outcome-title {
       margin: 0 0 8px;
-      font-size: 22px;
+      font-size: 1.375rem;
       font-weight: 700;
       color: var(--fintech-text);
     }
-    .outcome-title:focus { outline: none; }
+    .outcome-title:focus:not(:focus-visible) { outline: none; }
     .outcome-message {
       margin: 0 0 20px;
-      font-size: 14px;
+      font-size: 0.875rem;
       line-height: 1.5;
       color: var(--fintech-text-secondary);
     }
@@ -95,26 +96,27 @@ const ICONS: Record<PaymentOutcome['kind'], string> = {
       gap: 16px;
       padding: 8px 0;
       border-bottom: 1px solid var(--fintech-border);
-      font-size: 14px;
+      font-size: 0.875rem;
     }
     .outcome-row:last-child { border-bottom: none; }
     .outcome-row dt { color: var(--fintech-text-secondary); }
     .outcome-row dd { margin: 0; font-weight: 600; color: var(--fintech-text); text-align: right; word-break: break-all; }
-    .outcome-row dd.mono { font-family: var(--fintech-font-mono); font-size: 13px; }
+    .outcome-row dd.mono { font-family: var(--fintech-font-mono); font-size: 0.8125rem; }
     .outcome-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; width: 100%; }
     .outcome-btn {
       flex: 1 1 140px;
       max-width: 220px;
-      padding: 12px 20px;
+      min-height: 44px;
+      padding: 10px 20px;
       border-radius: 24px;
       font: inherit;
-      font-size: 14px;
+      font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
       border: 1px solid var(--fintech-primary);
     }
-    .outcome-btn.primary { background: var(--fintech-primary); color: #fff; }
-    .outcome-btn.secondary { background: var(--fintech-surface); color: var(--fintech-text); border-color: var(--fintech-border); }
+    .outcome-btn.primary { background: var(--fintech-primary); color: var(--fintech-on-primary); }
+    .outcome-btn.secondary { background: var(--fintech-surface); color: var(--fintech-text); border-color: var(--fintech-border-strong); }
     .outcome-btn.secondary:hover { border-color: var(--fintech-text); }
   `],
 })
@@ -130,6 +132,11 @@ export class PaymentOutcomePanelComponent implements AfterViewInit {
   get hasDetails(): boolean {
     const o = this.outcome;
     return (o.amount !== undefined && o.amount !== null) || !!(o.reference || o.pspReference || o.refusalReason || o.resultCode);
+  }
+
+  /** After a failure, trying again is offered as a secondary action rather than a filled button. */
+  get filledPrimary(): boolean {
+    return this.outcome.kind === 'success' || this.outcome.kind === 'pending';
   }
 
   get icon(): string {

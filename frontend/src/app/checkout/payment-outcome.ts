@@ -119,12 +119,32 @@ export function errorOutcome(title: string, message: string, context: PaymentCon
   return { ...context, kind: 'error', title, message };
 }
 
+const CARD_BRANDS: Record<string, string> = {
+  visa: 'Visa',
+  mc: 'Mastercard',
+  mastercard: 'Mastercard',
+  amex: 'American Express',
+  maestro: 'Maestro',
+  cartebancaire: 'Cartes Bancaires',
+  cup: 'UnionPay',
+  diners: 'Diners Club',
+  discover: 'Discover',
+  jcb: 'JCB',
+};
+
+/** Display name of an Adyen card brand code ("mc" → "Mastercard"). */
+export function cardBrandLabel(brand: string | null | undefined): string {
+  const code = (brand || '').trim();
+  if (!code) return 'Card';
+  return CARD_BRANDS[code.toLowerCase()] ?? code.charAt(0).toUpperCase() + code.slice(1);
+}
+
 /**
  * Outcome shown when the Drop-in can't be loaded. Adyen Web error messages are written for developers
  * (request URL, client key), so only the error type is used to choose the text.
  */
 export function dropinLoadFailure(error: unknown, form: 'payment form' | 'card form', context: PaymentContext = {}): PaymentOutcome {
-  const title = `Couldn't load the ${form}`;
+  const title = `Unable to load the ${form}`;
   if (error instanceof HttpErrorResponse) {
     return errorOutcome(title, httpErrorMessage(error, 'Try again in a moment.'), context);
   }

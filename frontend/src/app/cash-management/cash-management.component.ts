@@ -3,11 +3,13 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {ActivatedRoute, RouterLink} from '@angular/router';
 import {FormBuilder, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import {CommonModule} from '@angular/common';
-import {MatSnackBar} from '@angular/material/snack-bar';
 import {MaterialModule} from '../material.module';
 import {BalanceAccount, BalanceInfo, PayoutAccount, SweepInfo} from '../models';
 import {AccountService, PayoutService, CashManagementService} from '../services';
-import {ConfirmDialogDetail, ConfirmService, MoneyPipe, currencyExponent, formatMoney, httpErrorMessage, httpStatus, toMinorUnits} from '../shared';
+import {
+    ConfirmDialogDetail, ConfirmService, InlineAlertComponent, MoneyPipe, NotifyService,
+    currencyExponent, formatMoney, httpErrorMessage, httpStatus, toMinorUnits
+} from '../shared';
 import {describeSchedule} from '../banktransfer/schedule-label';
 
 type AccountsState = 'loading' | 'ready' | 'missing' | 'error';
@@ -22,6 +24,7 @@ const BUSINESS_BANK_ACCOUNT = 'Business Bank Account';
 const DEFAULT_PAYOUT_CURRENCIES = ['EUR', 'GBP', 'USD'];
 const BALANCE_ACCOUNT_CURRENCIES = ['EUR', 'GBP', 'USD'];
 const PAYOUT_FREQUENCY_LABELS: Record<string, string> = {daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly'};
+const ACCOUNT_STATUS_LABELS: Record<string, string> = {active: 'Active', inactive: 'Inactive', suspended: 'Suspended', closed: 'Closed'};
 
 function withDefaultCurrencyFirst(account: BalanceAccount): BalanceAccount {
     if (!account.balances?.length || !account.currencyCode) return account;
@@ -38,7 +41,8 @@ function withDefaultCurrencyFirst(account: BalanceAccount): BalanceAccount {
         FormsModule,
         RouterLink,
         MaterialModule,
-        MoneyPipe
+        MoneyPipe,
+        InlineAlertComponent
     ],
     templateUrl: './cash-management.component.html',
     styleUrl: './cash-management.component.css'
@@ -59,12 +63,15 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     creatingAccount = false;
     createError = '';
     togglingSweepId: string | null = null;
+    /** Last failed activate/suspend, shown next to the schedule it is about. */
+    sweepError: {sweepId: string; message: string} | null = null;
 
     // Internal transfer
     transferForm: FormGroup;
     submittingTransfer = false;
     availableCurrencies: string[] = [];
     transferRecap: Recap | null = null;
+    transferError = '';
 
     // Payout
     payoutForm: FormGroup;
@@ -74,6 +81,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     payoutAccountsError = '';
     payoutCurrencies: string[] = DEFAULT_PAYOUT_CURRENCIES;
     payoutRecap: Recap | null = null;
+    payoutError = '';
 
     // Cashout
     cashoutForm: FormGroup;
@@ -85,6 +93,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     instantAvailable: boolean | null = null;
     checkingInstant = false;
     cashoutRecap: Recap | null = null;
+    cashoutError = '';
 
     // Cashout cooldown
     cashoutCooldownRemaining = 0;
@@ -98,7 +107,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     private payoutService = inject(PayoutService);
     private cashManagementService = inject(CashManagementService);
     private confirmService = inject(ConfirmService);
-    private snackBar = inject(MatSnackBar);
+    private notify = inject(NotifyService);
     private destroyRef = inject(DestroyRef);
     private zone = inject(NgZone);
 
@@ -178,7 +187,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 const status = httpStatus(err);
-                const message = httpErrorMessage(err, 'We couldn\'t load your balance accounts.');
+                const message = httpErrorMessage(err, 'Unable to load balance accounts. Try again.');
                 // The backend answers 400 "User has no accountHolderId" until onboarding has created the account holder.
                 this.accountsState = status === 404 || (status === 400 && /accountHolder/i.test(message)) ? 'missing' : 'error';
                 this.accountsError = message;
@@ -224,17 +233,26 @@ export class CashManagementComponent implements OnInit, OnDestroy {
                 this.newAccountDescription = '';
                 this.showCreateForm = false;
                 this.creatingAccount = false;
-                this.toastSuccess(`Balance account "${res.description || description}" created in ${res.currencyCode || currency}`);
+                this.notify.success(`Balance account "${res.description || description}" created in ${res.currencyCode || currency}`);
             },
             error: err => {
                 this.creatingAccount = false;
-                this.createError = httpErrorMessage(err, 'We couldn\'t create the balance account. Try again.');
+                this.createError = httpErrorMessage(err, 'Unable to create the balance account. Try again.');
             }
         });
     }
 
     hasActiveSweeps(account: BalanceAccount): boolean {
         return !!account.sweeps?.some(s => s.status !== 'inactive');
+    }
+
+    accountStatusLabel(status: string | null | undefined): string {
+        if (!status) return ACCOUNT_STATUS_LABELS['active'];
+        return ACCOUNT_STATUS_LABELS[status.toLowerCase()] ?? 'Unavailable';
+    }
+
+    isAccountActive(status: string | null | undefined): boolean {
+        return !status || status.toLowerCase() === 'active';
     }
 
     accountName(account: BalanceAccount | undefined | null): string {
@@ -270,30 +288,49 @@ export class CashManagementComponent implements OnInit, OnDestroy {
     async toggleSweep(account: BalanceAccount, sweep: SweepInfo) {
         if (this.togglingSweepId) return;
         const activate = sweep.status === 'inactive';
-        if (!activate) {
+        if (activate) {
+            const details: ConfirmDialogDetail[] = [
+                {label: 'From', value: this.accountName(account)},
+                {label: 'To', value: this.getSweepBeneficiary(sweep)},
+                {label: 'Type', value: sweep.category === 'internal' ? 'Internal transfer' : 'Bank payout'},
+                {label: 'Currency', value: sweep.currency},
+                {label: 'Frequency', value: this.getSweepScheduleLabel(sweep)}
+            ];
+            if (sweep.priorities?.length) {
+                details.push({label: 'Speed', value: this.getSweepPriorities(sweep)});
+            }
             const confirmed = await this.confirmService.confirm({
-                title: 'Suspend this payout schedule?',
-                message: 'No automatic payouts will be made until you activate it again.',
-                details: [
-                    {label: 'Account', value: this.accountName(account)},
-                    {label: 'Schedule', value: this.getSweepScheduleLabel(sweep)},
-                    {label: 'Beneficiary', value: this.getSweepBeneficiary(sweep)}
-                ],
-                confirmText: 'Suspend',
-                danger: true
+                title: 'Activate this schedule?',
+                message: 'Funds then move automatically at each run of the schedule below.',
+                details,
+                confirmText: 'Activate schedule',
+                cancelText: 'Cancel'
             });
             if (!confirmed) return;
         }
+        // Suspending is safe to take back, so it runs at once and offers Undo instead of a dialog.
+        this.setSweepStatus(account, sweep, activate, !activate);
+    }
+
+    private setSweepStatus(account: BalanceAccount, sweep: SweepInfo, activate: boolean, offerUndo: boolean) {
         this.togglingSweepId = sweep.id;
+        this.sweepError = null;
         this.cashManagementService.updateSweepStatus(this.userId, account.balanceAccountId, sweep.id, activate).subscribe({
             next: () => {
                 this.togglingSweepId = null;
-                this.toastSuccess(activate ? 'Payout schedule activated' : 'Payout schedule suspended');
+                if (offerUndo) {
+                    this.notify.undoable('Schedule suspended', () => this.setSweepStatus(account, sweep, true, false));
+                } else {
+                    this.notify.success('Schedule activated');
+                }
                 this.loadBalanceAccounts(false);
             },
             error: err => {
                 this.togglingSweepId = null;
-                this.toastError(httpErrorMessage(err, 'We couldn\'t update the payout schedule. Try again.'));
+                this.sweepError = {
+                    sweepId: sweep.id,
+                    message: httpErrorMessage(err, `Unable to ${activate ? 'activate' : 'suspend'} the schedule. Try again.`)
+                };
             }
         });
     }
@@ -388,14 +425,15 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         }
 
         const confirmed = await this.confirmService.confirm({
-            title: 'Confirm transfer',
-            message: 'Funds move between your balance accounts straight away.',
+            title: `Transfer ${formatMoney(amount, val.currency)}?`,
+            message: 'Funds move between the balance accounts straight away.',
             details: rows,
             confirmText: 'Transfer funds'
         });
         if (!confirmed) return;
 
         this.submittingTransfer = true;
+        this.transferError = '';
         this.cashManagementService.internalTransfer({
             userId: this.userId,
             sourceBalanceAccountId: val.sourceBalanceAccountId,
@@ -417,7 +455,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 this.submittingTransfer = false;
-                this.toastError(httpErrorMessage(err, 'The transfer failed. Try again.'));
+                this.transferError = httpErrorMessage(err, 'The transfer failed. Check the details and try again.');
             }
         });
     }
@@ -438,7 +476,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 this.loadingPayoutAccounts = false;
-                this.payoutAccountsError = httpErrorMessage(err, 'We couldn\'t load your payout bank accounts.');
+                this.payoutAccountsError = httpErrorMessage(err, 'Unable to load payout bank accounts. Try again.');
             }
         });
     }
@@ -467,7 +505,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         if (!v.balanceAccountId) return 'Select the balance account to pay out from.';
         if (!v.currencyCode) return 'Select a currency.';
         if (!v.transferInstrumentId) {
-            return this.payoutAccounts().length ? 'Select the bank account to receive the payouts.' : 'You need a payout bank account first.';
+            return this.payoutAccounts().length ? 'Select the bank account to receive the payouts.' : 'Add a payout bank account first.';
         }
         if (!v.schedule) return 'Select how often to pay out.';
         return null;
@@ -485,7 +523,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         ];
 
         const confirmed = await this.confirmService.confirm({
-            title: 'Create payout schedule?',
+            title: 'Create this payout schedule?',
             message: 'The full available balance in this currency is paid out automatically at each run.',
             details: rows,
             confirmText: 'Create schedule'
@@ -493,6 +531,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         if (!confirmed) return;
 
         this.submittingPayout = true;
+        this.payoutError = '';
         this.payoutService.createPayoutConfiguration({
             userId: this.userId,
             balanceAccountId: val.balanceAccountId,
@@ -515,7 +554,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 this.submittingPayout = false;
-                this.toastError(httpErrorMessage(err, 'We couldn\'t create the payout schedule. Try again.'));
+                this.payoutError = httpErrorMessage(err, 'Unable to create the payout schedule. Try again.');
             }
         });
     }
@@ -543,7 +582,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         const v = this.cashoutForm.value;
         if (this.cashoutCooldownRemaining > 0) return `Wait ${this.cashoutCooldownRemaining}s before the next cash out.`;
         if (!this.cashoutSelectedCurrency) {
-            return this.userCurrencyError || 'Loading your account currency...';
+            return this.userCurrencyError || 'Loading the account currency…';
         }
         if (!v.balanceAccountId) return 'Select the balance account to cash out from.';
         if (this.cashoutPendingBalance <= 0) return 'There are no pending funds to cash out on this account.';
@@ -552,8 +591,8 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         if (this.cashoutAmountMinor > this.cashoutPendingBalance) {
             return `The amount is more than the pending balance (${formatMoney(this.cashoutPendingBalance, this.cashoutCurrency)}).`;
         }
-        if (this.checkingInstant) return 'Checking whether this bank account accepts instant payouts...';
-        if (this.instantAvailable === false) return 'Choose another bank account or keep the funds on your balance account.';
+        if (this.checkingInstant) return 'Checking whether this bank account accepts instant payouts…';
+        if (this.instantAvailable === false) return 'Select another bank account or keep the funds on the balance account.';
         return null;
     }
 
@@ -566,7 +605,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
                 this.onCashoutAccountChange(this.cashoutForm.get('balanceAccountId')?.value);
             },
             error: err => {
-                this.userCurrencyError = httpErrorMessage(err, 'We couldn\'t load your account currency. Refresh the page to try again.');
+                this.userCurrencyError = httpErrorMessage(err, 'Unable to load the account currency. Select Refresh to try again.');
             }
         });
     }
@@ -618,14 +657,15 @@ export class CashManagementComponent implements OnInit, OnDestroy {
         ];
 
         const confirmed = await this.confirmService.confirm({
-            title: 'Confirm cash out',
-            message: 'The fee is charged on top of the amount you cash out.',
+            title: `Cash out ${formatMoney(this.cashoutAmountMinor, currency)}?`,
+            message: 'The fee is charged on top of the amount cashed out.',
             details: rows,
             confirmText: 'Cash out'
         });
         if (!confirmed) return;
 
         this.submittingCashout = true;
+        this.cashoutError = '';
         this.cashManagementService.cashout({
             userId: this.userId,
             balanceAccountId: val.balanceAccountId,
@@ -639,8 +679,8 @@ export class CashManagementComponent implements OnInit, OnDestroy {
                 this.cashoutRecap = {
                     title: 'Cash out requested',
                     message: val.transferInstrumentId
-                        ? 'The funds are on their way to your bank account.'
-                        : 'The funds will be available on your balance account shortly.',
+                        ? 'The funds are on their way to the bank account.'
+                        : 'The funds will be available on the balance account shortly.',
                     rows
                 };
                 formDir.resetForm({balanceAccountId: '', currency: this.userCurrency, amount: null, transferInstrumentId: '', description: ''});
@@ -650,7 +690,7 @@ export class CashManagementComponent implements OnInit, OnDestroy {
             error: err => {
                 this.submittingCashout = false;
                 const msg = httpErrorMessage(err, 'The cash out request failed. Try again.');
-                this.toastError(msg);
+                this.cashoutError = msg;
                 const match = msg.match(/(\d+) seconds/);
                 if (match) {
                     this.startCooldownTimer(parseInt(match[1], 10));
@@ -716,13 +756,5 @@ export class CashManagementComponent implements OnInit, OnDestroy {
 
     private capitalize(value: string | null | undefined): string {
         return value ? value.charAt(0).toUpperCase() + value.slice(1) : '';
-    }
-
-    private toastSuccess(message: string) {
-        this.snackBar.open(message, 'Close', {duration: 3000, panelClass: 'fintech-snack-success'});
-    }
-
-    private toastError(message: string) {
-        this.snackBar.open(message, 'Close', {duration: 6000, panelClass: 'fintech-snack-error'});
     }
 }

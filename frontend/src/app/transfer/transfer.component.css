@@ -3,139 +3,163 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 .mono { font-family: var(--fintech-font-mono); }
 
 /* Page title */
-.page-title h1 { font-size: 28px; font-weight: 700; margin: 0 0 8px 0; color: var(--fintech-text); letter-spacing: -0.5px; }
-.page-title p { font-size: 15px; color: var(--fintech-text-secondary); margin: 0; }
+.page-title h1 { font-size: 1.75rem; font-weight: 700; margin: 0 0 8px 0; color: var(--fintech-text); letter-spacing: -0.5px; }
+.page-title p { font-size: 0.9375rem; color: var(--fintech-text-secondary); margin: 0; }
 
 /* Balance card */
 .account-header { text-align: center; margin-bottom: 24px; }
-.account-label { color: var(--fintech-text-secondary); font-size: 14px; font-weight: 500; margin: 0 0 8px 0; }
-.account-balance { font-size: 40px; font-weight: 700; color: var(--fintech-text); margin: 0 0 8px 0; letter-spacing: -1px; overflow-wrap: anywhere; }
-.account-details { font-size: 13px; color: var(--fintech-text-secondary); margin: 0; overflow-wrap: anywhere; }
+.account-label { color: var(--fintech-text-secondary); font-size: 0.875rem; font-weight: 500; margin: 0 0 8px 0; }
+.account-balance { font-size: 2.5rem; font-weight: 700; color: var(--fintech-text); margin: 0 0 8px 0; letter-spacing: -1px; overflow-wrap: anywhere; }
+.account-details { font-size: 0.8125rem; color: var(--fintech-text-secondary); margin: 0; overflow-wrap: anywhere; }
 .account-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+.statement-alert { margin-top: 16px; }
 
 .fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.fintech-btn.primary { background-color: var(--fintech-primary) !important; color: white !important; }
-.fintech-btn:disabled { background-color: var(--fintech-border) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; opacity: 0.7; box-shadow: none !important; }
-.fintech-btn.secondary { background-color: var(--fintech-bg) !important; color: var(--fintech-text) !important; border: none !important; }
+.fintech-btn.primary { background-color: var(--fintech-primary) !important; color: var(--fintech-on-primary) !important; }
+.fintech-btn.secondary { background-color: var(--fintech-surface-muted) !important; color: var(--fintech-text) !important; border: none !important; }
+.fintech-btn:disabled { background-color: var(--fintech-surface-muted) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; box-shadow: none !important; }
 
 /* Statements menu: it opens in an overlay, so these rules target the elements of the template */
-.statements-menu-title { margin: 0; padding: 4px 16px 8px; font-size: 12px; font-weight: 600; color: var(--fintech-text-secondary); }
-.statements-menu-state { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 16px 12px; font-size: 13px; line-height: 1.4; color: var(--fintech-text-secondary); }
+.statements-menu-title { margin: 0; padding: 4px 16px 8px; font-size: 0.75rem; font-weight: 600; color: var(--fintech-text-secondary); }
+.statements-menu-state { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 16px 12px; font-size: 0.8125rem; line-height: 1.4; color: var(--fintech-text-secondary); }
 .statement-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
-.statement-currency { padding: 2px 8px; border-radius: 999px; background: var(--fintech-bg); color: var(--fintech-text-secondary); font-size: 12px; font-weight: 600; }
+.statement-currency { padding: 2px 8px; border-radius: 999px; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); font-size: 0.75rem; font-weight: 600; }
 
 /* No device warning */
 .no-device-warning { border-left: 4px solid var(--fintech-warning) !important; display: flex; flex-direction: column; gap: 20px; }
 .warning-banner { display: flex; align-items: flex-start; gap: 16px; }
-.warning-icon-wrapper { width: 48px; height: 48px; background: var(--fintech-warning-bg); color: var(--fintech-warning); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.warning-icon-wrapper mat-icon { font-size: 28px; width: 28px; height: 28px; }
-.warning-text h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px 0; color: var(--fintech-text); }
-.warning-text p { font-size: 13px; color: var(--fintech-text-secondary); margin: 0; line-height: 1.5; }
+.warning-icon-wrapper { width: 3rem; height: 3rem; background: var(--fintech-warning-bg); color: var(--fintech-warning); border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.warning-icon-wrapper mat-icon { font-size: 1.75rem; width: 1.75rem; height: 1.75rem; }
+.warning-text h2 { font-size: 1.0625rem; font-weight: 600; margin: 0 0 6px 0; color: var(--fintech-text); }
+.warning-text p { font-size: 0.8125rem; color: var(--fintech-text-secondary); margin: 0; line-height: 1.5; }
 
 /* Transactions section */
 .tx-section { display: flex; flex-direction: column; gap: 16px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.page-header h2 { font-size: 22px; font-weight: 700; margin: 0 0 4px 0; color: var(--fintech-text); }
-.page-header .subtitle { font-size: 14px; color: var(--fintech-text-secondary); margin: 0; }
-.header-actions { display: flex; align-items: center; gap: 12px; }
-.last-updated-label { font-size: 12px; color: var(--fintech-text-secondary); white-space: nowrap; }
+.page-header h2 { font-size: 1.375rem; font-weight: 700; margin: 0 0 4px 0; color: var(--fintech-text); }
+.page-header .subtitle { font-size: 0.875rem; color: var(--fintech-text-secondary); margin: 0; }
+.header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.last-updated-label { font-size: 0.75rem; color: var(--fintech-text-secondary); }
 
 /* Loading, empty and error */
 .loading-state, .empty-state { text-align: center; padding: 64px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); }
 .loading-state mat-spinner { margin: 0 auto 16px; }
 .loading-state p { color: var(--fintech-text-secondary); margin: 0; }
-.empty-state mat-icon { font-size: 64px; width: 64px; height: 64px; color: var(--fintech-border); margin-bottom: 16px; }
-.empty-state h3 { margin: 0 0 8px; }
+.empty-state mat-icon { font-size: 4rem; width: 4rem; height: 4rem; color: var(--fintech-text-tertiary); margin-bottom: 16px; }
+.empty-state h3 { margin: 0 0 8px; color: var(--fintech-text); }
 .empty-state p { color: var(--fintech-text-secondary); margin: 0; }
 .empty-action { display: inline-flex; margin-top: 20px; }
-.error-state { text-align: center; padding: 48px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.error-state mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--fintech-danger); }
-.error-state span { color: var(--fintech-text-secondary); font-size: 14px; }
+.error-state { padding: 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .phone-approval { padding: 32px 24px; background: var(--fintech-surface); border-radius: var(--fintech-radius); display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.phone-approval h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--fintech-text); text-align: center; }
+.phone-approval h3 { margin: 0; font-size: 1.0625rem; font-weight: 600; color: var(--fintech-text); text-align: center; }
 
 /* Transactions list */
-.tx-scroll { overflow-x: auto; border-radius: var(--fintech-radius); }
-.tx-list { min-width: 640px; background: var(--fintech-surface); border-radius: var(--fintech-radius); overflow: hidden; border: 1px solid var(--fintech-border); }
-.tx-list-header { display: grid; grid-template-columns: 110px 1fr 1fr 100px 150px; padding: 12px 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fintech-text-secondary); border-bottom: 1px solid var(--fintech-border); background: var(--fintech-bg); }
-.tx-row { display: grid; grid-template-columns: 110px 1fr 1fr 100px 150px; padding: 14px 20px; align-items: center; border-bottom: 1px solid var(--fintech-border); cursor: pointer; transition: background 0.15s; }
-.tx-row:last-child { border-bottom: none; }
-.tx-row:hover { background: var(--fintech-bg); }
-.tx-row:focus-visible { outline: 2px solid var(--fintech-primary); outline-offset: -2px; }
+.tx-list { background: var(--fintech-surface); border-radius: var(--fintech-radius); overflow: hidden; border: 1px solid var(--fintech-border); }
+.tx-items { list-style: none; margin: 0; padding: 0; }
+.tx-items li + li { border-top: 1px solid var(--fintech-border); }
+.tx-list-header, .tx-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr) 7.5rem 9.5rem;
+  grid-template-areas: "date desc ref status amount";
+  column-gap: 12px;
+  padding: 14px 20px;
+  align-items: center;
+}
+.tx-list-header { padding-block: 12px; font-size: 0.75rem; font-weight: 600; color: var(--fintech-text-secondary); border-bottom: 1px solid var(--fintech-border); background: var(--fintech-bg); }
+.tx-row { width: 100%; box-sizing: border-box; border: none; margin: 0; background: transparent; font: inherit; color: inherit; text-align: left; }
+button.tx-row { cursor: pointer; transition: background 0.15s; }
+button.tx-row:hover { background: var(--fintech-bg); }
+button.tx-row:focus-visible { outline: 2px solid var(--fintech-primary); outline-offset: -2px; }
 
-.col-date { font-size: 13px; color: var(--fintech-text-secondary); }
-.col-description, .col-reference { min-width: 0; }
-.description-text { font-size: 14px; font-weight: 500; color: var(--fintech-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.reference-text { font-size: 12px; color: var(--fintech-text-secondary); font-family: var(--fintech-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.col-date { grid-area: date; font-size: 0.8125rem; color: var(--fintech-text-secondary); }
+.col-description { grid-area: desc; min-width: 0; }
+.col-reference { grid-area: ref; min-width: 0; }
+.col-status { grid-area: status; display: flex; flex-direction: column; gap: 2px; }
+.col-amount { grid-area: amount; font-size: 0.875rem; font-weight: 600; text-align: right; color: var(--fintech-text); }
+.description-text { font-size: 0.875rem; font-weight: 500; color: var(--fintech-text); overflow-wrap: anywhere; display: block; }
+.reference-text { font-size: 0.75rem; color: var(--fintech-text-secondary); font-family: var(--fintech-font-mono); overflow-wrap: anywhere; display: block; }
+.no-detail { font-size: 0.75rem; color: var(--fintech-text-secondary); }
 
-.col-status { display: flex; flex-direction: column; gap: 2px; }
-.status-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; text-transform: capitalize; width: fit-content; }
-.st-booked, .st-transferred { background: #e8f5e9; color: #2e7d32; }
-.st-authorised { background: #e3f2fd; color: #1565c0; }
-.st-refused, .st-failed { background: #ffebee; color: #c62828; }
-.st-received, .st-pending { background: #fff8e1; color: #a15c00; }
+.status-badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; width: fit-content; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+.status-badge.st-booked, .status-badge.st-transferred { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.status-badge.st-authorised { background: var(--fintech-info-bg); color: var(--fintech-info); }
+.status-badge.st-refused, .status-badge.st-failed { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
+.status-badge.st-received, .status-badge.st-pending { background: var(--fintech-warning-bg); color: var(--fintech-warning); }
 
-.col-amount { font-size: 14px; font-weight: 600; text-align: right; color: var(--fintech-text); }
 .tx-row .col-amount { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .amount-value { white-space: nowrap; }
-.amount-direction { font-size: 11px; font-weight: 500; color: var(--fintech-text-secondary); }
-.incoming-amount { color: #2e7d32 !important; }
+.amount-direction { font-size: 0.75rem; font-weight: 500; color: var(--fintech-text-secondary); }
+.incoming-amount { color: var(--fintech-success) !important; }
 
 /* Detail modal */
-.detail-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 2000; animation: fadeIn 0.2s ease; }
+.detail-overlay { position: fixed; inset: 0; background: var(--fintech-overlay); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 2000; animation: fadeIn 0.2s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.detail-modal { background: var(--fintech-surface); border-radius: 20px; width: 100%; max-width: 640px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); animation: slideUp 0.25s ease; }
+.detail-modal { background: var(--fintech-surface); color: var(--fintech-text); border-radius: 20px; width: 100%; max-width: 640px; max-height: 85vh; max-height: 85dvh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); animation: slideUp 0.25s ease; }
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 28px 16px; border-bottom: 1px solid var(--fintech-border); flex-shrink: 0; }
-.modal-header h2 { margin: 0; font-size: 20px; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .detail-modal { animation: fadeIn 0.15s ease; }
+}
+
+.modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 24px 28px 16px; border-bottom: 1px solid var(--fintech-border); flex-shrink: 0; }
+.modal-header h2 { margin: 0; font-size: 1.25rem; font-weight: 700; }
 .modal-body { padding: 20px 28px 28px; overflow-y: auto; flex: 1; }
 
 .detail-section { margin-bottom: 28px; }
 .detail-section:last-child { margin-bottom: 0; }
-.detail-section h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fintech-text-secondary); margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--fintech-border); }
+.detail-section h3 { font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--fintech-border); }
 
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; margin: 0; }
 .detail-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .detail-item dd { margin: 0; }
-.detail-item .label { font-size: 11px; font-weight: 600; color: var(--fintech-text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }
-.detail-item .value { font-size: 14px; color: var(--fintech-text); overflow-wrap: anywhere; }
-.detail-item .value.mono { font-family: var(--fintech-font-mono); font-size: 12px; }
-.detail-item .value.reason-text { color: #c62828; font-weight: 500; }
+.detail-item .label { font-size: 0.75rem; font-weight: 600; color: var(--fintech-text-secondary); }
+.detail-item .value { font-size: 0.875rem; color: var(--fintech-text); overflow-wrap: anywhere; }
+.detail-item .value.mono { font-family: var(--fintech-font-mono); font-size: 0.75rem; }
+.detail-item .value.reason-text { color: var(--fintech-danger); font-weight: 500; }
 
-.modal-loading, .modal-error { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 28px; }
+.modal-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 28px; }
 .modal-loading p { color: var(--fintech-text-secondary); margin: 0; }
-.modal-error mat-icon { font-size: 48px; width: 48px; height: 48px; color: var(--fintech-danger); }
-.modal-error span { color: var(--fintech-text-secondary); font-size: 14px; text-align: center; }
+.modal-error { padding: 24px 28px; }
 
 /* Direction badge */
-.direction-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; background: var(--fintech-bg); color: var(--fintech-text-secondary); }
-.direction-badge.incoming { background: #e8f5e9; color: #2e7d32; }
-.direction-badge.outgoing { background: #fce4ec; color: #c62828; }
-.direction-icon { font-size: 14px !important; width: 14px !important; height: 14px !important; }
+.direction-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+.direction-badge.incoming { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.direction-icon { font-size: 0.875rem !important; width: 0.875rem !important; height: 0.875rem !important; }
 
 /* Lifecycle timeline */
 .lifecycle-timeline { display: flex; flex-direction: column; list-style: none; margin: 0; padding: 0; }
 .lifecycle-event { display: flex; gap: 14px; }
 .event-dot-col { display: flex; flex-direction: column; align-items: center; width: 18px; flex-shrink: 0; }
-.event-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fintech-border); margin-top: 4px; flex-shrink: 0; }
-.dot-booked, .dot-transferred { background: #4caf50; }
-.dot-authorised { background: #1976d2; }
-.dot-refused, .dot-failed { background: #e53935; }
-.dot-received, .dot-pending { background: #ff9800; }
+.event-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--fintech-border-strong); margin-top: 4px; flex-shrink: 0; }
+.dot-booked, .dot-transferred { background: var(--fintech-success-fill); }
+.dot-authorised { background: var(--fintech-info); }
+.dot-refused, .dot-failed { background: var(--fintech-danger); }
+.dot-received, .dot-pending { background: var(--fintech-warning-fill); }
 .event-line { width: 2px; flex: 1; background: var(--fintech-border); min-height: 20px; }
 .event-info { padding-bottom: 16px; flex: 1; }
-.event-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.event-status { font-size: 13px; font-weight: 600; text-transform: capitalize; }
-.event-type { font-size: 12px; color: var(--fintech-text-secondary); }
-.event-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--fintech-text-secondary); }
+.event-header { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.event-status { font-size: 0.8125rem; font-weight: 600; }
+.event-status.st-booked, .event-status.st-transferred { color: var(--fintech-success); }
+.event-status.st-refused, .event-status.st-failed { color: var(--fintech-danger); }
+.event-type { font-size: 0.75rem; color: var(--fintech-text-secondary); }
+.event-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; color: var(--fintech-text-secondary); }
 .event-amount { font-weight: 500; }
 
 @media (max-width: 600px) {
   mat-card { padding: 20px 16px; }
-  .account-balance { font-size: 32px; }
+  .account-balance { font-size: 2rem; }
   .header-actions { width: 100%; justify-content: space-between; }
+  .tx-list-header { display: none; }
+  .tx-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "desc amount" "date status" "ref ref";
+    row-gap: 6px;
+    padding: 14px 16px;
+  }
+  .tx-row .col-amount { flex-direction: row; align-items: baseline; gap: 6px; }
+  .col-status { align-items: flex-end; text-align: right; }
+  .col-reference.empty { display: none; }
   .detail-grid { grid-template-columns: 1fr; }
   .modal-header { padding: 20px 20px 12px; }
   .modal-body { padding: 16px 20px 20px; }

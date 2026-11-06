@@ -3,7 +3,6 @@ import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {ActivatedRoute} from '@angular/router';
 import {FormBuilder, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
 import {CommonModule} from "@angular/common";
-import {MatSnackBar} from '@angular/material/snack-bar';
 import {firstValueFrom} from 'rxjs';
 import {MaterialModule} from '../material.module';
 import {PayoutConfiguration, BalanceAccount, PayoutAccount} from "../models";
@@ -11,7 +10,7 @@ import {AccountService, PayoutService, SessionService} from "../services";
 import {AdyenPlatformExperience, PayoutsOverview} from '@adyen/adyen-platform-experience-web';
 import "@adyen/adyen-platform-experience-web/adyen-platform-experience-web.css";
 import {PayoutTypePipe} from "./payout-type-pipe";
-import {ConfirmService, httpErrorMessage} from '../shared';
+import {ConfirmService, InlineAlertComponent, NotifyService, httpErrorMessage} from '../shared';
 import {describeSchedule} from '../banktransfer/schedule-label';
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -27,7 +26,8 @@ const BUSINESS_BANK_ACCOUNT = 'Business Bank Account';
         ReactiveFormsModule,
         FormsModule,
         MaterialModule,
-        PayoutTypePipe
+        PayoutTypePipe,
+        InlineAlertComponent
     ],
     templateUrl: './payout.component.html',
     styleUrl: './payout.component.css'
@@ -38,6 +38,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
     userId = '';
     selectedBalanceAccount = '';
     submitting = false;
+    submitError = '';
 
     accountsState: LoadState = 'loading';
     accountsError = '';
@@ -61,7 +62,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
     private payoutService = inject(PayoutService);
     private sessionService = inject(SessionService);
     private confirmService = inject(ConfirmService);
-    private matSnackBar = inject(MatSnackBar);
+    private notify = inject(NotifyService);
     private destroyRef = inject(DestroyRef);
 
     constructor() {
@@ -72,6 +73,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
             schedule: ['', Validators.required],
             transferInstrumentId: ['', Validators.required],
         });
+        this.configForm.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.submitError = '');
     }
 
     ngOnInit() {
@@ -129,7 +131,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 this.accountsState = 'error';
-                this.accountsError = httpErrorMessage(err, 'We couldn\'t load your balance accounts.');
+                this.accountsError = httpErrorMessage(err, "The balance accounts couldn't be loaded. Try again.");
             }
         });
     }
@@ -158,7 +160,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
             error: err => {
                 if (balanceAccountId !== this.selectedBalanceAccount) return;
                 this.configurationsState = 'error';
-                this.configurationsError = httpErrorMessage(err, 'We couldn\'t load the payout schedules for this account.');
+                this.configurationsError = httpErrorMessage(err, "The payout schedules of this account couldn't be loaded. Try again.");
             }
         });
     }
@@ -172,7 +174,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
             },
             error: err => {
                 this.payoutAccountsState = 'error';
-                this.payoutAccountsError = httpErrorMessage(err, 'We couldn\'t load your payout bank accounts.');
+                this.payoutAccountsError = httpErrorMessage(err, "The payout bank accounts couldn't be loaded. Try again.");
             }
         });
     }
@@ -183,20 +185,22 @@ export class PayoutComponent implements OnInit, OnDestroy {
         const bank = this.payoutAccounts().find(a => a.transferInstrumentId === transferInstrumentId);
 
         const confirmed = await this.confirmService.confirm({
-            title: 'Create payout schedule?',
-            message: 'The available balance in this currency is paid out automatically at each run.',
+            title: 'Create this payout schedule?',
+            message: 'The available balance in this currency is paid out automatically to the bank account at each run.',
             details: [
-                {label: 'From', value: this.selectedAccount?.description || this.selectedBalanceAccount},
-                {label: 'To', value: bank?.accountIdentifier || transferInstrumentId},
+                {label: 'Balance account', value: this.selectedAccount?.description || this.selectedBalanceAccount},
                 {label: 'Currency', value: currencyCode},
                 {label: 'Frequency', value: this.scheduleLabel(schedule)},
-                {label: 'Speed', value: [regular ? 'Regular' : '', instant ? 'Instant' : ''].filter(Boolean).join(', ')}
+                {label: 'Speed', value: [regular ? 'Regular' : '', instant ? 'Instant' : ''].filter(Boolean).join(', ')},
+                {label: 'Payout bank account', value: bank?.accountIdentifier || transferInstrumentId}
             ],
-            confirmText: 'Create schedule'
+            confirmText: 'Create schedule',
+            cancelText: 'Cancel'
         });
         if (!confirmed) return;
 
         this.submitting = true;
+        this.submitError = '';
         this.payoutService.createPayoutConfiguration({
             userId: this.userId,
             balanceAccountId: this.selectedBalanceAccount,
@@ -208,14 +212,13 @@ export class PayoutComponent implements OnInit, OnDestroy {
         }).subscribe({
             next: res => {
                 this.payoutConfigurations.set([...this.payoutConfigurations(), res]);
-                this.matSnackBar.open('Payout schedule created', 'Close', {duration: 3000, panelClass: 'fintech-snack-success'});
+                this.notify.success('Payout schedule created');
                 formDir.resetForm({currencyCode: '', regular: true, instant: false, schedule: '', transferInstrumentId: ''});
                 this.submitting = false;
             },
             error: err => {
-                this.matSnackBar.open(httpErrorMessage(err, 'We couldn\'t create the payout schedule. Try again.'), 'Close',
-                    {duration: 6000, panelClass: 'fintech-snack-error'});
                 this.submitting = false;
+                this.submitError = httpErrorMessage(err, "The payout schedule couldn't be created. Check the details and try again.");
             }
         });
     }
@@ -238,7 +241,7 @@ export class PayoutComponent implements OnInit, OnDestroy {
             this.overviewState = 'ready';
         } catch (err) {
             this.overviewState = 'error';
-            this.overviewError = httpErrorMessage(err, 'We couldn\'t load the payouts overview.');
+            this.overviewError = httpErrorMessage(err, "The payouts overview couldn't be loaded. Try again.");
         }
     }
 }

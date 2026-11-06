@@ -214,7 +214,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
       const session = await firstValueFrom(this.remoteSessions.decline(this.token));
       this.apply(session);
     } catch (err) {
-      this.error.set(httpErrorMessage(err, "Couldn't decline the request. Try again."));
+      this.error.set(httpErrorMessage(err, "Unable to decline the request. Try again."));
     }
   }
 
@@ -235,7 +235,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
       await this.associate();
       return;
     }
-    this.status.set('Preparing your passkey...');
+    this.status.set('Preparing your passkey…');
     const response = await firstValueFrom(this.remoteSessions.register(this.token, this.availability));
     const output = await this.usePasskey('register', response.sdkInput!);
     if (output !== null) {
@@ -244,7 +244,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
   }
 
   private async associate() {
-    this.status.set('Linking this phone to your bank account...');
+    this.status.set('Linking this phone to your bank account…');
     const response = await firstValueFrom(this.remoteSessions.associate(this.token));
     const output = await this.usePasskey('associate', response.sdkInput!);
     if (output !== null) {
@@ -253,7 +253,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
   }
 
   private async runApproval() {
-    this.status.set('Preparing the approval...');
+    this.status.set('Preparing the approval…');
     const response = await firstValueFrom(this.remoteSessions.challenge(this.token, this.availability));
     if (response.status === 'completed') {
       this.finish();
@@ -269,7 +269,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
     this.pending = null;
     this.pendingStep.set(null);
     if (step === 'register') {
-      this.status.set('Registering this phone...');
+      this.status.set('Registering this phone…');
       const response = await firstValueFrom(
         this.remoteSessions.finalizeRegistration(this.token, output, currentDeviceKind(), this.label)
       );
@@ -279,10 +279,10 @@ export class ContinueComponent implements OnInit, OnDestroy {
         return;
       }
     } else if (step === 'associate') {
-      this.status.set('Linking this phone to your bank account...');
+      this.status.set('Linking this phone to your bank account…');
       await firstValueFrom(this.remoteSessions.finalizeAssociation(this.token, output));
     } else {
-      this.status.set('Approving...');
+      this.status.set('Approving…');
       await firstValueFrom(this.remoteSessions.approve(this.token, output));
     }
     this.finish();
@@ -293,7 +293,7 @@ export class ContinueComponent implements OnInit, OnDestroy {
    * may have dismissed the prompt. A Continue button then calls it again directly.
    */
   private async usePasskey(step: PasskeyStep, sdkInput: string): Promise<string | null> {
-    this.status.set(step === 'register' ? 'Creating your passkey...' : 'Waiting for your passkey...');
+    this.status.set(step === 'register' ? 'Creating your passkey…' : 'Waiting for your passkey…');
     try {
       const output = step === 'register' ? await this.sca.register(sdkInput) : await this.sca.authenticate(sdkInput);
       return String(output);
@@ -332,9 +332,9 @@ export class ContinueComponent implements OnInit, OnDestroy {
   private failToOpen(err: unknown) {
     const status = httpStatus(err);
     if (status === 0) {
-      this.end("Couldn't reach the server", 'Check the connection of your phone, then scan the QR code again.');
+      this.end("Unable to reach the server", 'Check the connection of your phone, then scan the QR code again.');
     } else if (status !== null && status !== 404) {
-      this.end("Couldn't open this request", httpErrorMessage(err, 'Something went wrong. Scan the QR code again.'));
+      this.end("Unable to open this request", httpErrorMessage(err, 'Something went wrong. Scan the QR code again.'));
     } else {
       this.end('This link is no longer valid', 'Start again on your computer, then scan the new QR code.');
     }

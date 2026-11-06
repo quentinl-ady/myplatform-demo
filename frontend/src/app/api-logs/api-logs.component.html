@@ -4,7 +4,7 @@
   <div class="panel-header">
     <div class="panel-header-left">
       <mat-icon class="panel-header-icon" aria-hidden="true">api</mat-icon>
-      <h2>API Explorer</h2>
+      <h2>API explorer</h2>
     </div>
     <div class="panel-header-right">
       <button
@@ -29,6 +29,7 @@
       <button
         type="button"
         mat-icon-button
+        class="danger-btn"
         (click)="clearLogs()"
         [disabled]="logs.length === 0 || clearing()"
         matTooltip="Clear API calls"
@@ -42,7 +43,7 @@
         cdkFocusInitial
         (click)="close()"
         matTooltip="Close"
-        aria-label="Close API Explorer">
+        aria-label="Close API explorer">
         <mat-icon aria-hidden="true">close</mat-icon>
       </button>
     </div>
@@ -112,11 +113,14 @@
     </button>
   </div>
 
+  <div class="panel-alert" *ngIf="clearError()">
+    <app-inline-alert title="Unable to clear the API calls" actionLabel="Try again" (action)="clearLogs()"
+                      [dismissible]="true" (dismiss)="clearError.set(null)">{{ clearError() }}</app-inline-alert>
+  </div>
+
   <!-- Refresh error while a list is already shown -->
-  <div class="inline-error" *ngIf="loadError() && logs.length > 0" role="alert">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <span>{{ loadError() }}</span>
-    <button type="button" class="link-btn" (click)="loadLogs()">Retry</button>
+  <div class="panel-alert" *ngIf="loadError() && logs.length > 0">
+    <app-inline-alert actionLabel="Try again" (action)="loadLogs()">{{ loadError() }}</app-inline-alert>
   </div>
 
   <!-- Log List -->
@@ -129,7 +133,7 @@
     <div *ngIf="!loading() && loadError() && logs.length === 0" class="empty-state" role="alert">
       <mat-icon class="empty-icon error" aria-hidden="true">cloud_off</mat-icon>
       <p>{{ loadError() }}</p>
-      <button type="button" mat-stroked-button class="retry-btn" (click)="loadLogs()">Retry</button>
+      <button type="button" mat-stroked-button class="retry-btn" (click)="loadLogs()">Try again</button>
     </div>
 
     <ng-container *ngIf="!loading() && !(loadError() && logs.length === 0)">
@@ -175,7 +179,7 @@
 
           <span class="log-time" [attr.title]="formatDateTime(log.timestamp)">{{ getTimeAgo(log.timestamp) }}</span>
 
-          <span class="impactful-chip" *ngIf="isImpactful(log)">write</span>
+          <span class="impactful-chip" *ngIf="isImpactful(log)">Write</span>
 
           <mat-icon class="expand-arrow" aria-hidden="true">{{ expandedLogId === log.id ? 'expand_less' : 'expand_more' }}</mat-icon>
         </button>
@@ -243,6 +247,8 @@
               <mat-icon aria-hidden="true">{{ copiedId === 'req-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
             </button>
             <pre class="json-preview" tabindex="0" aria-label="Request body">{{ formatJson(log.requestBody) || '(empty)' }}</pre>
+            <app-inline-alert class="copy-alert" *ngIf="copyErrorId() === 'req-' + log.id" title="Unable to copy the request body"
+                              [dismissible]="true" (dismiss)="copyErrorId.set(null)">Select the text and copy it manually.</app-inline-alert>
           </div>
           <div class="json-container" *ngIf="activeTab === 'response'">
             <button
@@ -255,6 +261,8 @@
               <mat-icon aria-hidden="true">{{ copiedId === 'res-' + log.id ? 'check' : 'content_copy' }}</mat-icon>
             </button>
             <pre class="json-preview" tabindex="0" aria-label="Response body">{{ formatJson(log.responseBody) || '(empty)' }}</pre>
+            <app-inline-alert class="copy-alert" *ngIf="copyErrorId() === 'res-' + log.id" title="Unable to copy the response body"
+                              [dismissible]="true" (dismiss)="copyErrorId.set(null)">Select the text and copy it manually.</app-inline-alert>
           </div>
         </div>
       </li>

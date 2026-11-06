@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -11,11 +11,29 @@ import {
   CardTransferValidationFact
 } from '../models';
 import { IssuingService } from '../services';
-import { formatMoney, httpErrorMessage } from '../shared';
+import { InlineAlertComponent, formatMoney, httpErrorMessage } from '../shared';
 import { MCC_CODES } from '../industry-codes';
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short', year: 'numeric' };
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { ...DATE_FORMAT, hour: '2-digit', minute: '2-digit' };
+
+/** Labels for transfer and event statuses; anything else is humanized. */
+const STATUS_LABELS: Record<string, string> = {
+  received: 'Received',
+  authorised: 'Authorised',
+  captured: 'Captured',
+  booked: 'Booked',
+  refused: 'Declined',
+  refunded: 'Refunded',
+  refundPending: 'Refund pending',
+  expired: 'Expired',
+  error: 'Failed'
+};
+const CARD_STATUS_LABELS: Record<string, string> = { active: 'Active', suspended: 'Suspended', closed: 'Closed' };
+const ADVICE_LABELS: Record<string, string> = {
+  DenyTransaction: 'Declined by a rule',
+  AllowTransaction: 'Allowed by the rules'
+};
 
 @Component({
   selector: 'app-card-transactions',
@@ -24,14 +42,15 @@ const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = { ...DATE_FORMAT, hour: '2-
     CommonModule,
     FormsModule,
     A11yModule,
-    MaterialModule
+    MaterialModule,
+    RouterLink,
+    InlineAlertComponent
   ],
   templateUrl: './card-transactions.component.html',
   styleUrl: './card-transactions.component.css'
 })
 export class CardTransactionsComponent implements OnInit {
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
   private issuingService = inject(IssuingService);
   private cdr = inject(ChangeDetectorRef);
 
@@ -72,7 +91,7 @@ export class CardTransactionsComponent implements OnInit {
       },
       error: (err) => {
         this.isLoadingCards = false;
-        this.cardsError = httpErrorMessage(err, "Couldn't load your cards. Try again.");
+        this.cardsError = httpErrorMessage(err, "The cards couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -99,7 +118,7 @@ export class CardTransactionsComponent implements OnInit {
       error: (err) => {
         this.transfers = [];
         this.isLoading = false;
-        this.transfersError = httpErrorMessage(err, "Couldn't load the card transactions. Try again.");
+        this.transfersError = httpErrorMessage(err, "The card transactions couldn't be loaded. Try again.");
         this.cdr.detectChanges();
       }
     });
@@ -112,7 +131,8 @@ export class CardTransactionsComponent implements OnInit {
   cardOptionLabel(card: CardResponse): string {
     const brand = card.brand === 'visa' ? 'Visa' : card.brand === 'mc' ? 'Mastercard' : card.brand;
     const currency = card.currencyCode ? ` · ${card.currencyCode}` : '';
-    return `${card.cardholderName} · ${brand} •••• ${card.lastFour}${currency} (${card.status})`;
+    const status = CARD_STATUS_LABELS[card.status] ?? this.humanize(card.status);
+    return `${card.cardholderName} · ${brand} •••• ${card.lastFour}${currency} (${status})`;
   }
 
   onCardFilterChange() {
@@ -125,10 +145,6 @@ export class CardTransactionsComponent implements OnInit {
     } else {
       this.loadTransfers();
     }
-  }
-
-  navigateToCreate() {
-    this.router.navigate(['/', this.userId, 'card-create']);
   }
 
   openDetail(transfer: CardTransfer, event?: Event) {
@@ -200,6 +216,14 @@ export class CardTransactionsComponent implements OnInit {
     if (!value) return '';
     const words = value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase();
     return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+
+  statusLabel(status: string): string {
+    return STATUS_LABELS[status] ?? (this.humanize(status) || 'Unknown');
+  }
+
+  adviceLabel(advice: string): string {
+    return ADVICE_LABELS[advice] ?? this.humanize(advice);
   }
 
   channelLabel(processingType: string): string {

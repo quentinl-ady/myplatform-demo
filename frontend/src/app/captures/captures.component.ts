@@ -4,12 +4,11 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { CheckoutPayment, CheckoutPaymentOperation, CheckoutPaymentState } from '../models';
 import { CaptureService } from '../services';
-import { ConfirmService, MoneyPipe, formatDateTime, formatMoney, formatTimeAgo, httpErrorMessage } from '../shared';
+import { ConfirmService, InlineAlertComponent, MoneyPipe, NotifyService, formatDateTime, formatMoney, formatTimeAgo, httpErrorMessage } from '../shared';
 import { describeCaptureMode, describeSplitMode, splitLineLabel } from '../checkout/advanced-options/advanced-options';
 import { CaptureDialogComponent, CaptureDialogData } from './capture-dialog.component';
 
@@ -42,7 +41,7 @@ const POLL_INTERVAL_MS = 10000;
 @Component({
   selector: 'app-captures',
   standalone: true,
-  imports: [CommonModule, MaterialModule, RouterLink, MoneyPipe],
+  imports: [CommonModule, MaterialModule, RouterLink, MoneyPipe, InlineAlertComponent],
   templateUrl: './captures.component.html',
   styleUrl: './captures.component.css'
 })
@@ -50,7 +49,7 @@ export class CapturesComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private captureService = inject(CaptureService);
   private dialog = inject(MatDialog);
-  private snackBar = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private confirmService = inject(ConfirmService);
   private liveAnnouncer = inject(LiveAnnouncer);
   private destroyRef = inject(DestroyRef);
@@ -63,6 +62,8 @@ export class CapturesComponent implements OnInit {
   readonly filter = signal<Filter>('all');
   readonly expandedId = signal<string | null>(null);
   readonly cancellingId = signal<string | null>(null);
+  /** Failed cancellation, shown under the row of the payment. */
+  readonly rowError = signal<{ id: string; message: string } | null>(null);
 
   readonly openCount = computed(() => this.payments().filter(p => this.isOpen(p)).length);
   readonly visiblePayments = computed(() =>
@@ -108,7 +109,7 @@ export class CapturesComponent implements OnInit {
         this.refreshing.set(false);
       },
       error: err => {
-        if (fullLoad) this.loadError.set(httpErrorMessage(err, "Couldn't load the payments. Try again."));
+        if (fullLoad) this.loadError.set(httpErrorMessage(err, "Unable to load the payments. Try again."));
         this.loading.set(false);
         this.refreshing.set(false);
       }
@@ -126,9 +127,7 @@ export class CapturesComponent implements OnInit {
     const amount = operation.amount != null ? ` of ${formatMoney(operation.amount, payment.currency)}` : '';
     const action = operation.type === 'CANCEL' ? 'cancellation' : `capture${amount}`;
     const reason = operation.reason ? `: ${operation.reason}` : '';
-    this.snackBar.open(`${payment.merchantReference}: the ${action} failed${reason}.`, 'Close', {
-      duration: 8000, panelClass: 'fintech-snack-error'
-    });
+    this.notify.error(`${payment.merchantReference}: the ${action} failed${reason}. Open the payment to see its history.`);
   }
 
   setFilter(filter: Filter): void {
@@ -153,8 +152,7 @@ export class CapturesComponent implements OnInit {
     ref.afterClosed().subscribe(updated => {
       if (!updated) return;
       this.replace(updated);
-      const message = 'Capture sent to Adyen. The status changes when the CAPTURE webhook arrives.';
-      this.snackBar.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-success' });
+      this.notify.success('Capture sent to Adyen. The status changes when Adyen confirms the capture.');
     });
   }
 
@@ -173,19 +171,17 @@ export class CapturesComponent implements OnInit {
     });
     if (!confirmed) return;
 
+    this.rowError.set(null);
     this.cancellingId.set(payment.id);
     this.captureService.cancel(payment.id, this.userId).subscribe({
       next: updated => {
         this.cancellingId.set(null);
         this.replace(updated);
-        const message = 'Cancellation sent to Adyen. The status changes when the CANCELLATION webhook arrives.';
-        this.snackBar.open(message, 'Close', { duration: 6000, panelClass: 'fintech-snack-success' });
+        this.notify.success('Cancellation sent to Adyen. The status changes when Adyen confirms the cancellation.');
       },
       error: err => {
         this.cancellingId.set(null);
-        this.snackBar.open(httpErrorMessage(err, "Couldn't cancel the payment. Try again."), 'Close', {
-          duration: 6000, panelClass: 'fintech-snack-error'
-        });
+        this.rowError.set({ id: payment.id, message: httpErrorMessage(err, "Unable to cancel the payment. Try again.") });
         this.fetch(false);
       }
     });
@@ -201,7 +197,7 @@ export class CapturesComponent implements OnInit {
   }
 
   stateOf(payment: CheckoutPayment): StateView {
-    return STATES[payment.state] ?? { label: payment.state, icon: 'help_outline', tone: 'neutral' };
+    return STATES[payment.state] ?? { label: 'Unknown status', icon: 'help_outline', tone: 'neutral' };
   }
 
   captureText(payment: CheckoutPayment): string {
@@ -248,7 +244,7 @@ export class CapturesComponent implements OnInit {
   }
 
   operationStatus(operation: CheckoutPaymentOperation): string {
-    const webhook = operation.type === 'CANCEL' ? 'CANCELLATION' : 'CAPTURE';
+    const webhook = operation.type === 'CANCEL' ? 'cancellation' : 'capture';
     switch (operation.status) {
       case 'SUCCEEDED':
         return 'Confirmed by Adyen';

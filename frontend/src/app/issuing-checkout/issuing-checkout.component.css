@@ -11,7 +11,7 @@
   text-align: left;
 }
 .header-section h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--fintech-text);
   margin: 0 0 8px 0;
@@ -19,7 +19,7 @@
 }
 .header-section p {
   color: var(--fintech-text-secondary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin: 0;
 }
 
@@ -45,25 +45,6 @@
   display: none;
 }
 
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-  padding: 40px 24px;
-}
-.error-state mat-icon {
-  font-size: 40px;
-  width: 40px;
-  height: 40px;
-  color: var(--fintech-danger);
-}
-.error-state p {
-  margin: 0;
-  color: var(--fintech-text);
-}
-
 mat-card {
   background: var(--fintech-surface);
   border-radius: var(--fintech-radius);
@@ -71,7 +52,7 @@ mat-card {
   padding: 24px;
 }
 .card-title {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   margin: 0 0 24px 0;
   color: var(--fintech-text);
@@ -94,7 +75,7 @@ mat-card {
 
 .form-group label {
   display: block;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--fintech-text-secondary);
   margin-bottom: 8px;
@@ -108,42 +89,49 @@ mat-card {
 .input-icon {
   position: absolute;
   left: 12px;
-  color: var(--fintech-text-secondary);
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  color: var(--fintech-text-tertiary);
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .fintech-input {
   width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--fintech-border);
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--fintech-border-strong);
   border-radius: 10px;
-  font-size: 15px;
+  font: inherit;
+  font-size: max(1rem, 16px);
   box-sizing: border-box;
   background: var(--fintech-surface);
+  color: var(--fintech-text);
   transition: border-color 0.2s;
 }
 .fintech-input.pl-40 {
   padding-left: 40px;
 }
+/* Chevron drawn with gradients so it follows the text token in dark mode and increased contrast. */
 select.fintech-input {
   appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--fintech-text-secondary) 50%),
+    linear-gradient(135deg, var(--fintech-text-secondary) 50%, transparent 50%);
+  background-position: right 20px center, right 15px center;
+  background-size: 5px 5px;
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  background-size: 16px;
   padding-right: 40px;
 }
 .fintech-input:focus {
-  outline: none;
   border-color: var(--fintech-primary);
 }
 
 .helper-text {
-  font-size: 11px;
+  font-size: 0.75rem;
+  line-height: 1.45;
   margin-top: 6px;
   display: block;
+  color: var(--fintech-text-secondary);
 }
 .helper-text.error {
   color: var(--fintech-danger);
@@ -155,15 +143,16 @@ select.fintech-input {
 .submit-hint {
   margin-top: -8px;
   text-align: center;
-  font-size: 12px;
-  color: var(--fintech-text-secondary);
 }
 
 .mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
+.mb-12 { display: block; margin-bottom: 12px; }
 
 /* Buttons */
 .fintech-btn {
+  min-height: 48px;
+  height: auto !important;
   border-radius: 24px !important;
   padding: 12px 24px !important;
   font-weight: 600 !important;
@@ -175,14 +164,18 @@ select.fintech-input {
 }
 .fintech-btn.primary {
   background-color: var(--fintech-primary) !important;
-  color: white !important;
+  color: var(--fintech-on-primary) !important;
+}
+.fintech-btn.primary:disabled {
+  background-color: var(--fintech-surface-muted) !important;
+  color: var(--fintech-text-secondary) !important;
 }
 .fintech-btn.full-width {
   width: 100%;
-  font-size: 15px !important;
+  font-size: 0.9375rem !important;
 }
 .fintech-btn.secondary {
-  border-color: var(--fintech-border) !important;
+  border-color: var(--fintech-border-strong) !important;
   color: var(--fintech-text) !important;
 }
 
@@ -197,6 +190,11 @@ select.fintech-input {
   border: 1px solid var(--fintech-primary);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
 }
+/* The Drop-in only ships light styles: it sits on a light panel in dark mode too. */
+.dropin-island {
+  padding: 16px;
+  border-radius: 12px;
+}
 
 .empty-dropin {
   display: flex;
@@ -210,26 +208,26 @@ select.fintech-input {
   padding: 40px;
 }
 .empty-dropin mat-icon {
-  font-size: 48px;
-  width: 48px;
-  height: 48px;
+  font-size: 3rem;
+  width: 3rem;
+  height: 3rem;
   margin-bottom: 16px;
-  opacity: 0.5;
+  color: var(--fintech-text-tertiary);
 }
 .empty-dropin p {
-  font-size: 14px;
+  font-size: 0.875rem;
   margin: 0;
   line-height: 1.5;
 }
 
 
 /* Adyen overrides to make it fit the theme */
-::ng-deep .adyen-checkout__payment-method {
+:host ::ng-deep .adyen-checkout__payment-method {
   border-radius: 12px !important;
   border: 1px solid var(--fintech-border) !important;
   margin-bottom: 8px !important;
 }
-::ng-deep .adyen-checkout__button--pay {
+:host ::ng-deep .adyen-checkout__button--pay {
   border-radius: 24px !important;
   background-color: var(--fintech-primary) !important;
   font-weight: 600 !important;
@@ -251,11 +249,13 @@ select.fintech-input {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 16px;
+  min-height: 44px;
+  padding: 10px 16px;
   border: none;
   background: transparent;
   border-radius: 10px;
-  font-size: 14px;
+  font: inherit;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--fintech-text-secondary);
   cursor: pointer;
@@ -267,17 +267,19 @@ select.fintech-input {
 }
 .tab-btn.active {
   background: var(--fintech-primary);
-  color: white;
+  color: var(--fintech-on-primary);
+  font-weight: 600;
 }
 .tab-btn mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }
 
 /* Section description */
 .section-desc {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--fintech-text-secondary);
   margin: -16px 0 16px 0;
   line-height: 1.5;
@@ -294,7 +296,7 @@ select.fintech-input {
   margin-bottom: 12px;
 }
 .stored-methods-header h3 {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: 600;
   margin: 0;
   color: var(--fintech-text);
@@ -303,7 +305,7 @@ select.fintech-input {
 .loading-state.compact {
   padding: 24px 0;
   flex-direction: row;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .empty-stored {
@@ -315,19 +317,15 @@ select.fintech-input {
   color: var(--fintech-text-secondary);
 }
 .empty-stored mat-icon {
-  font-size: 36px;
-  width: 36px;
-  height: 36px;
-  opacity: 0.4;
+  font-size: 2.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--fintech-text-tertiary);
   margin-bottom: 8px;
 }
 .empty-stored p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   margin: 0;
-}
-.empty-stored.error mat-icon {
-  color: var(--fintech-danger);
-  opacity: 1;
 }
 
 .stored-card-list {
@@ -335,78 +333,91 @@ select.fintech-input {
   flex-direction: column;
   gap: 8px;
 }
-.stored-card-item {
+.stored-card-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border: 1px solid var(--fintech-border);
+  gap: 4px;
+  padding-right: 4px;
+  border: 1px solid var(--fintech-border-strong);
   border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.2s;
 }
-.stored-card-item:hover {
+.stored-card-row:hover {
   border-color: var(--fintech-text-secondary);
 }
-.stored-card-item.selected {
-  border-color: var(--fintech-primary);
-  background: rgba(0, 0, 0, 0.02);
+.stored-card-row.selected {
+  border: 2px solid var(--fintech-primary);
+  margin: -1px;
 }
-.card-brand-icon mat-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
-  color: var(--fintech-text-secondary);
+.stored-card-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+/* The radio is visually hidden: its focus ring is drawn on the label. */
+.stored-card-row input:focus-visible + .stored-card-item {
+  outline: 2px solid var(--fintech-primary);
+  outline-offset: 2px;
+}
+.card-brand-icon {
+  flex-shrink: 0;
+  font-size: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--fintech-text-tertiary);
 }
 .card-info {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 8rem;
 }
 .card-brand {
-  font-size: 12px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--fintech-text);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 .card-number {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--fintech-text);
   font-family: var(--fintech-font-mono);
 }
-.card-expiry {
-  font-size: 11px;
+.card-expiry,
+.card-holder {
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
 }
 .card-holder {
-  font-size: 12px;
-  color: var(--fintech-text-secondary);
+  overflow-wrap: anywhere;
+}
+.check-icon {
+  flex-shrink: 0;
+  color: var(--fintech-text-tertiary);
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.stored-card-row.selected .check-icon {
+  color: var(--fintech-primary);
 }
 .delete-token-btn {
+  flex-shrink: 0;
   color: var(--fintech-text-secondary);
-  opacity: 0.6;
-  transition: opacity 0.2s, color 0.2s;
-}
-.stored-card-item:hover .delete-token-btn,
-.stored-card-item:focus-within .delete-token-btn {
-  opacity: 1;
 }
 .delete-token-btn:hover {
   color: var(--fintech-danger) !important;
 }
 .delete-token-btn mat-icon {
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
-}
-
-.check-icon {
-  color: var(--fintech-primary);
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 /* Selected card badge */
@@ -415,17 +426,18 @@ select.fintech-input {
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--fintech-surface-muted);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 500;
   color: var(--fintech-text);
   margin-bottom: 8px;
 }
 .selected-card-badge mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
   color: var(--fintech-text-secondary);
 }
 
@@ -439,12 +451,29 @@ select.fintech-input {
   .tab-bar {
     flex-direction: column;
   }
+  .tab-btn {
+    justify-content: flex-start;
+  }
   .form-row {
     flex-direction: column;
     gap: 16px;
   }
+}
+
+@media (pointer: coarse) {
+  .tab-btn,
   .stored-card-item {
-    flex-wrap: wrap;
+    min-height: 48px;
+  }
+  .delete-token-btn {
+    min-width: 48px;
+    min-height: 48px;
+  }
+}
+
+@media (forced-colors: active) {
+  .tab-btn.active {
+    outline: 2px solid Highlight;
   }
 }
 
@@ -455,13 +484,15 @@ select.fintech-input {
   margin-top: 12px;
   padding: 8px 16px;
   background: var(--fintech-info-bg);
-  border: 1px solid #bfdbfe;
+  border: 1px solid var(--fintech-info-border);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--fintech-info);
+  overflow-wrap: anywhere;
 }
 .issuing-badge mat-icon {
-  font-size: 18px;
-  width: 18px;
-  height: 18px;
+  flex-shrink: 0;
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
 }

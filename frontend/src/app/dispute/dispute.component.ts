@@ -20,7 +20,7 @@ export class DisputeComponent extends PlatformExperiencePage {
   readonly pageDescription = 'Track chargebacks and respond to disputes.';
   readonly itemLabel = 'disputes';
   readonly containerId = 'disputes-overview-container';
-  protected readonly errorFallback = 'We could not open a disputes session with Adyen. Please try again.';
+  protected readonly errorFallback = 'Unable to open a disputes session with Adyen. Try again.';
 
   protected requestSession(userId: string) {
     return this.sessionService.getDisputeInformation(userId);

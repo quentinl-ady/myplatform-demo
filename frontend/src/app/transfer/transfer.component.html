@@ -24,18 +24,18 @@
                 [matMenuTriggerFor]="statementsMenu" (menuOpened)="loadStatements()" [disabled]="!!downloadingStatement">
           <mat-icon *ngIf="!downloadingStatement" aria-hidden="true">receipt_long</mat-icon>
           <mat-spinner *ngIf="downloadingStatement" diameter="20" aria-hidden="true"></mat-spinner>
-          {{ downloadingStatement ? 'Downloading...' : 'Statements' }}
+          {{ downloadingStatement ? 'Downloading…' : 'Statements' }}
           <mat-icon *ngIf="!downloadingStatement" iconPositionEnd aria-hidden="true">expand_more</mat-icon>
         </button>
         <mat-menu #statementsMenu="matMenu">
           <p class="statements-menu-title">Account statements (PDF)</p>
           <div class="statements-menu-state" *ngIf="statementsState === 'loading'" role="status">
             <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
-            Loading statements...
+            Loading statements…
           </div>
           <button mat-menu-item type="button" *ngIf="statementsState === 'error'" (click)="$event.stopPropagation(); loadStatements()">
             <mat-icon aria-hidden="true">refresh</mat-icon>
-            <span>Couldn't load your statements. Retry</span>
+            <span>Unable to load statements. Try again</span>
           </button>
           <p class="statements-menu-state" *ngIf="statementsState === 'ready' && !statements.length">
             No statements yet. New ones appear here as soon as Adyen generates them.
@@ -53,6 +53,9 @@
           </ng-container>
         </mat-menu>
       </div>
+      <app-inline-alert *ngIf="statementError" class="statement-alert" title="Unable to download the statement"
+                        actionLabel="Try again" (action)="retryStatement()" [dismissible]="true"
+                        (dismiss)="dismissStatementError()">{{ statementError }}</app-inline-alert>
     </mat-card>
 
     <!-- ==================== NO DEVICE WARNING ==================== -->
@@ -79,10 +82,10 @@
         </div>
         <div class="header-actions">
           <span class="last-updated-label" *ngIf="lastUpdated && !isLoadingTransactions">{{ getLastUpdatedLabel() }}</span>
-          <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoadingTransactions">
+          <button mat-flat-button type="button" class="fintech-btn secondary" (click)="refresh()" [disabled]="isLoadingTransactions">
             <mat-icon *ngIf="!isLoadingTransactions || transactionsRemoteStart" aria-hidden="true">refresh</mat-icon>
             <mat-spinner *ngIf="isLoadingTransactions && !transactionsRemoteStart" diameter="18" aria-hidden="true"></mat-spinner>
-            {{ isLoadingTransactions && !transactionsRemoteStart ? 'Refreshing...' : 'Refresh' }}
+            {{ isLoadingTransactions && !transactionsRemoteStart ? 'Refreshing…' : 'Refresh' }}
           </button>
         </div>
       </div>
@@ -90,7 +93,7 @@
       <!-- Loading -->
       <div class="loading-state" *ngIf="isLoadingTransactions && !transactionsRemoteStart" role="status">
         <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
-        <p>Loading transactions... Approve the request with your passkey if your browser asks.</p>
+        <p>Loading transactions… Approve the request with your passkey if your browser asks.</p>
       </div>
 
       <!-- Approval on the phone -->
@@ -103,10 +106,8 @@
       </div>
 
       <!-- Error -->
-      <div class="error-state" *ngIf="transactionsError && !isLoadingTransactions" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ transactionsError }}</span>
-        <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()">Retry</button>
+      <div class="error-state" *ngIf="transactionsError && !isLoadingTransactions">
+        <app-inline-alert title="Unable to load the transactions" actionLabel="Try again" (action)="refresh()">{{ transactionsError }}</app-inline-alert>
         <app-approval-switch *ngIf="approval.canSwitch" [mode]="approval.mode" (switchTo)="switchApproval($event)"></app-approval-switch>
       </div>
 
@@ -119,35 +120,46 @@
       </div>
 
       <!-- Transactions List -->
-      <div class="tx-scroll" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length > 0">
-        <div class="tx-list" role="table" aria-label="Bank transactions">
-          <div class="tx-list-header" role="row">
-            <span class="col-date" role="columnheader">Date</span>
-            <span class="col-description" role="columnheader">Description</span>
-            <span class="col-reference" role="columnheader">Reference</span>
-            <span class="col-status" role="columnheader">Status</span>
-            <span class="col-amount" role="columnheader">Amount</span>
-          </div>
-          <div class="tx-row" role="row" *ngFor="let t of transactions" tabindex="0"
-               [attr.aria-label]="'View details: ' + (t.description || 'transaction') + ', ' + (t.amount | money:t.currency:'exceptZero')"
-               (click)="openDetail(t)" (keydown.enter)="openDetail(t)" (keydown.space)="$event.preventDefault(); openDetail(t)">
-            <span class="col-date" role="cell">{{ formatDate(t.creationDate) }}</span>
-            <div class="col-description" role="cell">
-              <span class="description-text">{{ t.description || '—' }}</span>
-            </div>
-            <span class="col-reference" role="cell">
-              <span class="reference-text">{{ t.transferReference || t.referenceForBeneficiary || '—' }}</span>
-            </span>
-            <span class="col-status" role="cell">
-              <span class="status-badge" [ngClass]="'st-' + t.status">{{ t.status }}</span>
-            </span>
-            <span class="col-amount" role="cell" [class.incoming-amount]="isIncoming(t)">
-              <span class="amount-value">{{ t.amount | money:t.currency:'exceptZero' }}</span>
-              <span class="amount-direction">{{ isIncoming(t) ? 'Credit' : 'Debit' }}</span>
-            </span>
-          </div>
+      <div class="tx-list" *ngIf="!isLoadingTransactions && !transactionsError && transactions.length > 0">
+        <div class="tx-list-header" aria-hidden="true">
+          <span class="col-date">Date</span>
+          <span class="col-description">Description</span>
+          <span class="col-reference">Reference</span>
+          <span class="col-status">Status</span>
+          <span class="col-amount">Amount</span>
         </div>
+        <ul class="tx-items" aria-labelledby="tx-title">
+          <li *ngFor="let t of transactions">
+            <button type="button" class="tx-row" *ngIf="t.transferId; else plainRow" (click)="openDetail(t)">
+              <ng-container *ngTemplateOutlet="rowContent; context: { $implicit: t }"></ng-container>
+            </button>
+            <ng-template #plainRow>
+              <div class="tx-row static">
+                <ng-container *ngTemplateOutlet="rowContent; context: { $implicit: t }"></ng-container>
+              </div>
+            </ng-template>
+          </li>
+        </ul>
       </div>
+
+      <ng-template #rowContent let-t>
+        <span class="col-description">
+          <span class="description-text">{{ t.description || '—' }}</span>
+        </span>
+        <span class="col-amount" [class.incoming-amount]="isIncoming(t)">
+          <span class="amount-value">{{ t.amount | money:t.currency:'exceptZero' }}</span>
+          <span class="amount-direction">{{ isIncoming(t) ? 'Credit' : 'Debit' }}</span>
+        </span>
+        <span class="col-date">{{ formatDate(t.creationDate) }}</span>
+        <span class="col-reference" [class.empty]="!(t.transferReference || t.referenceForBeneficiary)">
+          <span class="cdk-visually-hidden">Reference: </span>
+          <span class="reference-text">{{ t.transferReference || t.referenceForBeneficiary || '—' }}</span>
+        </span>
+        <span class="col-status">
+          <span class="status-badge" [ngClass]="'st-' + t.status">{{ statusLabel(t.status) }}</span>
+          <span class="no-detail" *ngIf="!t.transferId">No details available</span>
+        </span>
+      </ng-template>
 
     </section>
 
@@ -168,13 +180,13 @@
       <!-- Loading -->
       <div class="modal-loading" *ngIf="isLoadingDetail" role="status">
         <mat-spinner diameter="36" aria-hidden="true"></mat-spinner>
-        <p>Loading transfer details...</p>
+        <p>Loading transfer details…</p>
       </div>
 
       <!-- Error -->
-      <div class="modal-error" *ngIf="detailError && !isLoadingDetail" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ detailError }}</span>
+      <div class="modal-error" *ngIf="detailError && !isLoadingDetail">
+        <app-inline-alert title="Unable to load the transfer details" actionLabel="Try again"
+                          (action)="retryDetail()">{{ detailError }}</app-inline-alert>
       </div>
 
       <!-- Detail content -->
@@ -186,7 +198,7 @@
           <dl class="detail-grid">
             <div class="detail-item">
               <dt class="label">Status</dt>
-              <dd><span class="status-badge" [ngClass]="'st-' + transferDetail.status">{{ transferDetail.status }}</span></dd>
+              <dd><span class="status-badge" [ngClass]="'st-' + transferDetail.status">{{ statusLabel(transferDetail.status) }}</span></dd>
             </div>
             <div class="detail-item">
               <dt class="label">Amount</dt>
@@ -264,8 +276,8 @@
               </div>
               <div class="event-info">
                 <div class="event-header">
-                  <span class="event-status" [ngClass]="'st-' + event.status">{{ event.status }}</span>
-                  <span class="event-type">({{ event.type }})</span>
+                  <span class="event-status" [ngClass]="'st-' + event.status">{{ statusLabel(event.status) }}</span>
+                  <span class="event-type">({{ readableLabel(event.type) }})</span>
                 </div>
                 <div class="event-meta">
                   <span>{{ formatDateTime(event.bookingDate || event.updateDate) }}</span>

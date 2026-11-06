@@ -7,19 +7,33 @@ import { TimeoutError, timeout } from 'rxjs';
 import { MaterialModule } from '../material.module';
 import { PosPaymentRequest, PosPaymentResponse, Store, TerminalResponse } from '../models';
 import { PaymentService, StoreService } from '../services';
-import { formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
+import { ConfirmService, InlineAlertComponent, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 
 /** Terminal API sync requests can legitimately take up to ~2 minutes (card entry, PIN, 3DS on device). */
 const TERMINAL_TIMEOUT_MS = 180_000;
 const SLOW_TERMINAL_SECONDS = 45;
+/** Nexo limits the MessageHeader ServiceID to 10 characters. */
+const SERVICE_ID_LENGTH = 10;
+const SERVICE_ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+/** Terminal error conditions that end a payment without taking money (cancelled from the app or on the terminal). */
+const CANCELLED_CONDITIONS = new Set(['aborted', 'cancel']);
+
+const TERMINAL_STATUS_LABELS: Record<string, string> = {
+  boarded: 'ready',
+  boarding: 'setting up',
+  deployed: 'deployed',
+  inventory: 'in inventory',
+  reassignmentinprogress: 'being reassigned'
+};
+
+export type PosOutcomeKind = 'success' | 'failure' | 'error' | 'cancelled';
 
 export interface PosOutcome {
-  kind: 'success' | 'failure' | 'error';
+  kind: PosOutcomeKind;
   title: string;
   message: string;
-  amount: number;
-  currency: string;
-  reference: string;
+  /** Request that produced this outcome, so a retry charges exactly the same amount on the same terminal. */
+  request: PosPaymentRequest;
   response: PosPaymentResponse | null;
   reason: string;
 }
@@ -30,7 +44,8 @@ export interface PosOutcome {
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MaterialModule
+    MaterialModule,
+    InlineAlertComponent
   ],
   templateUrl: './pos.component.html',
   styleUrl: './pos.component.css'
@@ -48,6 +63,19 @@ export class PosComponent implements OnInit {
   readonly elapsedSeconds = signal(0);
   readonly isSlow = computed(() => this.elapsedSeconds() >= SLOW_TERMINAL_SECONDS);
   readonly outcome = signal<PosOutcome | null>(null);
+  readonly cancelling = signal(false);
+  readonly abortError = signal<string | null>(null);
+
+  /** Text of the polite live region: changes only on state changes, never with the elapsed counter. */
+  readonly liveMessage = computed(() => {
+    if (this.isPaying()) {
+      if (this.cancelling()) return 'Cancelling the payment on the terminal…';
+      if (this.isSlow()) return 'This is taking longer than usual. Check the terminal screen.';
+      return 'Waiting for the customer. Ask the customer to present their card on the terminal.';
+    }
+    const result = this.outcome();
+    return result ? `${result.title}. ${result.message}` : '';
+  });
 
   readonly currencies = [
     { code: 'EUR', label: 'EUR (€)' },
@@ -59,8 +87,11 @@ export class PosComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private paymentService = inject(PaymentService);
   private storeService = inject(StoreService);
+  private confirm = inject(ConfirmService);
   private destroyRef = inject(DestroyRef);
   private elapsedTimer: ReturnType<typeof setInterval> | null = null;
+  /** Payment currently waiting on the terminal; its serviceId is what an abort targets. */
+  private pendingRequest: PosPaymentRequest | null = null;
 
   readonly posForm = this.fb.group({
     storeId: ['', Validators.required],
@@ -103,7 +134,7 @@ export class PosComponent implements OnInit {
         this.loadingStores.set(false);
       },
       error: (err) => {
-        this.storesError.set(httpErrorMessage(err, 'Could not load your stores.'));
+        this.storesError.set(httpErrorMessage(err, 'Unable to load stores. Try again.'));
         this.loadingStores.set(false);
       }
     });
@@ -130,7 +161,7 @@ export class PosComponent implements OnInit {
       },
       error: (err) => {
         if (this.posForm.controls.storeId.value !== storeId) return;
-        this.terminalsError.set(httpErrorMessage(err, 'Could not load the terminals for this store.'));
+        this.terminalsError.set(httpErrorMessage(err, 'Unable to load terminals for this store.'));
         this.terminals.set([]);
         this.loadingTerminals.set(false);
       }
@@ -140,6 +171,11 @@ export class PosComponent implements OnInit {
   retryTerminals(): void {
     const storeId = this.posForm.controls.storeId.value;
     if (storeId) this.loadTerminals(storeId);
+  }
+
+  terminalStatusLabel(status: string | null | undefined): string {
+    if (!status) return '';
+    return TERMINAL_STATUS_LABELS[status.toLowerCase()] ?? this.humanize(status).toLowerCase();
   }
 
   submitHint(): string {
@@ -169,48 +205,21 @@ export class PosComponent implements OnInit {
 
     const raw = this.posForm.getRawValue();
     const currency = raw.currency || 'EUR';
-    const amount = toMinorUnits(Number(raw.amount), currency);
-    const reference = (raw.reference || '').trim();
-
-    const payload: PosPaymentRequest = {
-      reference,
-      amount,
+    this.startPayment({
+      reference: (raw.reference || '').trim(),
+      amount: toMinorUnits(Number(raw.amount), currency),
       currency,
       terminalId: raw.terminalId || ''
-    };
-
-    this.isPaying.set(true);
-    this.outcome.set(null);
-    this.startTimer();
-
-    this.paymentService.makePosPayment(payload).pipe(timeout(TERMINAL_TIMEOUT_MS)).subscribe({
-      next: (res) => {
-        this.stopTimer();
-        this.outcome.set(this.toOutcome(res, payload));
-        this.isPaying.set(false);
-      },
-      error: (err) => {
-        this.stopTimer();
-        const message = err instanceof TimeoutError
-          ? 'The terminal did not answer in time. Check the terminal screen before trying again so the customer is not charged twice.'
-          : httpErrorMessage(err, 'Could not reach the terminal. Check that it is online and try again.');
-        this.outcome.set({
-          kind: 'error',
-          title: 'Terminal not reachable',
-          message,
-          amount: payload.amount,
-          currency: payload.currency,
-          reference: payload.reference,
-          response: null,
-          reason: ''
-        });
-        this.isPaying.set(false);
-      }
     });
   }
 
   formatAmount(minor: number, currency: string): string {
     return formatMoney(minor, currency);
+  }
+
+  terminalLabel(terminalId: string): string {
+    const terminal = this.terminals().find(t => t.id === terminalId);
+    return terminal ? `${terminal.model} · ${terminal.id}` : terminalId;
   }
 
   /** New payment on the same terminal: keeps store, terminal and currency. */
@@ -220,18 +229,106 @@ export class PosComponent implements OnInit {
     this.posForm.controls.reference.reset(this.generateReference());
   }
 
-  /** Retry the same payment with a fresh reference so it is not rejected as a duplicate. */
+  /** After a declined payment no money was taken, so the same payment can be sent again right away. */
   retryPayment(): void {
+    const result = this.outcome();
+    if (!result || this.isPaying()) return;
+    this.resendPayment(result.request);
+  }
+
+  /** The first attempt may have been charged (timeout, unknown answer): ask before charging again. */
+  async chargeAgain(): Promise<void> {
+    const result = this.outcome();
+    if (!result || this.isPaying()) return;
+    const amount = this.formatAmount(result.request.amount, result.request.currency);
+    const confirmed = await this.confirm.confirm({
+      title: `Charge ${amount} again?`,
+      message: 'If the first payment went through, the customer is charged twice. Check the terminal screen or the transactions list first.',
+      details: [
+        { label: 'Amount', value: amount },
+        { label: 'First reference', value: result.request.reference },
+        { label: 'Terminal', value: this.terminalLabel(result.request.terminalId) }
+      ],
+      confirmText: 'Charge again',
+      cancelText: 'Cancel',
+      danger: true
+    });
+    if (!confirmed || this.outcome() !== result || this.isPaying()) return;
+    this.resendPayment(result.request);
+  }
+
+  /** Asks the terminal to stop waiting for the card; the pending payment then ends as cancelled. */
+  cancelPayment(): void {
+    const pending = this.pendingRequest;
+    if (!pending?.serviceId || this.cancelling()) return;
+    this.cancelling.set(true);
+    this.abortError.set(null);
+    this.paymentService.abortPosPayment({ terminalId: pending.terminalId, serviceId: pending.serviceId })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        // On success the button keeps showing "Cancelling…" until the terminal answers the payment.
+        error: (err) => {
+          if (this.pendingRequest !== pending) return;
+          this.cancelling.set(false);
+          this.abortError.set(httpErrorMessage(err, 'The cancel request did not reach the terminal.'));
+        }
+      });
+  }
+
+  /** Same amount, currency and terminal as the previous attempt, with a fresh reference so it is not rejected as a duplicate. */
+  private resendPayment(previous: PosPaymentRequest): void {
+    const reference = this.generateReference(previous.reference);
+    this.posForm.controls.reference.setValue(reference);
+    this.startPayment({
+      reference,
+      amount: previous.amount,
+      currency: previous.currency,
+      terminalId: previous.terminalId
+    });
+  }
+
+  private startPayment(request: Omit<PosPaymentRequest, 'serviceId'>): void {
+    const payload: PosPaymentRequest = { ...request, serviceId: this.generateServiceId() };
+
+    this.pendingRequest = payload;
+    this.cancelling.set(false);
+    this.abortError.set(null);
     this.outcome.set(null);
-    this.posForm.controls.reference.setValue(this.generateReference());
-    this.onSubmit();
+    this.isPaying.set(true);
+    this.startTimer();
+
+    this.paymentService.makePosPayment(payload)
+      .pipe(timeout(TERMINAL_TIMEOUT_MS), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => this.finishPayment(this.toOutcome(res, payload)),
+        error: (err) => {
+          const timedOut = err instanceof TimeoutError;
+          this.finishPayment({
+            kind: 'error',
+            title: timedOut ? 'No answer from the terminal' : 'Unable to reach the terminal',
+            message: timedOut
+              ? 'The terminal did not answer in time, so the payment may have gone through. Check the terminal screen or the transactions list before charging again.'
+              : httpErrorMessage(err, 'The payment may not have reached the terminal. Check that the terminal is online and check its screen before charging again.'),
+            request: payload,
+            response: null,
+            reason: ''
+          });
+        }
+      });
+  }
+
+  private finishPayment(result: PosOutcome): void {
+    this.stopTimer();
+    this.pendingRequest = null;
+    this.cancelling.set(false);
+    this.abortError.set(null);
+    this.outcome.set(result);
+    this.isPaying.set(false);
   }
 
   private toOutcome(res: PosPaymentResponse, payload: PosPaymentRequest): PosOutcome {
     const base = {
-      amount: payload.amount,
-      currency: payload.currency,
-      reference: res.reference || payload.reference,
+      request: { ...payload, reference: res.reference || payload.reference },
       response: res,
       reason: this.readableReason(res)
     };
@@ -239,18 +336,21 @@ export class PosComponent implements OnInit {
       case 'SUCCESS':
         return { ...base, kind: 'success', title: 'Payment approved', message: 'The customer can take their card.' };
       case 'FAILURE':
+        if (CANCELLED_CONDITIONS.has((res.errorCondition || '').toLowerCase())) {
+          return { ...base, kind: 'cancelled', title: 'Payment cancelled', message: 'No money was taken.', reason: '' };
+        }
         return {
           ...base,
           kind: 'failure',
           title: 'Payment declined',
-          message: 'The payment was not approved. Ask the customer for another card or try again.'
+          message: 'No money was taken. Ask the customer for another card or try again.'
         };
       default:
         return {
           ...base,
           kind: 'error',
           title: 'Payment status unknown',
-          message: 'The terminal returned an unexpected response. Check the terminal and the Transactions page before trying again.'
+          message: 'The terminal returned an unexpected response, so the payment may have gone through. Check the terminal screen or the transactions list before charging again.'
         };
     }
   }
@@ -275,10 +375,18 @@ export class PosComponent implements OnInit {
     return value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
   }
 
-  private generateReference(): string {
+  /** Time-based reference; a suffix keeps it distinct from a previous attempt made in the same second. */
+  private generateReference(previous?: string): string {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `POS-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    const reference = `POS-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    return reference === previous ? `${reference}-${this.generateServiceId().slice(0, 4)}` : reference;
+  }
+
+  private generateServiceId(): string {
+    const bytes = new Uint8Array(SERVICE_ID_LENGTH);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => SERVICE_ID_ALPHABET[b % SERVICE_ID_ALPHABET.length]).join('');
   }
 
   private startTimer(): void {

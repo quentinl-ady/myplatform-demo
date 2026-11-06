@@ -25,7 +25,7 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
             <h1>{{ view() === 'login' ? 'Welcome back' : 'Create an account' }}</h1>
           </mat-card-title>
           <mat-card-subtitle class="auth-subtitle">
-            {{ view() === 'login' ? 'Log in to your account to continue' : 'Set up a test platform account in a few steps' }}
+            {{ view() === 'login' ? 'Sign in to continue' : 'Set up a test platform account in a few steps' }}
           </mat-card-subtitle>
         </mat-card-header>
 
@@ -39,7 +39,7 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
             {{ view() === 'login' ? "Don't have an account?" : "Already have an account?" }}
           </span>
           <button type="button" class="switch-link" (click)="toggleView()">
-            {{ view() === 'login' ? "Sign up" : "Log in" }}
+            {{ view() === 'login' ? "Sign up" : "Sign in" }}
           </button>
         </mat-card-actions>
       </mat-card>
@@ -108,7 +108,7 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
       margin-bottom: 8px !important;
     }
     .auth-title h1 {
-      font-size: 24px;
+      font-size: 1.5rem;
       font-weight: 700;
       line-height: 1.25;
       color: var(--fintech-text);
@@ -116,7 +116,7 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
       margin: 0;
     }
     .auth-subtitle {
-      font-size: 14px !important;
+      font-size: 0.875rem !important;
       color: var(--fintech-text-secondary);
       margin: 0 !important;
     }
@@ -134,7 +134,7 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
       justify-content: center;
       align-items: center;
       gap: 6px;
-      font-size: 14px;
+      font-size: 0.875rem;
     }
     .switch-text {
       color: var(--fintech-text-secondary);
@@ -152,7 +152,14 @@ import { PageTitleStrategy } from '../layout/page-title.strategy';
       text-underline-offset: 3px;
     }
     .switch-link:hover {
-      opacity: 0.7;
+      text-decoration-thickness: 2px;
+    }
+    @media (pointer: coarse) {
+      .switch-link {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 4px 8px;
+      }
     }
 
     @media (max-width: 599.98px) {
@@ -175,6 +182,6 @@ export class MainComponent {
 
   toggleView() {
     this.view.set(this.view() === 'login' ? 'signup' : 'login');
-    this.titleStrategy.setPageTitle(this.view() === 'login' ? 'Log in' : 'Sign up');
+    this.titleStrategy.setPageTitle(this.view() === 'login' ? 'Sign in' : 'Sign up');
   }
 }

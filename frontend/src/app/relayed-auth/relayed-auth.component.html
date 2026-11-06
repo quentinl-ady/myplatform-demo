@@ -14,11 +14,11 @@
   </div>
 
   <!-- Error -->
-  <div class="loading-state error-state" *ngIf="!isLoading && loadError">
+  <div class="loading-state error-state" *ngIf="!isLoading && loadError" role="alert">
     <mat-icon class="state-icon" aria-hidden="true">error_outline</mat-icon>
-    <h2>Could not load the configuration</h2>
+    <h2>Unable to load the configuration</h2>
     <p>{{ loadError }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="loadConfig()">Retry</button>
+    <button mat-stroked-button type="button" class="fintech-btn secondary centered" (click)="loadConfig()">Try again</button>
   </div>
 
   <ng-container *ngIf="!isLoading && !loadError">
@@ -64,6 +64,7 @@
       </div>
 
       <!-- Save Button -->
+      <app-inline-alert *ngIf="saveError" class="save-alert" actionLabel="Try again" (action)="save()" [dismissible]="true" (dismiss)="saveError = null">{{ saveError }}</app-inline-alert>
       <div class="save-section">
         <span class="submit-hint" *ngIf="!hasChanges && !isSaving">No changes to save.</span>
         <button mat-stroked-button type="button" class="fintech-btn secondary" *ngIf="hasChanges && !isSaving" (click)="resetChanges()">
@@ -91,6 +92,8 @@
           <mat-icon aria-hidden="true">content_copy</mat-icon>
         </button>
       </div>
+      <app-inline-alert *ngIf="copyFailed" class="copy-alert" title="Unable to copy the URL"
+                        [dismissible]="true" (dismiss)="copyFailed = false">Select the URL and copy it manually.</app-inline-alert>
 
       <div class="info-steps">
         <h3>How it works</h3>

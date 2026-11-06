@@ -17,28 +17,25 @@
       </button>
       <button mat-stroked-button type="button" class="mark-all-btn" (click)="acknowledgeAll()"
               *ngIf="unreadCount > 0" [disabled]="acknowledgingAll()">
-        <mat-spinner *ngIf="acknowledgingAll()" diameter="16"></mat-spinner>
+        <mat-spinner *ngIf="acknowledgingAll()" diameter="16" aria-hidden="true"></mat-spinner>
         <mat-icon *ngIf="!acknowledgingAll()" aria-hidden="true">done_all</mat-icon>
         Mark all as read
       </button>
     </div>
   </div>
 
+  <app-inline-alert *ngIf="ackAllError" title="Unable to mark the notifications as read" actionLabel="Try again"
+                    (action)="acknowledgeAll()" [dismissible]="true" (dismiss)="ackAllError = ''">{{ ackAllError }}</app-inline-alert>
+
   <mat-card class="notif-card" [attr.aria-busy]="loading()">
 
     <div *ngIf="loading()" class="loading-spinner" role="status">
-      <mat-spinner diameter="32"></mat-spinner>
+      <mat-spinner diameter="32" aria-hidden="true"></mat-spinner>
       <span class="cdk-visually-hidden">Loading notifications</span>
     </div>
 
-    <div *ngIf="!loading() && loadError() as error" class="empty-state error-state" role="alert">
-      <mat-icon class="empty-icon error-icon" aria-hidden="true">error_outline</mat-icon>
-      <p>Notifications could not be loaded</p>
-      <span class="empty-hint">{{ error }}</span>
-      <button mat-flat-button type="button" class="fintech-btn" (click)="loadEvents()">
-        <mat-icon aria-hidden="true">refresh</mat-icon>
-        Retry
-      </button>
+    <div *ngIf="!loading() && loadError() as error" class="state-alert">
+      <app-inline-alert actionLabel="Try again" (action)="loadEvents()">{{ error }}</app-inline-alert>
     </div>
 
     <ng-container *ngIf="!loading() && !loadError() && events.length === 0">
@@ -69,32 +66,29 @@
         [class.expanded]="expandedEventId === event.id"
       >
         <div class="notif-row">
-          <div class="notif-row-main"
-               role="button"
-               tabindex="0"
-               [attr.aria-expanded]="expandedEventId === event.id"
-               [attr.aria-controls]="'notif-detail-' + event.id"
-               (click)="onRowClick(event)"
-               (keydown.enter)="onRowKeydown(event, $event)"
-               (keydown.space)="onRowKeydown(event, $event)">
-            <div class="notif-icon-wrapper" [attr.data-type]="event.webhookType" aria-hidden="true">
+          <button type="button"
+                  class="notif-row-main"
+                  [attr.aria-expanded]="expandedEventId === event.id"
+                  [attr.aria-controls]="'notif-detail-' + event.id"
+                  (click)="onRowClick(event)">
+            <span class="notif-icon-wrapper" [attr.data-type]="event.webhookType" aria-hidden="true">
               <mat-icon>{{ getEventIcon(event.webhookType, event.eventType) }}</mat-icon>
-              <div class="notif-dot" *ngIf="!event.acknowledged"></div>
-            </div>
+              <span class="notif-dot" *ngIf="!event.acknowledged"></span>
+            </span>
 
-            <div class="notif-content">
-              <div class="notif-title">
+            <span class="notif-content">
+              <span class="notif-title">
                 <span class="cdk-visually-hidden" *ngIf="!event.acknowledged">Unread: </span>{{ event.title || 'Notification' }}
-              </div>
-              <div class="notif-description">{{ event.description || event.eventType }}</div>
-              <div class="notif-meta">
+              </span>
+              <span class="notif-description">{{ event.description || event.eventType }}</span>
+              <span class="notif-meta">
                 <span class="notif-category" [attr.data-type]="event.webhookType">{{ getCategoryLabel(event.webhookType) }}</span>
                 <time class="notif-time" [attr.datetime]="event.receivedAt" [attr.title]="getDateTime(event.receivedAt)">{{ getTimeAgo(event.receivedAt) }}</time>
-              </div>
-            </div>
+              </span>
+            </span>
 
             <mat-icon class="notif-chevron" aria-hidden="true">{{ expandedEventId === event.id ? 'expand_less' : 'expand_more' }}</mat-icon>
-          </div>
+          </button>
 
           <div class="notif-actions">
             <button mat-icon-button
@@ -105,7 +99,7 @@
                     matTooltip="Mark as read"
                     [attr.aria-label]="'Mark ' + (event.title || 'notification') + ' as read'"
                     class="notif-ack-btn">
-              <mat-spinner *ngIf="isAcknowledging(event)" diameter="18"></mat-spinner>
+              <mat-spinner *ngIf="isAcknowledging(event)" diameter="18" aria-hidden="true"></mat-spinner>
               <mat-icon *ngIf="!isAcknowledging(event)" aria-hidden="true">done</mat-icon>
             </button>
             <span *ngIf="event.acknowledged" class="notif-read-label">
@@ -114,6 +108,10 @@
             </span>
           </div>
         </div>
+
+        <app-inline-alert *ngIf="ackError?.id === event.id" class="row-alert"
+                          title="Unable to mark this notification as read" actionLabel="Try again"
+                          (action)="acknowledgeEvent(event)" [dismissible]="true" (dismiss)="ackError = null">{{ ackError?.message }}</app-inline-alert>
 
         <div class="notif-detail" *ngIf="expandedEventId === event.id" [id]="'notif-detail-' + event.id">
           <dl class="notif-detail-grid">
@@ -162,14 +160,22 @@
         id="webhook-json"
         class="json-editor"
         [(ngModel)]="jsonInput"
-        aria-describedby="webhook-json-hint"
-        placeholder='{ "type": "balancePlatform.transfer.updated", "data": { ... } }'
+        (ngModelChange)="onJsonInputChange()"
+        [attr.aria-invalid]="jsonError ? 'true' : null"
+        [attr.aria-describedby]="jsonError ? 'webhook-json-hint webhook-json-error' : 'webhook-json-hint'"
+        placeholder='{ "type": "balancePlatform.transfer.updated", "data": { … } }'
         rows="10"
         spellcheck="false"
       ></textarea>
+      <p class="field-error" id="webhook-json-error" *ngIf="jsonError">
+        <mat-icon aria-hidden="true">error</mat-icon>
+        <span>{{ jsonError }}</span>
+      </p>
+      <app-inline-alert *ngIf="sendError" class="send-alert" title="Unable to send the test event" actionLabel="Try again"
+                        (action)="pushEvent()" [dismissible]="true" (dismiss)="sendError = ''">{{ sendError }}</app-inline-alert>
       <div class="devtools-actions">
         <button mat-flat-button type="button" class="fintech-btn" (click)="pushEvent()" [disabled]="pushing() || !jsonInput.trim()">
-          <mat-spinner *ngIf="pushing()" diameter="16"></mat-spinner>
+          <mat-spinner *ngIf="pushing()" diameter="16" aria-hidden="true"></mat-spinner>
           <mat-icon *ngIf="!pushing()" aria-hidden="true">send</mat-icon>
           {{ pushing() ? 'Sending…' : 'Send test event' }}
         </button>

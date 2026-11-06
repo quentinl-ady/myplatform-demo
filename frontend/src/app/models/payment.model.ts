@@ -25,6 +25,14 @@ export interface PosPaymentRequest {
   amount: number;
   currency: string;
   terminalId: string;
+  /** Nexo ServiceID of the payment (1-10 letters or digits, unique per request); needed to cancel it. */
+  serviceId?: string;
+}
+
+export interface PosAbortRequest {
+  terminalId: string;
+  /** ServiceID sent with the payment to cancel. */
+  serviceId: string;
 }
 
 export interface PosPaymentResponse {

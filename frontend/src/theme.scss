@@ -1,3 +1,4 @@
+@use 'sass:map';
 @use '@angular/material' as mat;
 
 // Monochrome palette so Material components (buttons, inputs, tabs, toggles,
@@ -36,14 +37,65 @@ $fintech-black-palette: (
   ),
 );
 
+// Dark appearance: the brand inverts to white controls on dark surfaces.
+$fintech-white-palette: (
+  50: #1c1c1e,
+  100: #2c2c2e,
+  200: #3a3a3c,
+  300: #636366,
+  400: #a1a1a6,
+  500: #ffffff,
+  600: #ffffff,
+  700: #ffffff,
+  800: #ffffff,
+  900: #ffffff,
+  A100: #2c2c2e,
+  A200: #a1a1a6,
+  A400: #e5e5ea,
+  A700: #ffffff,
+  contrast: (
+    50: #ffffff,
+    100: #ffffff,
+    200: #ffffff,
+    300: #ffffff,
+    400: #000000,
+    500: #000000,
+    600: #000000,
+    700: #000000,
+    800: #000000,
+    900: #000000,
+    A100: #ffffff,
+    A200: #000000,
+    A400: #000000,
+    A700: #000000,
+  ),
+);
+
 $fintech-primary: mat.define-palette($fintech-black-palette, 500, 100, 900);
 $fintech-accent: mat.define-palette($fintech-black-palette, 500, 100, 900);
-$fintech-warn: mat.define-palette(mat.$red-palette, 700);
+$fintech-warn: mat.define-palette(mat.$red-palette, 900);
 
+$fintech-dark-primary: mat.define-palette($fintech-white-palette, 500, 100, 900);
+$fintech-dark-warn: mat.define-palette(mat.$red-palette, 200);
+
+// Sizes in rem so Material text follows the browser's font-size setting.
+// Values are the M2 defaults converted from px (16px = 1rem).
 $fintech-typography: mat.define-typography-config(
   $font-family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  $headline-1: mat.define-typography-level(6rem, 6rem, 300, $letter-spacing: -0.015625em),
+  $headline-2: mat.define-typography-level(3.75rem, 3.75rem, 300, $letter-spacing: -0.0083333333em),
+  $headline-3: mat.define-typography-level(3rem, 3.125rem, 400, $letter-spacing: normal),
+  $headline-4: mat.define-typography-level(2.125rem, 2.5rem, 400, $letter-spacing: 0.0073529412em),
+  $headline-5: mat.define-typography-level(1.5rem, 2rem, 400, $letter-spacing: normal),
+  $headline-6: mat.define-typography-level(1.25rem, 2rem, 500, $letter-spacing: 0.0125em),
+  $subtitle-1: mat.define-typography-level(1rem, 1.75rem, 400, $letter-spacing: 0.009375em),
+  $subtitle-2: mat.define-typography-level(0.875rem, 1.375rem, 500, $letter-spacing: 0.0071428571em),
+  $body-1: mat.define-typography-level(1rem, 1.5rem, 400, $letter-spacing: 0.03125em),
+  $body-2: mat.define-typography-level(0.875rem, 1.25rem, 400, $letter-spacing: 0.0178571429em),
+  $caption: mat.define-typography-level(0.75rem, 1.25rem, 400, $letter-spacing: 0.0333333333em),
   // The M2 default button tracking (1.25px) looks spaced out with the system font.
-  $button: mat.define-typography-level(14px, 36px, 500, $letter-spacing: normal),
+  $button: mat.define-typography-level(0.875rem, 2.25rem, 500, $letter-spacing: normal),
+  $overline: mat.define-typography-level(0.75rem, 2rem, 500, $letter-spacing: 0.1666666667em),
 );
 
 $fintech-theme: mat.define-light-theme((
@@ -56,12 +108,45 @@ $fintech-theme: mat.define-light-theme((
   density: 0,
 ));
 
+// Surfaces match the --fintech-* dark tokens in styles.css.
+$fintech-dark-background: (
+  status-bar: #000000,
+  app-bar: #1c1c1e,
+  background: #0f0f10,
+  hover: rgba(255, 255, 255, 0.06),
+  card: #1c1c1e,
+  dialog: #1c1c1e,
+  raised-button: #2c2c2e,
+  selected-button: #3a3a3c,
+  selected-disabled-button: #2c2c2e,
+  disabled-button: rgba(255, 255, 255, 0.12),
+  focused-button: rgba(255, 255, 255, 0.12),
+  disabled-button-toggle: #2c2c2e,
+  unselected-chip: #2c2c2e,
+  disabled-list-option: rgba(255, 255, 255, 0.12),
+  tooltip: #3a3a3c,
+);
+
+$fintech-dark-theme: mat.define-dark-theme((
+  color: (
+    primary: $fintech-dark-primary,
+    accent: $fintech-dark-primary,
+    warn: $fintech-dark-warn,
+  ),
+  typography: $fintech-typography,
+  density: 0,
+));
+$fintech-dark-theme: map.deep-merge($fintech-dark-theme, (color: (background: $fintech-dark-background)));
+
 @include mat.core();
 @include mat.all-component-themes($fintech-theme);
 @include mat.typography-hierarchy($fintech-theme);
 
-// The M2 snack bar paints its action with the accent colour, which would be
-// black on the dark snack bar background with a monochrome accent.
-.mat-mdc-snack-bar-container {
-  --mat-snack-bar-button-color: #ffffff;
+// Material's default focus overlay is too faint to find with a keyboard.
+@include mat.strong-focus-indicators((border-style: solid, border-width: 2px, border-radius: 4px));
+@include mat.strong-focus-indicators-color($fintech-theme);
+
+@media (prefers-color-scheme: dark) {
+  @include mat.all-component-colors($fintech-dark-theme);
+  @include mat.strong-focus-indicators-color($fintech-dark-theme);
 }

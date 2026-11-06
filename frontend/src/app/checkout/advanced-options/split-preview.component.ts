@@ -41,7 +41,7 @@ import { SplitPreview, previewSplit } from './advanced-options';
       justify-content: space-between;
       gap: 12px;
       padding: 6px 0;
-      font-size: 13px;
+      font-size: 0.8125rem;
     }
     .preview-row + .preview-row { border-top: 1px solid var(--fintech-border); }
     .preview-row dt { color: var(--fintech-text-secondary); }
@@ -49,7 +49,7 @@ import { SplitPreview, previewSplit } from './advanced-options';
     .preview-error {
       display: block;
       margin-top: 6px;
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--fintech-danger);
     }
   `]

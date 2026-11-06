@@ -6,14 +6,12 @@
 
   <div class="loading-state" *ngIf="isLoading" role="status">
     <mat-spinner diameter="40"></mat-spinner>
-    <p>Loading your account…</p>
+    <p>Loading account details…</p>
   </div>
 
-  <mat-card class="state-card error" *ngIf="!isLoading && loadError">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <p>{{ loadError }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadData()">Retry</button>
-  </mat-card>
+  <app-inline-alert *ngIf="!isLoading && loadError" title="Unable to load the card form" actionLabel="Try again" (action)="loadData()">
+    {{ loadError }}
+  </app-inline-alert>
 
   <mat-card class="create-card-form" *ngIf="!isLoading && !loadError && !isSuccess">
     <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
@@ -33,7 +31,7 @@
         <div class="card-details-row">
           <div class="card-holder">
             <span class="label">Cardholder</span>
-            <span class="value">{{ form.value.cardholderName || 'Your name' }}</span>
+            <span class="value">{{ form.value.cardholderName || 'Cardholder name' }}</span>
           </div>
           <div class="card-expiry">
             <span class="label">Expires</span>
@@ -63,41 +61,42 @@
         <div class="form-group">
           <label for="cc-cardholder">Cardholder name</label>
           <input id="cc-cardholder" type="text" class="fintech-input" formControlName="cardholderName"
-                 autocomplete="name" placeholder="e.g. Jane Doe" />
-          <span class="field-error" *ngIf="form.get('cardholderName')?.invalid && form.get('cardholderName')?.touched">
+                 autocomplete="name" placeholder="e.g. Jane Doe"
+                 [attr.aria-invalid]="form.get('cardholderName')?.invalid && form.get('cardholderName')?.touched ? true : null"
+                 [attr.aria-describedby]="form.get('cardholderName')?.invalid && form.get('cardholderName')?.touched ? 'cc-cardholder-error' : null" />
+          <span id="cc-cardholder-error" class="field-error" *ngIf="form.get('cardholderName')?.invalid && form.get('cardholderName')?.touched">
             Enter the cardholder name (at least 2 characters).
           </span>
         </div>
 
-        <div class="form-group">
-          <span class="group-label" id="cc-network-label">Card network</span>
-          <div class="brand-selector" role="radiogroup" aria-labelledby="cc-network-label">
-            <button type="button" class="brand-option" role="radio"
-                    [class.selected]="form.value.brand === 'visa'"
-                    [attr.aria-checked]="form.value.brand === 'visa'"
-                    [disabled]="!isBrandConfigured('visa')"
-                    (click)="selectBrand('visa')">
+        <fieldset class="form-group brand-fieldset">
+          <legend class="group-label">Card network</legend>
+          <div class="brand-selector">
+            <input type="radio" id="cc-brand-visa" name="brand" class="cdk-visually-hidden brand-radio" formControlName="brand" value="visa"
+                   [attr.disabled]="isBrandConfigured('visa') ? null : ''" />
+            <label for="cc-brand-visa" class="brand-option">
+              <mat-icon class="brand-check" *ngIf="form.value.brand === 'visa'" aria-hidden="true">check_circle</mat-icon>
               <svg viewBox="0 0 750 471" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                 <path d="M278.198 334.228l33.36-195.763h53.358l-33.384 195.763h-53.334zm246.11-191.54c-10.57-3.966-27.135-8.222-47.822-8.222-52.725 0-89.863 26.551-90.18 64.604-.297 28.129 26.514 43.821 46.754 53.185 20.77 9.597 27.752 15.716 27.652 24.283-.133 13.123-16.586 19.116-31.924 19.116-21.355 0-32.701-2.967-50.225-10.274l-6.878-3.112-7.487 43.822c12.463 5.466 35.508 10.199 59.438 10.445 56.09 0 92.502-26.248 92.916-66.884.199-22.27-14.016-39.216-44.801-53.188-18.65-9.056-30.072-15.099-29.951-24.269 0-8.137 9.668-16.838 30.559-16.838 17.447-.271 30.088 3.534 39.936 7.5l4.781 2.259 7.232-42.427m137.308-4.223h-41.23c-12.773 0-22.332 3.486-27.941 16.234l-79.244 179.402h56.031s9.16-24.121 11.232-29.418c6.123 0 60.555.084 68.336.084 1.596 6.854 6.492 29.334 6.492 29.334h49.512l-43.188-195.636zm-65.417 126.408c4.414-11.279 21.26-54.724 21.26-54.724-.314.521 4.381-11.334 7.074-18.684l3.607 16.878s10.217 46.729 12.352 56.527h-44.293v.003zM185.213 138.465L133.188 271.94l-5.562-27.129c-9.726-31.274-40.025-65.157-73.898-82.12l47.767 171.204 56.455-.064 84.004-195.386h-56.741" fill="#1a1f71"/>
               </svg>
-              <span>Visa</span>
+              <span class="brand-name">Visa</span>
               <span class="brand-note" *ngIf="brandNote('visa') as note">{{ note }}</span>
-            </button>
-            <button type="button" class="brand-option" role="radio"
-                    [class.selected]="form.value.brand === 'mc'"
-                    [attr.aria-checked]="form.value.brand === 'mc'"
-                    [disabled]="!isBrandConfigured('mc')"
-                    (click)="selectBrand('mc')">
+            </label>
+            <input type="radio" id="cc-brand-mc" name="brand" class="cdk-visually-hidden brand-radio" formControlName="brand" value="mc"
+                   [attr.disabled]="isBrandConfigured('mc') ? null : ''" />
+            <label for="cc-brand-mc" class="brand-option">
+              <mat-icon class="brand-check" *ngIf="form.value.brand === 'mc'" aria-hidden="true">check_circle</mat-icon>
               <svg viewBox="0 0 152 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
                 <circle cx="50" cy="50" r="45" fill="#eb001b"/>
                 <circle cx="102" cy="50" r="45" fill="#f79e1b"/>
                 <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
               </svg>
-              <span>Mastercard</span>
+              <span class="brand-name">Mastercard</span>
               <span class="brand-note" *ngIf="brandNote('mc') as note">{{ note }}</span>
-            </button>
+            </label>
           </div>
-        </div>
+        </fieldset>
+
       </section>
 
       <section class="form-section" aria-labelledby="step-auth">
@@ -106,15 +105,17 @@
           <span class="optional-badge">Recommended</span>
         </div>
         <p class="section-description">
-          Some online payments ask the cardholder for a one-time code (3D Secure). We send it by SMS, or by email
+          Some online payments ask the cardholder for a one-time code (3D Secure). The code is sent by SMS, or by email
           if there's no mobile number. Without either, those payments are declined.
         </p>
 
         <div class="form-group">
           <label for="cc-email">Email</label>
           <input id="cc-email" type="email" class="fintech-input" formControlName="email"
-                 autocomplete="email" placeholder="cardholder@example.com" />
-          <span class="field-error" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
+                 autocomplete="email" placeholder="cardholder@example.com"
+                 [attr.aria-invalid]="form.get('email')?.invalid && form.get('email')?.touched ? true : null"
+                 [attr.aria-describedby]="form.get('email')?.invalid && form.get('email')?.touched ? 'cc-email-error' : null" />
+          <span id="cc-email-error" class="field-error" *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
             Enter a valid email address.
           </span>
         </div>
@@ -151,7 +152,7 @@
         </div>
         <p class="section-description">
           Set spending limits and block merchant categories. Amounts are in the card currency{{ currency ? ' (' + currency + ')' : '' }}.
-          You can also add rules later from My cards.
+          You can also add rules later from Cards.
         </p>
 
         <div class="rules-subsection">
@@ -177,14 +178,16 @@
                   <input type="number" inputmode="decimal" class="fintech-input" formControlName="value" [id]="'cc-rule-value-' + i"
                          [step]="rule.value.type === 'maxTransactions' ? '1' : '0.01'"
                          [min]="rule.value.type === 'maxTransactions' ? 1 : 0.01"
-                         [placeholder]="rule.value.type === 'maxTransactions' ? 'e.g. 10' : 'e.g. 100.00'" />
+                         [placeholder]="rule.value.type === 'maxTransactions' ? 'e.g. 10' : 'e.g. 100.00'"
+                         [attr.aria-invalid]="ruleError(rule) ? true : null"
+                         [attr.aria-describedby]="ruleError(rule) ? 'cc-rule-error-' + i : null" />
                   <span class="currency-hint" *ngIf="rule.value.type !== 'maxTransactions'" aria-hidden="true">{{ currency }}</span>
                 </div>
                 <button type="button" class="remove-rule-btn" (click)="removeRule(i)" [attr.aria-label]="'Remove limit ' + (i + 1)">
                   <mat-icon aria-hidden="true">close</mat-icon>
                 </button>
               </div>
-              <span class="field-error" *ngIf="ruleError(rule) as error">{{ error }}</span>
+              <span class="field-error" [id]="'cc-rule-error-' + i" *ngIf="ruleError(rule) as error">{{ error }}</span>
             </div>
           </div>
 
@@ -213,10 +216,10 @@
                      [matAutocomplete]="mccAuto" />
               <mat-autocomplete #mccAuto="matAutocomplete" (optionSelected)="addMcc($event)">
                 <mat-option *ngFor="let mcc of filteredMccs" [value]="mcc">
-                  <span class="mcc-option" [class.risky]="mcc.risky">
+                  <span class="mcc-option">
                     <span class="mcc-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
                     <span class="mcc-label">{{ mcc.label }}</span>
-                    <span class="risky-badge" *ngIf="mcc.risky">High risk</span>
+                    <span class="risky-badge" *ngIf="mcc.risky"><mat-icon aria-hidden="true">warning</mat-icon>High risk</span>
                   </span>
                 </mat-option>
               </mat-autocomplete>
@@ -226,8 +229,7 @@
               <div class="mcc-chip" *ngFor="let mcc of selectedMccs" [class.risky]="mcc.risky">
                 <span class="chip-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
                 <span class="chip-label">{{ mcc.label }}</span>
-                <mat-icon class="risky-indicator" *ngIf="mcc.risky" aria-hidden="true">warning</mat-icon>
-                <span class="cdk-visually-hidden" *ngIf="mcc.risky">(high risk)</span>
+                <span class="risky-badge" *ngIf="mcc.risky"><mat-icon aria-hidden="true">warning</mat-icon>High risk</span>
                 <button type="button" class="chip-remove" (click)="removeMcc(mcc)" [attr.aria-label]="'Remove ' + mcc.code + ' ' + mcc.label">
                   <mat-icon aria-hidden="true">close</mat-icon>
                 </button>
@@ -241,6 +243,11 @@
           </div>
         </div>
       </section>
+
+      <app-inline-alert class="submit-alert" *ngIf="submitError" title="Unable to create the card"
+                        actionLabel="Try again" (action)="submit()" [dismissible]="true" (dismiss)="submitError = null">
+        {{ submitError }}
+      </app-inline-alert>
 
       <button mat-flat-button class="fintech-btn primary full-width" type="submit"
               [disabled]="form.invalid || isProcessing || !isBrandConfigured(form.value.brand || '')" aria-describedby="cc-submit-hint">
@@ -300,9 +307,9 @@
         Create another card
       </button>
       <button mat-flat-button type="button" class="fintech-btn primary" (click)="viewCards()">
-        View my cards
+        View cards
       </button>
     </div>
-    <button type="button" class="link-btn" (click)="viewCardTransactions()">View card transactions</button>
+    <a class="link-btn" [routerLink]="['/', userId, 'card-transactions']">View card transactions</a>
   </mat-card>
 </div>

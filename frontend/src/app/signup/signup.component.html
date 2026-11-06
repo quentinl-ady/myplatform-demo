@@ -146,9 +146,9 @@
     </p>
   </fieldset>
 
-  <!-- LOGIN DETAILS -->
+  <!-- SIGN-IN DETAILS -->
   <fieldset class="form-section">
-    <legend class="section-title">Login details</legend>
+    <legend class="section-title">Sign-in details</legend>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Email address</mat-label>
@@ -188,6 +188,10 @@
   </fieldset>
 
   <div class="submit-area">
+    <app-inline-alert
+      *ngIf="error"
+      [dismissible]="true"
+      (dismiss)="dismissError()">{{ error }}</app-inline-alert>
     <button
       mat-flat-button
       type="submit"
@@ -197,7 +201,7 @@
       <ng-container *ngIf="!loading">Create account</ng-container>
       <ng-container *ngIf="loading">
         <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
-        <span>Creating your account…</span>
+        <span>Creating account…</span>
       </ng-container>
     </button>
     <p *ngIf="!loading && missingFields().length" id="signup-submit-hint" class="submit-hint">
@@ -206,8 +210,4 @@
     <p *ngIf="loading" class="submit-hint" role="status">This can take a few seconds while the test account is set up.</p>
   </div>
 
-  <div *ngIf="error" class="error-msg" role="alert">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <span>{{ error }}</span>
-  </div>
 </form>

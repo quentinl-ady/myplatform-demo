@@ -8,7 +8,7 @@
 
 /* Header */
 .header-section h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--fintech-text);
   margin: 0 0 8px 0;
@@ -16,7 +16,7 @@
 }
 .header-section p {
   color: var(--fintech-text-secondary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin: 0;
 }
 
@@ -28,7 +28,7 @@ mat-card {
   padding: 24px;
 }
 .card-title {
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: 600;
   margin: 0 0 20px 0;
   color: var(--fintech-text);
@@ -38,9 +38,11 @@ mat-card {
 .form-group {
   margin-bottom: 20px;
 }
-.form-group label {
+.form-group label,
+.checkbox-fieldset legend {
   display: block;
-  font-size: 13px;
+  padding: 0;
+  font-size: 0.8125rem;
   font-weight: 500;
   color: var(--fintech-text-secondary);
   margin-bottom: 8px;
@@ -50,15 +52,30 @@ mat-card {
   padding: 12px 16px;
   border: 1px solid var(--fintech-border);
   border-radius: 10px;
-  font-size: 15px;
+  font-size: max(1rem, 16px);
   box-sizing: border-box;
   background: var(--fintech-surface);
+  color: var(--fintech-text);
   transition: border-color 0.2s;
   appearance: none;
 }
+/* Chevron drawn with gradients so it follows the text token in dark mode and increased contrast. */
+select.fintech-input {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--fintech-text-secondary) 50%),
+    linear-gradient(135deg, var(--fintech-text-secondary) 50%, transparent 50%);
+  background-position: right 20px center, right 15px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 40px;
+}
 .fintech-input:focus {
-  outline: none;
   border-color: var(--fintech-primary);
+}
+.checkbox-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 20px 0;
 }
 .checkbox-group {
   display: flex;
@@ -79,12 +96,17 @@ mat-card {
 }
 .fintech-btn.primary {
   background-color: var(--fintech-primary) !important;
-  color: white !important;
+  color: var(--fintech-on-primary) !important;
 }
 .fintech-btn.full-width {
   width: 100%;
   padding: 12px 24px !important;
-  font-size: 15px !important;
+  font-size: 0.9375rem !important;
+}
+.fintech-btn:disabled {
+  background-color: var(--fintech-surface-muted) !important;
+  color: var(--fintech-text-secondary) !important;
+  cursor: not-allowed !important;
 }
 
 /* Config list */
@@ -100,9 +122,6 @@ mat-card {
   padding: 16px;
   background: var(--fintech-bg);
   border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 .config-grid {
   margin: 0;
@@ -117,7 +136,7 @@ mat-card {
   gap: 16px;
 }
 .config-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--fintech-text-secondary);
   font-weight: 500;
 }
@@ -125,13 +144,13 @@ mat-card {
   margin: 0;
   text-align: right;
   overflow-wrap: anywhere;
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--fintech-text);
   font-weight: 600;
 }
 .config-value.mono {
   font-family: var(--fintech-font-mono);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--fintech-text-secondary);
 }
@@ -140,70 +159,35 @@ mat-card {
 .empty-text {
   margin: 0;
   color: var(--fintech-text-secondary);
-  font-size: 14px;
-  font-style: italic;
+  font-size: 0.875rem;
 }
 .loading-container {
   display: flex;
   align-items: center;
   gap: 12px;
   color: var(--fintech-text-secondary);
-  font-size: 14px;
-}
-.checkbox-fieldset {
-  border: none;
-  padding: 0;
-  margin: 0 0 20px 0;
-}
-.checkbox-fieldset legend {
-  padding: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--fintech-text-secondary);
-  margin-bottom: 8px;
+  font-size: 0.875rem;
 }
 .hint-text {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--fintech-text-secondary);
   margin-top: 6px;
 }
 .submit-hint {
-  min-height: 18px;
+  min-height: 1.125rem;
   margin: 8px 0 0 0;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
   color: var(--fintech-text-secondary);
 }
-.fintech-btn:disabled {
-  background-color: var(--fintech-border) !important;
-  color: var(--fintech-text-secondary) !important;
-  cursor: not-allowed !important;
-}
-.link-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 600;
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.inline-alert {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 13px;
+.section-alert {
   margin-bottom: 16px;
 }
-.inline-alert mat-icon { font-size: 18px; width: 18px; height: 18px; }
-.inline-alert span { flex: 1; min-width: 180px; }
-.inline-alert.error { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
-.inline-alert.info { background: var(--fintech-info-bg); color: var(--fintech-info); }
+/* The Adyen payouts overview only ships light styles. */
+.overview-container {
+  border-radius: 12px;
+}
 
 @media (max-width: 600px) {
   mat-card { padding: 20px 16px; }

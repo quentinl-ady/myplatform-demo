@@ -2,13 +2,12 @@ import { Component, NgZone, OnDestroy, OnInit, inject, signal } from '@angular/c
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { MaterialModule } from '../material.module';
 import { AdvancedPaymentOptions, SendPaymentPayload, SendPaymentResponse, Store, StoredPaymentMethod, TokenPaymentPayload } from '../models';
 import { CaptureService } from '../services';
 import { IssuingPaymentService, IssuingUserInfo } from '../services/issuing-payment.service';
-import { ConfirmService, httpErrorMessage, toMinorUnits } from '../shared';
+import { ConfirmService, InlineAlertComponent, NotifyService, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 import { AdyenCheckout, AdyenCheckoutError, CoreConfiguration, Dropin } from '@adyen/adyen-web/auto';
 import '@adyen/adyen-web/styles/adyen.css';
 import { firstValueFrom } from 'rxjs';
@@ -16,6 +15,7 @@ import { environment } from '../../environments/environment';
 import {
   PaymentContext,
   PaymentOutcome,
+  cardBrandLabel,
   describePaymentResult,
   describeTokenizationResult,
   dropinLoadFailure,
@@ -37,6 +37,12 @@ const log = (...args: unknown[]) => { if (!environment.production) console.log(.
 
 type CheckoutTab = 'payment' | 'tokenize' | 'token-payment';
 
+const TABS: { id: CheckoutTab; label: string; icon: string }[] = [
+  { id: 'payment', label: 'Payment', icon: 'shopping_cart' },
+  { id: 'tokenize', label: 'Save a card', icon: 'credit_card' },
+  { id: 'token-payment', label: 'Pay with saved card', icon: 'replay' },
+];
+
 @Component({
   selector: 'app-issuing-checkout',
   standalone: true,
@@ -45,7 +51,8 @@ type CheckoutTab = 'payment' | 'tokenize' | 'token-payment';
     MaterialModule,
     ReactiveFormsModule,
     PaymentOutcomePanelComponent,
-    AdvancedOptionsComponent
+    AdvancedOptionsComponent,
+    InlineAlertComponent
   ],
   templateUrl: './issuing-checkout.component.html',
   styleUrl: './issuing-checkout.component.css'
@@ -60,6 +67,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly loadError = signal<string | null>(null);
 
+  readonly tabs = TABS;
   readonly activeTab = signal<CheckoutTab>('payment');
 
   readonly submitting = signal(false);
@@ -67,16 +75,19 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   readonly paymentOutcome = signal<PaymentOutcome | null>(null);
   /** Id on the Captures page of the current Drop-in payment (delayed or manual capture only). */
   readonly paymentTrackingId = signal<string | null>(null);
+  readonly paymentError = signal<string | null>(null);
 
   readonly submittingTokenize = signal(false);
   readonly tokenizeDropinActive = signal(false);
   readonly tokenizeOutcome = signal<PaymentOutcome | null>(null);
+  readonly tokenizeError = signal<string | null>(null);
 
   readonly storedMethods = signal<StoredPaymentMethod[]>([]);
   readonly loadingStoredMethods = signal(false);
   readonly storedMethodsError = signal<string | null>(null);
   readonly selectedStoredMethod = signal<StoredPaymentMethod | null>(null);
   readonly deletingToken = signal<string | null>(null);
+  readonly deleteError = signal<string | null>(null);
   readonly submittingTokenPayment = signal(false);
   readonly tokenPaymentOutcome = signal<PaymentOutcome | null>(null);
   readonly tokenPaymentTrackingId = signal<string | null>(null);
@@ -91,7 +102,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   private zone = inject(NgZone);
   private issuingPaymentService = inject(IssuingPaymentService);
   private captureService = inject(CaptureService);
-  private matSnackBar = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private confirmService = inject(ConfirmService);
 
   private dropin: Dropin | null = null;
@@ -185,7 +196,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        this.loadError.set(httpErrorMessage(err, "Couldn't load the issuing test merchant. Try again."));
+        this.loadError.set(httpErrorMessage(err, "Unable to load the issuing test merchant. Try again."));
         this.loading.set(false);
       }
     });
@@ -205,7 +216,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
         this.loading.set(false);
       },
       error: (err) => {
-        this.loadError.set(httpErrorMessage(err, "Couldn't load the stores. Try again."));
+        this.loadError.set(httpErrorMessage(err, "Unable to load the stores. Try again."));
         this.loading.set(false);
       }
     });
@@ -216,6 +227,34 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     if (tab === 'token-payment') {
       this.loadStoredPaymentMethods();
     }
+  }
+
+  /** Arrow keys, Home and End move between the tabs (roving tabindex). */
+  onTabKeydown(event: KeyboardEvent): void {
+    const ids = this.tabs.map(t => t.id);
+    const current = ids.indexOf(this.activeTab());
+    let next: number;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = (current + 1) % ids.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = (current - 1 + ids.length) % ids.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = ids.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.switchTab(ids[next]);
+    (event.currentTarget as HTMLElement).querySelector<HTMLElement>('#tab-' + ids[next])?.focus();
   }
 
   /** Explains why a disabled submit button can't be used yet. */
@@ -241,10 +280,6 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
 
   private storeReferenceOf(form: FormGroup): string {
     return this.isEmbeddedPayment ? (form.get('storeReference')?.value || '') : '';
-  }
-
-  private showError(message: string): void {
-    this.matSnackBar.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
   }
 
   private async ensureClientKey(): Promise<string> {
@@ -284,6 +319,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     this.unmountPaymentDropin();
     this.paymentOutcome.set(null);
     this.paymentTrackingId.set(null);
+    this.paymentError.set(null);
     this.submitting.set(true);
     this.issuingPaymentService.sendPayment(payload).subscribe({
       next: (res) => {
@@ -292,7 +328,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
         this.mountPaymentDropin(res, { amount: res.amount ?? amount, currency: res.currency || currency, reference }, advancedOptions);
       },
       error: (err) => {
-        this.showError(httpErrorMessage(err, "Couldn't create the payment session. Try again."));
+        this.paymentError.set(httpErrorMessage(err, "Unable to create the payment session. Try again."));
         this.submitting.set(false);
       }
     });
@@ -302,6 +338,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     this.unmountPaymentDropin();
     this.paymentOutcome.set(null);
     this.paymentTrackingId.set(null);
+    this.paymentError.set(null);
     this.checkoutForm.reset({
       storeReference: this.checkoutForm.get('storeReference')?.value || '',
       currencyCode: this.checkoutForm.get('currencyCode')?.value || 'EUR',
@@ -421,6 +458,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
 
     this.unmountTokenizeDropin();
     this.tokenizeOutcome.set(null);
+    this.tokenizeError.set(null);
     this.submittingTokenize.set(true);
     this.issuingPaymentService.createTokenizationSession(payload).subscribe({
       next: (res) => {
@@ -428,7 +466,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
         this.mountTokenizeDropin(res, { currency: res.currency || currency, reference });
       },
       error: (err) => {
-        this.showError(httpErrorMessage(err, "Couldn't start the card tokenization. Try again."));
+        this.tokenizeError.set(httpErrorMessage(err, "Unable to start the card tokenization. Try again."));
         this.submittingTokenize.set(false);
       }
     });
@@ -437,6 +475,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   newTokenization(): void {
     this.unmountTokenizeDropin();
     this.tokenizeOutcome.set(null);
+    this.tokenizeError.set(null);
     this.tokenizeForm.reset({
       storeReference: this.tokenizeForm.get('storeReference')?.value || '',
       currencyCode: this.tokenizeForm.get('currencyCode')?.value || 'EUR',
@@ -521,6 +560,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     this.selectedStoredMethod.set(null);
     this.tokenPaymentOutcome.set(null);
     this.storedMethodsError.set(null);
+    this.deleteError.set(null);
 
     if (this.isEmbeddedPayment && !this.tokenPaymentForm.get('storeReference')?.value) {
       this.storedMethods.set([]);
@@ -535,7 +575,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.storedMethods.set([]);
-        this.storedMethodsError.set(httpErrorMessage(err, "Couldn't load saved cards. Try again."));
+        this.storedMethodsError.set(httpErrorMessage(err, "Unable to load saved cards. Try again."));
         this.loadingStoredMethods.set(false);
       }
     });
@@ -550,12 +590,22 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     return this.selectedStoredMethod()?.recurringDetailReference === method.recurringDetailReference;
   }
 
-  cardLabel(method: StoredPaymentMethod): string {
-    return `${(method.cardBrand || 'Card').toUpperCase()} •••• ${method.cardSummary}`;
+  brandLabel(method: StoredPaymentMethod): string {
+    return cardBrandLabel(method.cardBrand);
   }
 
-  async deleteStoredMethod(event: Event, method: StoredPaymentMethod): Promise<void> {
-    event.stopPropagation();
+  cardLabel(method: StoredPaymentMethod): string {
+    return `${this.brandLabel(method)} •••• ${method.cardSummary}`;
+  }
+
+  /** Label of the charge button, with the amount once it is valid. */
+  chargeLabel(): string {
+    const amount = this.minorAmount(this.tokenPaymentForm);
+    return amount !== null ? `Charge ${formatMoney(amount, this.tokenPaymentForm.get('currencyCode')?.value)}` : 'Charge saved card';
+  }
+
+  async deleteStoredMethod(method: StoredPaymentMethod): Promise<void> {
+    this.deleteError.set(null);
     const confirmed = await this.confirmService.confirm({
       title: 'Delete saved card?',
       message: 'The card token is removed permanently. The card will need to be entered again for future payments.',
@@ -573,17 +623,17 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     this.issuingPaymentService.deleteStoredPaymentMethod(this.storeReferenceOf(this.tokenPaymentForm), method.recurringDetailReference).subscribe({
       next: () => {
         this.deletingToken.set(null);
-        this.matSnackBar.open('Saved card deleted', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+        this.notify.success(`${this.cardLabel(method)} deleted`);
         this.loadStoredPaymentMethods();
       },
       error: (err) => {
         this.deletingToken.set(null);
-        this.showError(httpErrorMessage(err, "Couldn't delete the saved card. Try again."));
+        this.deleteError.set(httpErrorMessage(err, "Unable to delete the saved card. Try again."));
       }
     });
   }
 
-  onTokenPaymentSubmit(): void {
+  async onTokenPaymentSubmit(): Promise<void> {
     const method = this.selectedStoredMethod();
     if (this.tokenPaymentForm.invalid || !method) {
       this.tokenPaymentForm.markAllAsTouched();
@@ -608,6 +658,22 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
       advancedOptions
     };
 
+    const formattedAmount = formatMoney(amount, currency);
+    const confirmed = await this.confirmService.confirm({
+      title: `Charge ${formattedAmount} to card •••• ${method.cardSummary}?`,
+      message: 'The saved card is charged right away, without the cardholder.',
+      details: [
+        { label: 'Amount', value: formattedAmount },
+        { label: 'Card', value: this.cardLabel(method) },
+        ...(method.holderName ? [{ label: 'Cardholder', value: method.holderName }] : []),
+        { label: 'Reference', value: reference },
+        ...(payload.storeReference ? [{ label: 'Store', value: payload.storeReference }] : [])
+      ],
+      confirmText: `Charge ${formattedAmount}`,
+      cancelText: 'Cancel'
+    });
+    if (!confirmed) return;
+
     this.tokenPaymentTrackingId.set(null);
     this.submittingTokenPayment.set(true);
     this.issuingPaymentService.makeTokenPayment(payload).subscribe({
@@ -621,7 +687,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
         this.submittingTokenPayment.set(false);
       },
       error: (err) => {
-        this.tokenPaymentOutcome.set(errorOutcome('Payment failed', httpErrorMessage(err, "Couldn't charge the saved card. Try again."), context));
+        this.tokenPaymentOutcome.set(errorOutcome('Payment failed', httpErrorMessage(err, "Unable to charge the saved card. Try again."), context));
         this.submittingTokenPayment.set(false);
       }
     });

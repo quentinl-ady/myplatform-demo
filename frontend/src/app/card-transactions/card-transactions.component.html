@@ -3,9 +3,9 @@
   <div class="page-header">
     <div class="header-content">
       <h1>Card transactions</h1>
-      <p class="subtitle">Authorisations, captures, refunds and more for your issued cards</p>
+      <p class="subtitle">Authorisations, captures, refunds and more for issued cards.</p>
     </div>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="refresh()" [disabled]="isLoading || isLoadingCards">
+    <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="refresh()" [disabled]="isLoading || isLoadingCards">
       <mat-icon aria-hidden="true">refresh</mat-icon>
       Refresh
     </button>
@@ -14,21 +14,18 @@
   <!-- Cards loading / error / empty -->
   <div class="loading-state" *ngIf="isLoadingCards" role="status">
     <mat-spinner diameter="40"></mat-spinner>
-    <p>Loading your cards…</p>
+    <p>Loading cards…</p>
   </div>
 
-  <div class="empty-state error" *ngIf="!isLoadingCards && cardsError">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <h3>Something went wrong</h3>
-    <p>{{ cardsError }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="loadCards()">Retry</button>
-  </div>
+  <app-inline-alert *ngIf="!isLoadingCards && cardsError" title="Unable to load cards" actionLabel="Try again" (action)="loadCards()">
+    {{ cardsError }}
+  </app-inline-alert>
 
   <div class="empty-state" *ngIf="!isLoadingCards && !cardsError && cards.length === 0">
     <mat-icon aria-hidden="true">credit_card_off</mat-icon>
-    <h3>No cards yet</h3>
+    <h2>No cards yet</h2>
     <p>Create a virtual card to see its transactions here.</p>
-    <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="navigateToCreate()">Create a card</button>
+    <a mat-flat-button class="fintech-btn primary centered" [routerLink]="['/', userId, 'card-create']">Create a card</a>
   </div>
 
   <ng-container *ngIf="!isLoadingCards && !cardsError && cards.length > 0">
@@ -45,50 +42,49 @@
       <p>Loading transactions…</p>
     </div>
 
-    <div class="empty-state error" *ngIf="!isLoading && transfersError">
-      <mat-icon aria-hidden="true">error_outline</mat-icon>
-      <h3>Something went wrong</h3>
-      <p>{{ transfersError }}</p>
-      <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="loadTransfers()">Retry</button>
-    </div>
+    <app-inline-alert *ngIf="!isLoading && transfersError" title="Unable to load transactions" actionLabel="Try again" (action)="loadTransfers()">
+      {{ transfersError }}
+    </app-inline-alert>
 
     <div class="empty-state" *ngIf="!isLoading && !transfersError && transfers.length === 0">
       <mat-icon aria-hidden="true">receipt_long</mat-icon>
-      <h3>No transactions yet</h3>
+      <h2>No transactions yet</h2>
       <p *ngIf="getSelectedCard() as card">Payments made with the card ending {{ card.lastFour }} appear here. Use the card online or from Test issued cards, then select Refresh.</p>
     </div>
 
-    <div class="tx-scroll" *ngIf="!isLoading && !transfersError && transfers.length > 0">
-      <div class="tx-list" role="table" aria-label="Card transactions">
-        <div class="tx-list-header" role="row">
-          <span class="col-date" role="columnheader">Date</span>
-          <span class="col-merchant" role="columnheader">Merchant</span>
-          <span class="col-type" role="columnheader">Channel</span>
-          <span class="col-status" role="columnheader">Status</span>
-          <span class="col-amount" role="columnheader">Amount</span>
-        </div>
-        <button type="button" class="tx-row" role="row" *ngFor="let t of transfers" (click)="openDetail(t, $event)"
-                [attr.aria-label]="'View details of ' + (t.merchantName || 'transaction') + ', ' + formatAmount(signedAmount(t), t.currency) + ', ' + formatDate(t.createdAt)">
-          <span class="col-date" role="cell">{{ formatDate(t.createdAt) }}</span>
-          <span class="col-merchant" role="cell">
-            <span class="merchant-name">{{ t.merchantName || 'Unknown merchant' }}</span>
-            <span class="merchant-mcc" *ngIf="t.mcc">{{ t.mcc }} · {{ getMccLabel(t.mcc) }}</span>
-          </span>
-          <span class="col-type" role="cell">
-            <span class="channel-badge" [class.ecom]="t.processingType === 'ecommerce'" [class.pos]="t.processingType === 'pos'">
-              {{ channelLabel(t.processingType) }}
-            </span>
-          </span>
-          <span class="col-status" role="cell">
-            <span class="status-badge" [ngClass]="'st-' + t.status">{{ humanize(t.status) }}</span>
-            <span class="tx-reason" *ngIf="t.reason && t.reason !== 'approved'">{{ humanize(t.reason) }}</span>
-          </span>
-          <span class="col-amount" role="cell" [class.credit]="isCredit(t)">
-            <span class="amount-value">{{ formatAmount(signedAmount(t), t.currency) }}</span>
-            <span class="amount-kind" *ngIf="directionLabel(t) as kind">{{ kind }}</span>
-          </span>
-        </button>
+    <!-- A list of buttons: each row opens the transaction details. The column header is visual only. -->
+    <div class="tx-list" *ngIf="!isLoading && !transfersError && transfers.length > 0">
+      <div class="tx-list-header" aria-hidden="true">
+        <span class="col-date">Date</span>
+        <span class="col-merchant">Merchant</span>
+        <span class="col-type">Channel</span>
+        <span class="col-status">Status</span>
+        <span class="col-amount">Amount</span>
       </div>
+      <ul class="tx-items" aria-label="Card transactions">
+        <li *ngFor="let t of transfers">
+          <button type="button" class="tx-row" aria-haspopup="dialog" (click)="openDetail(t, $event)">
+            <span class="col-date">{{ formatDate(t.createdAt) }}</span>
+            <span class="col-merchant">
+              <span class="merchant-name">{{ t.merchantName || 'Unknown merchant' }}</span>
+              <span class="merchant-mcc" *ngIf="t.mcc">{{ t.mcc }} · {{ getMccLabel(t.mcc) }}</span>
+            </span>
+            <span class="col-type">
+              <span class="channel-badge" [class.ecom]="t.processingType === 'ecommerce'" [class.pos]="t.processingType === 'pos'">
+                {{ channelLabel(t.processingType) }}
+              </span>
+            </span>
+            <span class="col-status">
+              <span class="status-badge" [ngClass]="'st-' + t.status">{{ statusLabel(t.status) }}</span>
+              <span class="tx-reason" *ngIf="t.reason && t.reason !== 'approved'">{{ humanize(t.reason) }}</span>
+            </span>
+            <span class="col-amount" [class.credit]="isCredit(t)">
+              <span class="amount-value">{{ formatAmount(signedAmount(t), t.currency) }}</span>
+              <span class="amount-kind" *ngIf="directionLabel(t) as kind">{{ kind }}</span>
+            </span>
+          </button>
+        </li>
+      </ul>
     </div>
   </ng-container>
 
@@ -119,7 +115,7 @@
             </div>
             <div class="detail-item">
               <dt class="label">Status</dt>
-              <dd class="value"><span class="status-badge" [ngClass]="'st-' + selectedTransfer.status">{{ humanize(selectedTransfer.status) }}</span></dd>
+              <dd class="value"><span class="status-badge" [ngClass]="'st-' + selectedTransfer.status">{{ statusLabel(selectedTransfer.status) }}</span></dd>
             </div>
             <div class="detail-item">
               <dt class="label">Type</dt>
@@ -206,7 +202,7 @@
               </div>
               <div class="event-info">
                 <div class="event-header">
-                  <span class="event-status" [ngClass]="'st-' + event.status">{{ humanize(event.status) }}</span>
+                  <span class="event-status">{{ statusLabel(event.status) }}</span>
                   <span class="event-type" *ngIf="event.type">({{ humanize(event.type) }})</span>
                 </div>
                 <div class="event-meta">
@@ -235,10 +231,11 @@
           <div class="rules-result">
             <div class="rules-summary">
               <span class="rules-advice" [class.deny]="selectedTransfer.transactionRulesResult.advice === 'DenyTransaction'">
-                {{ humanize(selectedTransfer.transactionRulesResult.advice) }}
+                <mat-icon aria-hidden="true">{{ selectedTransfer.transactionRulesResult.advice === 'DenyTransaction' ? 'block' : 'check_circle' }}</mat-icon>
+                {{ adviceLabel(selectedTransfer.transactionRulesResult.advice) }}
               </span>
               <span class="rules-passed" *ngIf="!selectedTransfer.transactionRulesResult.allHardBlockRulesPassed">
-                Hard block rules failed
+                A hard block rule failed
               </span>
             </div>
             <ul class="triggered-rules" *ngIf="selectedTransfer.transactionRulesResult.triggeredRules?.length">

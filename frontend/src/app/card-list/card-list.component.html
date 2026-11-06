@@ -1,13 +1,13 @@
 <div class="fintech-wrapper">
   <div class="page-header">
     <div class="header-content">
-      <h1>My cards</h1>
-      <p class="subtitle">Manage your virtual cards and spending rules</p>
+      <h1>Cards</h1>
+      <p class="subtitle">Manage virtual cards and their spending rules.</p>
     </div>
-    <button mat-flat-button type="button" class="fintech-btn primary" (click)="navigateToCreate()">
+    <a mat-flat-button class="fintech-btn primary" [routerLink]="['/', userId, 'card-create']">
       <mat-icon aria-hidden="true">add</mat-icon>
       New card
-    </button>
+    </a>
   </div>
 
   <!-- Search -->
@@ -26,9 +26,9 @@
           <div class="search-suggestion">
             <span class="suggestion-name">{{ card.cardholderName }}</span>
             <span class="suggestion-meta">
-              <span class="suggestion-brand" [class.visa]="card.brand === 'visa'" [class.mc]="card.brand === 'mc'">{{ card.brand === 'visa' ? 'Visa' : 'MC' }}</span>
+              <span class="suggestion-brand">{{ brandLabel(card) }}</span>
               •••• {{ card.lastFour }}
-              <span class="suggestion-status" [class]="card.status">{{ card.status }}</span>
+              <span class="suggestion-status" [class]="card.status">{{ statusLabel(card.status) }}</span>
             </span>
           </div>
         </mat-option>
@@ -41,23 +41,21 @@
 
   <div class="loading-state" *ngIf="isLoadingActive" role="status">
     <mat-spinner diameter="40"></mat-spinner>
-    <p>Loading your cards…</p>
+    <p>Loading cards…</p>
   </div>
 
-  <div class="empty-state error" *ngIf="!isLoadingActive && loadError">
-    <mat-icon aria-hidden="true">error_outline</mat-icon>
-    <h3>Something went wrong</h3>
-    <p>{{ loadError }}</p>
-    <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="loadActiveAndSuspended()">Retry</button>
-  </div>
+  <app-inline-alert class="page-alert" *ngIf="!isLoadingActive && loadError"
+                    title="Unable to load cards" actionLabel="Try again" (action)="loadActiveAndSuspended()">
+    {{ loadError }}
+  </app-inline-alert>
 
   <div class="empty-state" *ngIf="!isLoadingActive && !loadError && !hasAnyCard">
     <mat-icon aria-hidden="true">credit_card_off</mat-icon>
-    <h3>No cards yet</h3>
-    <p>Create your first virtual card to start paying online.</p>
-    <button mat-flat-button type="button" class="fintech-btn primary centered" (click)="navigateToCreate()">
+    <h2>No cards yet</h2>
+    <p>Create a virtual card to start paying online.</p>
+    <a mat-flat-button class="fintech-btn primary centered" [routerLink]="['/', userId, 'card-create']">
       Create a card
-    </button>
+    </a>
   </div>
 
   <div class="no-results" *ngIf="!isLoadingActive && !loadError && hasSearchTerm && filteredActiveCards.length === 0 && filteredSuspendedCards.length === 0 && (activeCards.length > 0 || suspendedCards.length > 0)">
@@ -72,7 +70,6 @@
         <div class="virtual-card"
              [class.visa]="card.brand === 'visa'"
              [class.mc]="card.brand === 'mc'"
-             [class.suspended]="card.status === 'suspended'"
              [class.closed]="card.status === 'closed'"
              [attr.role]="card.status !== 'closed' ? 'button' : null"
              [attr.tabindex]="card.status !== 'closed' ? 0 : null"
@@ -81,11 +78,7 @@
              (keydown.enter)="selectCard(card)"
              (keydown.space)="$event.preventDefault(); selectCard(card)">
 
-          <span class="cdk-visually-hidden">{{ cardName(card) }}, {{ card.status }}.</span>
-
-          <div class="card-status-badge" *ngIf="card.status !== 'active'" aria-hidden="true">
-            {{ card.status | titlecase }}
-          </div>
+          <span class="cdk-visually-hidden">{{ cardName(card) }}, {{ statusLabel(card.status) }}.</span>
 
           <div class="card-top-row">
             <div class="card-brand-logo" aria-hidden="true">
@@ -98,6 +91,10 @@
                 <path d="M76 18.5a45 45 0 0 0 0 63 45 45 0 0 0 0-63z" fill="#ff5f00"/>
               </svg>
             </div>
+            <span class="card-status-badge" *ngIf="card.status !== 'active'" aria-hidden="true">
+              <mat-icon>{{ card.status === 'suspended' ? 'pause_circle' : 'block' }}</mat-icon>
+              {{ statusLabel(card.status) }}
+            </span>
           </div>
 
           <div class="card-number" [class.revealed]="revealedCardId === card.paymentInstrumentId">
@@ -112,7 +109,7 @@
           <div class="card-bottom-row">
             <div class="card-holder">
               <span class="label">Cardholder</span>
-              <span class="value">{{ card.cardholderName }}</span>
+              <span class="value" [attr.title]="card.cardholderName">{{ card.cardholderName }}</span>
             </div>
             <div class="card-expiry">
               <span class="label">Expires</span>
@@ -130,7 +127,7 @@
           </div>
           <div class="card-balance-account" *ngIf="card.balanceAccountDescription">
             <span class="label">Balance account</span>
-            <span class="value">{{ card.balanceAccountDescription }}<ng-container *ngIf="card.currencyCode"> · {{ card.currencyCode }}</ng-container></span>
+            <span class="value" [attr.title]="card.balanceAccountDescription">{{ card.balanceAccountDescription }}<ng-container *ngIf="card.currencyCode"> · {{ card.currencyCode }}</ng-container></span>
           </div>
         </div>
 
@@ -139,7 +136,7 @@
                   [matMenuTriggerFor]="cardMenu"
                   [attr.aria-label]="'Actions for ' + cardName(card)"
                   [disabled]="isBusy(card)">
-            <mat-spinner *ngIf="isBusy(card)" diameter="20" class="menu-spinner"></mat-spinner>
+            <mat-spinner *ngIf="isBusy(card)" diameter="20" class="menu-spinner" aria-label="Updating the card"></mat-spinner>
             <mat-icon *ngIf="!isBusy(card)" aria-hidden="true">more_vert</mat-icon>
           </button>
           <mat-menu #cardMenu="matMenu">
@@ -185,6 +182,11 @@
       <p class="reveal-note" *ngIf="revealedCardId === card.paymentInstrumentId && revealedData">
         Details are hidden automatically after 30 seconds.
       </p>
+      <app-inline-alert *ngIf="cardError?.id === card.paymentInstrumentId && cardError as error"
+                        [title]="error.title" [actionLabel]="error.retry ? 'Try again' : ''" (action)="retryCardError()"
+                        [dismissible]="true" (dismiss)="cardError = null">
+        {{ error.message }}
+      </app-inline-alert>
     </div>
   </ng-template>
 
@@ -226,10 +228,10 @@
       <mat-spinner diameter="24"></mat-spinner>
       <p>Loading closed cards…</p>
     </div>
-    <div class="inline-error" *ngIf="closedCardsError && !isLoadingClosed">
-      <span>{{ closedCardsError }}</span>
-      <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="loadClosedCards()">Retry</button>
-    </div>
+    <app-inline-alert *ngIf="closedCardsError && !isLoadingClosed"
+                      title="Unable to load closed cards" actionLabel="Try again" (action)="loadClosedCards()">
+      {{ closedCardsError }}
+    </app-inline-alert>
     <div *ngIf="closedCardsLoaded && closedCards.length > 0">
       <div class="section-title">
         <span class="status-dot closed" aria-hidden="true"></span>
@@ -246,10 +248,10 @@
   </section>
 
   <div class="card-transactions-link" *ngIf="!isLoadingActive && !loadError && hasAnyCard">
-    <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="viewTransactions()">
+    <a mat-stroked-button class="fintech-btn secondary" [routerLink]="['/', userId, 'card-transactions']">
       <mat-icon aria-hidden="true">receipt_long</mat-icon>
       View card transactions
-    </button>
+    </a>
   </div>
 
   <!-- Rules panel -->
@@ -260,7 +262,7 @@
        (keydown)="onRulesPanelKeydown($event)">
     <div class="panel-header">
       <div>
-        <h3 id="rules-panel-title">Transaction rules</h3>
+        <h2 id="rules-panel-title">Transaction rules</h2>
         <p class="panel-subtitle" id="rules-panel-subtitle">{{ cardName(selectedCard) }} · {{ selectedCard.cardholderName }}</p>
       </div>
       <button mat-icon-button type="button" (click)="closeRulesPanel()" aria-label="Close transaction rules">
@@ -269,6 +271,12 @@
     </div>
 
     <div class="panel-scrollable-content">
+      <app-inline-alert class="panel-alert" *ngIf="rulesError as error"
+                        [title]="error.title" [actionLabel]="error.retry ? 'Try again' : ''" (action)="retryRulesError()"
+                        [dismissible]="true" (dismiss)="rulesError = null">
+        {{ error.message }}
+      </app-inline-alert>
+
       <div class="loading-state small" *ngIf="isRefreshingRules" role="status">
         <mat-spinner diameter="24"></mat-spinner>
         <p>Updating rules…</p>
@@ -295,26 +303,26 @@
             </div>
           </div>
           <div class="rule-actions">
-            <span class="rule-status" [class.active]="rule.status === 'active'" [class.inactive]="rule.status === 'inactive'">
+            <span class="rule-status" [class.active]="rule.status === 'active'">
               {{ rule.status === 'active' ? 'Active' : 'Inactive' }}
             </span>
             <button mat-icon-button type="button" [matMenuTriggerFor]="ruleMenu" [disabled]="busyRuleId === rule.id"
                     [attr.aria-label]="'Actions for rule: ' + getRuleName(rule.type)">
-              <mat-spinner *ngIf="busyRuleId === rule.id" diameter="18" class="menu-spinner"></mat-spinner>
+              <mat-spinner *ngIf="busyRuleId === rule.id" diameter="18" class="menu-spinner" aria-label="Updating the rule"></mat-spinner>
               <mat-icon *ngIf="busyRuleId !== rule.id" aria-hidden="true">more_vert</mat-icon>
             </button>
             <mat-menu #ruleMenu="matMenu">
               <button mat-menu-item type="button" (click)="toggleRuleStatus(rule)" *ngIf="rule.status === 'active'">
                 <mat-icon aria-hidden="true">pause</mat-icon>
-                <span>Disable</span>
+                <span>Disable rule</span>
               </button>
               <button mat-menu-item type="button" (click)="toggleRuleStatus(rule)" *ngIf="rule.status !== 'active'">
                 <mat-icon aria-hidden="true">play_arrow</mat-icon>
-                <span>Enable</span>
+                <span>Enable rule</span>
               </button>
               <button mat-menu-item type="button" (click)="deleteRule(rule)" class="danger-item">
                 <mat-icon aria-hidden="true">delete</mat-icon>
-                <span>Delete…</span>
+                <span>Delete rule…</span>
               </button>
             </mat-menu>
           </div>
@@ -328,8 +336,13 @@
     </div>
 
     <div class="panel-fixed-footer">
-      <h4>Add a rule</h4>
+      <h3>Add a rule</h3>
       <form [formGroup]="ruleForm" (ngSubmit)="addRule()" novalidate>
+        <app-inline-alert class="panel-alert" *ngIf="addRuleError"
+                          title="Unable to add the rule" [dismissible]="true" (dismiss)="addRuleError = null">
+          {{ addRuleError }}
+        </app-inline-alert>
+
         <label for="rule-type" class="field-label">Rule type</label>
         <select id="rule-type" class="fintech-input full-width" formControlName="type" (change)="onRuleTypeChange()">
           <option value="maxTransactions">Transaction limit</option>
@@ -341,14 +354,15 @@
         <ng-container *ngIf="ruleForm.value.type !== 'blockedMccs'">
           <label for="rule-value" class="field-label">{{ isCountRule ? 'Maximum number of transactions' : 'Limit' + (ruleCurrency ? ' (' + ruleCurrency + ')' : '') }}</label>
           <div class="rule-form-row">
-            <input id="rule-value" type="number" inputmode="decimal" class="fintech-input" formControlName="value"
+            <input id="rule-value" type="number" [attr.inputmode]="isCountRule ? 'numeric' : 'decimal'" class="fintech-input" formControlName="value"
                    [step]="isCountRule ? '1' : '0.01'"
                    [min]="isCountRule ? 1 : 0.01"
-                   [placeholder]="isCountRule ? 'e.g. 10' : 'e.g. 15.00'" />
+                   [placeholder]="isCountRule ? 'e.g. 10' : 'e.g. 15.00'"
+                   [attr.aria-describedby]="ruleHint ? 'rule-hint' : null" />
             <button mat-flat-button class="fintech-btn primary" type="submit"
                     [disabled]="ruleForm.invalid || isAddingRule">
               <mat-spinner *ngIf="isAddingRule" diameter="20" aria-label="Adding rule"></mat-spinner>
-              <span *ngIf="!isAddingRule">Add</span>
+              <span *ngIf="!isAddingRule">Add rule</span>
             </button>
           </div>
         </ng-container>
@@ -365,10 +379,10 @@
                    [matAutocomplete]="mccAuto" />
             <mat-autocomplete #mccAuto="matAutocomplete" (optionSelected)="addMccToRule($event)">
               <mat-option *ngFor="let mcc of filteredMccs" [value]="mcc">
-                <span class="mcc-option" [class.risky]="mcc.risky">
+                <span class="mcc-option">
                   <span class="mcc-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
                   <span class="mcc-label">{{ mcc.label }}</span>
-                  <span class="risky-badge" *ngIf="mcc.risky">High risk</span>
+                  <span class="risky-badge" *ngIf="mcc.risky"><mat-icon aria-hidden="true">warning</mat-icon>High risk</span>
                 </span>
               </mat-option>
             </mat-autocomplete>
@@ -378,8 +392,7 @@
             <div class="mcc-chip" *ngFor="let mcc of selectedMccsForRule" [class.risky]="mcc.risky">
               <span class="chip-code" [class.risky]="mcc.risky">{{ mcc.code }}</span>
               <span class="chip-label">{{ mcc.label }}</span>
-              <mat-icon class="risky-indicator" *ngIf="mcc.risky" aria-hidden="true">warning</mat-icon>
-              <span class="cdk-visually-hidden" *ngIf="mcc.risky">(high risk)</span>
+              <span class="risky-badge" *ngIf="mcc.risky"><mat-icon aria-hidden="true">warning</mat-icon>High risk</span>
               <button type="button" class="chip-remove" (click)="removeMccFromRule(mcc)" [attr.aria-label]="'Remove ' + mcc.code + ' ' + mcc.label">
                 <mat-icon aria-hidden="true">close</mat-icon>
               </button>
@@ -389,10 +402,10 @@
           <button mat-flat-button class="fintech-btn primary full-width mcc-add-btn" type="submit"
                   [disabled]="selectedMccsForRule.length === 0 || isAddingRule">
             <mat-spinner *ngIf="isAddingRule" diameter="20" aria-label="Adding rule"></mat-spinner>
-            <span *ngIf="!isAddingRule">Add merchant category block</span>
+            <span *ngIf="!isAddingRule">Block these categories</span>
           </button>
         </div>
-        <p class="form-hint" *ngIf="!isAddingRule && ruleHint as hint">{{ hint }}</p>
+        <p id="rule-hint" class="form-hint" *ngIf="!isAddingRule && ruleHint as hint">{{ hint }}</p>
       </form>
     </div>
   </div>

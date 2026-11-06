@@ -2,20 +2,35 @@ import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { Observable } from 'rxjs';
 import { MaterialModule } from '../material.module';
+import { UserBranding } from '../models';
+import { InlineAlertComponent, httpErrorMessage } from '../shared';
+
+export interface BrandingPayload {
+  platformName?: string;
+  logoData?: string;
+  logoType?: string;
+  themeId?: string;
+}
 
 export interface BrandingDialogData {
   platformName: string;
   logoPreview: string | null;
   themeId: string | null;
+  /** The dialog stays open while these run, so a failure is shown next to the form. */
+  save: (payload: BrandingPayload) => Observable<UserBranding>;
+  reset: () => Observable<void>;
 }
+
+export type BrandingDialogResult = { action: 'saved'; branding: UserBranding } | { action: 'reset' };
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-branding-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, MaterialModule],
+  imports: [CommonModule, FormsModule, MaterialModule, InlineAlertComponent],
   template: `
     <h2 mat-dialog-title>Customize branding</h2>
     <mat-dialog-content class="branding-dialog-content">
@@ -78,17 +93,25 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
       <mat-form-field appearance="outline" class="full-width theme-field">
         <mat-label>Hosted onboarding theme ID</mat-label>
-        <input matInput [(ngModel)]="themeId" placeholder="e.g. 37a3b051-..." autocomplete="off" />
+        <input matInput [(ngModel)]="themeId" placeholder="e.g. 37a3b051-…" autocomplete="off" />
         <mat-hint>Optional. The ID of your hosted onboarding theme.</mat-hint>
       </mat-form-field>
+
+      <app-inline-alert
+        *ngIf="submitError"
+        class="submit-error"
+        [dismissible]="true"
+        (dismiss)="submitError = ''">{{ submitError }}</app-inline-alert>
 
     </mat-dialog-content>
 
     <mat-dialog-actions class="branding-actions">
-      <button mat-button type="button" class="reset-btn" (click)="onReset()">Reset to default</button>
+      <button mat-button type="button" class="reset-btn" (click)="onReset()" [disabled]="busy">Reset to default</button>
       <span class="actions-spacer"></span>
-      <button mat-button type="button" mat-dialog-close>Cancel</button>
-      <button mat-flat-button type="button" class="fintech-btn" (click)="onSave()" [disabled]="loadingUrl">Save</button>
+      <button mat-stroked-button type="button" class="secondary-btn" mat-dialog-close [disabled]="busy">Cancel</button>
+      <button mat-flat-button type="button" class="fintech-btn" (click)="onSave()" [disabled]="loadingUrl || busy">
+        {{ busy === 'save' ? 'Saving…' : 'Save branding' }}
+      </button>
     </mat-dialog-actions>
   `,
   styles: [`
@@ -99,17 +122,19 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       width: 100%;
     }
     .section-label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 600;
       color: var(--fintech-text);
       margin: 8px 0;
     }
     .logo-preview {
-      height: 50px;
+      min-height: 50px;
+      box-sizing: border-box;
       background: var(--fintech-bg);
       border: 1px solid var(--fintech-border);
       border-radius: 8px;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       padding: 8px 16px;
       margin-bottom: 12px;
@@ -122,9 +147,10 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       object-fit: contain;
     }
     .default-badge {
-      font-size: 11px;
+      font-size: 0.75rem;
+      font-weight: 600;
       color: var(--fintech-text-secondary);
-      background: #eeeeee;
+      background: var(--fintech-surface-muted);
       padding: 2px 8px;
       border-radius: 4px;
     }
@@ -138,7 +164,7 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       border-radius: 24px;
     }
     .field-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--fintech-text-secondary);
     }
     .url-input-row {
@@ -152,7 +178,7 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       min-width: 0;
     }
     .url-btn {
-      height: 56px;
+      min-height: 56px;
       min-width: 72px;
       border-radius: 12px;
     }
@@ -162,9 +188,12 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
     .theme-field {
       margin-top: 8px;
     }
+    .submit-error {
+      margin-top: 16px;
+    }
     .error-msg {
       color: var(--fintech-danger);
-      font-size: 13px;
+      font-size: 0.8125rem;
       margin: -4px 0 12px 0;
     }
     .branding-actions {
@@ -180,21 +209,27 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
       color: var(--fintech-danger) !important;
       margin-left: -8px;
     }
+    .secondary-btn {
+      border-radius: 24px !important;
+    }
     .fintech-btn {
       border-radius: 24px !important;
       padding: 0 24px !important;
       background-color: var(--fintech-primary) !important;
-      color: #ffffff !important;
+      color: var(--fintech-on-primary) !important;
       font-weight: 600 !important;
     }
     .fintech-btn[disabled] {
-      background-color: #e5e5e5 !important;
-      color: #a3a3a3 !important;
+      background-color: var(--fintech-surface-muted) !important;
+      color: var(--fintech-text-secondary) !important;
+    }
+    .reset-btn[disabled] {
+      color: var(--fintech-text-secondary) !important;
     }
   `]
 })
 export class BrandingDialogComponent implements OnInit {
-  private dialogRef = inject(MatDialogRef<BrandingDialogComponent>);
+  private dialogRef: MatDialogRef<BrandingDialogComponent, BrandingDialogResult> = inject(MatDialogRef);
   private data: BrandingDialogData = inject(MAT_DIALOG_DATA);
 
   platformName: string = '';
@@ -205,6 +240,8 @@ export class BrandingDialogComponent implements OnInit {
   themeId: string = '';
   errorMsg: string = '';
   loadingUrl: boolean = false;
+  busy: 'save' | 'reset' | null = null;
+  submitError = '';
 
   ngOnInit() {
     this.platformName = this.data.platformName || '';
@@ -233,7 +270,7 @@ export class BrandingDialogComponent implements OnInit {
     const reader = new FileReader();
     reader.onload = () => this.setLogo(reader.result as string);
     reader.onerror = () => {
-      this.errorMsg = 'We couldn\'t read this file. Try another image.';
+      this.errorMsg = 'This file can\'t be read. Try another image.';
     };
     reader.readAsDataURL(file);
   }
@@ -258,15 +295,15 @@ export class BrandingDialogComponent implements OnInit {
           this.loadingUrl = false;
         };
         reader.onerror = () => {
-          this.errorMsg = 'We couldn\'t read this image. Download it and use "Upload image" instead.';
+          this.errorMsg = 'This image can\'t be read. Download it and use "Upload image" instead.';
           this.loadingUrl = false;
         };
         reader.readAsDataURL(blob);
       })
       .catch((err: Error) => {
         this.errorMsg = err?.message === 'NOT_IMAGE'
-          ? 'This URL doesn\'t point to an image.'
-          : 'We couldn\'t load this URL (the site probably blocks downloads). Download the image and use "Upload image" instead.';
+          ? 'This URL doesn\'t point to an image. Check the address or use "Upload image" instead.'
+          : 'This URL can\'t be loaded (the site probably blocks downloads). Download the image and use "Upload image" instead.';
         this.loadingUrl = false;
       });
   }
@@ -285,16 +322,41 @@ export class BrandingDialogComponent implements OnInit {
   }
 
   onSave() {
-    this.dialogRef.close({
-      action: 'save',
-      platformName: this.platformName.trim(),
-      logoData: this.logoData,
-      logoType: this.logoType,
-      themeId: this.themeId.trim()
-    });
+    if (this.busy) return;
+    const payload: BrandingPayload = {};
+    const platformName = this.platformName.trim();
+    if (platformName) payload.platformName = platformName;
+    if (this.logoData) {
+      payload.logoData = this.logoData;
+      payload.logoType = this.logoType as string;
+    }
+    payload.themeId = this.themeId.trim();
+    this.run('save', this.data.save(payload), 'Unable to save the branding. Try again.',
+      branding => ({ action: 'saved', branding }));
   }
 
   onReset() {
-    this.dialogRef.close({ action: 'reset' });
+    if (this.busy) return;
+    this.run('reset', this.data.reset(), 'Unable to reset the branding. Try again.',
+      () => ({ action: 'reset' }));
+  }
+
+  private run<T>(kind: 'save' | 'reset', request: Observable<T>, fallback: string,
+                 result: (value: T) => BrandingDialogResult) {
+    this.busy = kind;
+    this.submitError = '';
+    this.dialogRef.disableClose = true;
+    request.subscribe({
+      next: (value) => {
+        this.busy = null;
+        this.dialogRef.disableClose = false;
+        this.dialogRef.close(result(value));
+      },
+      error: (err) => {
+        this.busy = null;
+        this.dialogRef.disableClose = false;
+        this.submitError = httpErrorMessage(err, fallback);
+      }
+    });
   }
 }

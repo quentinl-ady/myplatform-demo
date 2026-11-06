@@ -13,7 +13,7 @@
   gap: 16px;
 }
 .page-header h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--fintech-text);
   margin: 0 0 8px 0;
@@ -21,7 +21,7 @@
 }
 .page-header p {
   color: var(--fintech-text-secondary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   margin: 0;
 }
 .refresh-btn {
@@ -50,26 +50,26 @@ mat-card.component-card {
 }
 .page-state p {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   max-width: 480px;
   line-height: 1.5;
 }
 .page-state h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--fintech-text);
 }
 .page-state .state-icon {
-  font-size: 40px;
-  width: 40px;
-  height: 40px;
+  font-size: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
   color: var(--fintech-danger);
 }
 
-.fintech-btn {
-  background-color: var(--fintech-primary) !important;
-  color: #fff !important;
+.fintech-btn-secondary {
+  background-color: var(--fintech-surface-muted) !important;
+  color: var(--fintech-text) !important;
   border-radius: 24px !important;
   padding: 0 24px !important;
   font-weight: 600 !important;
@@ -84,6 +84,6 @@ mat-card.component-card {
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 @media (max-width: 600px) {
-  .page-header h1 { font-size: 24px; }
+  .page-header h1 { font-size: 1.5rem; }
   mat-card.component-card { padding: 16px; }
 }

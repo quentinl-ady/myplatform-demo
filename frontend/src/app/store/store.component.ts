@@ -2,7 +2,6 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatStepper, MatStepperModule } from '@angular/material/stepper';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
@@ -10,7 +9,7 @@ import { MaterialModule } from '../material.module';
 import { Store, StorePayload, BusinessLine, BalanceAccount, VerificationStatus } from '../models';
 import { AccountService, ActivityService, StoreService } from '../services';
 import { INDUSTRY_CODES } from "../industry-codes";
-import { httpErrorMessage } from '../shared';
+import { InlineAlertComponent, NotifyService, httpErrorMessage } from '../shared';
 
 export interface PaymentMethodDef {
   key: string;
@@ -83,7 +82,8 @@ const COUNTRY_SUGGESTIONS: Record<string, { city: string; postal: string; phone:
     CommonModule,
     MaterialModule,
     ReactiveFormsModule,
-    MatStepperModule
+    MatStepperModule,
+    InlineAlertComponent
   ],
   templateUrl: './store.component.html',
   styleUrl: './store.component.css'
@@ -95,6 +95,11 @@ export class StoreComponent implements OnInit {
   loadError: string | null = null;
   balanceAccountsError: string | null = null;
   businessLinesError: string | null = null;
+  countryError: string | null = null;
+  addPmError: string | null = null;
+  createError: string | null = null;
+  /** Last failed payment method toggle, shown inside the store card it belongs to. */
+  toggleError: { storeId: string; message: string } | null = null;
   lastUpdated: number | null = null;
   lastCreatedStore: Store | null = null;
   readonly busyPmIds = new Set<string>();
@@ -118,7 +123,7 @@ export class StoreComponent implements OnInit {
   private accountService = inject(AccountService);
   private activityService = inject(ActivityService);
   private storeService = inject(StoreService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
 
   generalForm = this.fb.group({
     country: ['', Validators.required],
@@ -149,6 +154,7 @@ export class StoreComponent implements OnInit {
   }
 
   loadUserCountry() {
+    this.countryError = null;
     this.accountService.getUserById(this.userId).subscribe({
       next: user => {
         this.userCountryCode = user.countryCode;
@@ -159,7 +165,7 @@ export class StoreComponent implements OnInit {
         this.buildPaymentsForm();
         this.buildAddPmForm();
       },
-      error: err => this.showError(httpErrorMessage(err, 'Could not load your account country. Refresh the page to try again.'))
+      error: err => this.countryError = httpErrorMessage(err, 'Unable to load the account country, which sets the available payment methods. Try again.')
     });
   }
 
@@ -200,7 +206,7 @@ export class StoreComponent implements OnInit {
         this.isLoading = false;
       },
       error: err => {
-        this.loadError = httpErrorMessage(err, 'Could not load your stores.');
+        this.loadError = httpErrorMessage(err, 'Unable to load stores. Try again.');
         this.isLoading = false;
       }
     });
@@ -210,6 +216,7 @@ export class StoreComponent implements OnInit {
     this.loadStores();
     this.loadBalanceAccounts();
     this.loadBusinessLines();
+    if (this.countryError) this.loadUserCountry();
   }
 
   getLastUpdatedLabel(): string {
@@ -224,7 +231,7 @@ export class StoreComponent implements OnInit {
     this.balanceAccountsError = null;
     this.accountService.getBalanceAccounts(this.userId).subscribe({
       next: res => this.balanceAccounts.set(res),
-      error: err => this.balanceAccountsError = httpErrorMessage(err, 'Could not load balance accounts.')
+      error: err => this.balanceAccountsError = httpErrorMessage(err, 'Unable to load balance accounts.')
     });
   }
 
@@ -232,7 +239,7 @@ export class StoreComponent implements OnInit {
     this.businessLinesError = null;
     this.activityService.getBusinessLines(this.userId).subscribe({
       next: res => this.businessLines.set(res),
-      error: err => this.businessLinesError = httpErrorMessage(err, 'Could not load business lines.')
+      error: err => this.businessLinesError = httpErrorMessage(err, 'Unable to load business activities.')
     });
   }
 
@@ -294,10 +301,6 @@ export class StoreComponent implements OnInit {
     });
   }
 
-  private showError(message: string) {
-    this.snack.open(message, 'Close', { duration: 5000, panelClass: 'fintech-snack-error' });
-  }
-
   sanitizeReference(ref: string): string {
     const clean = ref.replace(/[^a-zA-Z0-9]/g, '');
     const suffix = Math.random().toString(36).substring(2, 9).toUpperCase();
@@ -338,6 +341,7 @@ export class StoreComponent implements OnInit {
   openAddPm(store: Store) {
     if (!this.addPmForm) return;
     this.addPmStoreId = store.storeId;
+    this.addPmError = null;
     this.buildAddPmForm();
     // Disable PMs already on this store
     const existingTypes = new Set(store.paymentMethods.map(pm => pm.type));
@@ -350,6 +354,7 @@ export class StoreComponent implements OnInit {
 
   closeAddPm() {
     this.addPmStoreId = null;
+    this.addPmError = null;
   }
 
   submitAddPm() {
@@ -359,6 +364,7 @@ export class StoreComponent implements OnInit {
       .map(p => p.key);
     if (selected.length === 0) return;
     this.addPmLoading = true;
+    this.addPmError = null;
     this.storeService.addPaymentMethods(this.userId, this.addPmStoreId, selected).subscribe({
       next: updatedPMs => {
         const typedPMs = updatedPMs.map(pm => ({
@@ -376,12 +382,12 @@ export class StoreComponent implements OnInit {
         });
         this.stores.set(updated);
         const labels = selected.map(k => this.getPmLabel(k)).join(', ');
-        this.snack.open(`Requested ${labels}. Verification can take a few minutes.`, 'Close', { duration: 4000 });
+        this.notify.success(`Requested ${labels}. Verification can take a few minutes.`);
         this.addPmLoading = false;
         this.addPmStoreId = null;
       },
       error: err => {
-        this.showError(httpErrorMessage(err, 'Could not add the payment methods.'));
+        this.addPmError = httpErrorMessage(err, 'Unable to add the payment methods. Try again.');
         this.addPmLoading = false;
       }
     });
@@ -393,6 +399,7 @@ export class StoreComponent implements OnInit {
     if (this.busyPmIds.has(pm.paymentMethodId)) return;
     const newEnabled = event.checked;
     this.busyPmIds.add(pm.paymentMethodId);
+    this.toggleError = null;
     this.storeService.togglePaymentMethod(pm.paymentMethodId, newEnabled).subscribe({
       next: updated => {
         const storesList = this.stores();
@@ -411,16 +418,16 @@ export class StoreComponent implements OnInit {
         });
         this.stores.set(updatedStores);
         this.busyPmIds.delete(pm.paymentMethodId);
-        this.snack.open(
-          `${this.getPmLabel(pm.type)} ${updated.enabled ? 'enabled' : 'disabled'}`,
-          'Close', { duration: 3000 }
-        );
+        this.notify.success(`${this.getPmLabel(pm.type)} ${updated.enabled ? 'enabled' : 'disabled'}`);
       },
       error: err => {
         this.busyPmIds.delete(pm.paymentMethodId);
         // The toggle already flipped visually; put it back to the server state.
         event.source.checked = pm.enabled;
-        this.showError(httpErrorMessage(err, `Could not ${newEnabled ? 'enable' : 'disable'} ${this.getPmLabel(pm.type)}.`));
+        this.toggleError = {
+          storeId,
+          message: httpErrorMessage(err, `Unable to ${newEnabled ? 'enable' : 'disable'} ${this.getPmLabel(pm.type)}. Try again.`)
+        };
       }
     });
   }
@@ -431,6 +438,7 @@ export class StoreComponent implements OnInit {
     if (this.isSubmitting || this.generalForm.invalid || this.activityForm.invalid || !this.paymentsForm || this.paymentsForm.invalid) return;
 
     this.isSubmitting = true;
+    this.createError = null;
     const general = this.generalForm.value;
     const activity = this.activityForm.value;
     const payments = this.paymentsForm.value;
@@ -463,7 +471,7 @@ export class StoreComponent implements OnInit {
         this.isSubmitting = false;
       },
       error: err => {
-        this.showError(httpErrorMessage(err, 'Could not create the store.'));
+        this.createError = httpErrorMessage(err, 'Unable to create the store. Check the details and try again.');
         this.isSubmitting = false;
       }
     });

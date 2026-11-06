@@ -1,18 +1,20 @@
 import { ChangeDetectorRef, Component, EventEmitter, Input, NgZone, OnInit, Output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from '../material.module';
 import { RemoteSessionPanelComponent } from '../remote-session/remote-session-panel.component';
 
 import { Device, DeviceKind, RemoteSession } from '../models';
 import { RemoteSessionService, TransferService } from '../services';
 import {
-  MAX_TRUSTED_DEVICES, currentDeviceKind, currentPlatformLabel, httpErrorMessage, httpStatus, platformPasskeysAvailable,
-  saveApprovalMode, scaErrorMessage
+  InlineAlertComponent, MAX_TRUSTED_DEVICES, NotifyService, currentDeviceKind, currentPlatformLabel, httpErrorMessage, httpStatus,
+  platformPasskeysAvailable, saveApprovalMode, scaErrorMessage
 } from '../shared';
 import { firstValueFrom } from 'rxjs';
 import ScaWebauthn from '@adyen/bpscaweb';
+
+/** WebAuthn recommends 5 minutes when user verification is required or preferred. */
+const PASSKEY_TIMEOUT_MS = 300000;
 
 const INVALID_CODE_MESSAGE = 'This verification code is invalid or has expired. Check the code or send a new one.';
 
@@ -49,7 +51,8 @@ let nextRegistrationId = 0;
     CommonModule,
     FormsModule,
     MaterialModule,
-    RemoteSessionPanelComponent
+    RemoteSessionPanelComponent,
+    InlineAlertComponent
   ],
   template: `
     <mat-card class="action-card">
@@ -59,10 +62,13 @@ let nextRegistrationId = 0;
         <p *ngIf="step() === 'qr'">Your phone creates its passkey. Keep this page open until it is done.</p>
       </div>
 
-      <div class="limit-notice" *ngIf="step() === 'name' && atLimit" role="status">
-        <mat-icon aria-hidden="true">info_outline</mat-icon>
-        <span>You have {{ devices.length }} trusted devices, the maximum for this account. Remove one to add another device.</span>
-      </div>
+      <app-inline-alert class="notice" *ngIf="linkWarning()" kind="warning" [dismissible]="true" (dismiss)="linkWarning.set('')">
+        {{ linkWarning() }}
+      </app-inline-alert>
+
+      <app-inline-alert class="notice" *ngIf="step() === 'name' && atLimit" kind="info">
+        You have {{ devices.length }} trusted devices, the maximum for this account. Remove one to add another device.
+      </app-inline-alert>
 
       <!-- Step 1: where, device name, then request OTP -->
       <form class="setup-form" *ngIf="step() === 'name' && !atLimit" (ngSubmit)="requestOtp()">
@@ -71,6 +77,7 @@ let nextRegistrationId = 0;
           <label class="choice" [class.selected]="target() === 'this'" [class.disabled]="passkeys() === false">
             <input type="radio" [name]="ids.target" value="this" [checked]="target() === 'this'"
                    [disabled]="passkeys() === false" (change)="choose('this')" />
+            <span class="choice-radio" aria-hidden="true"></span>
             <mat-icon class="choice-icon" aria-hidden="true">{{ thisIcon }}</mat-icon>
             <span class="choice-text">
               <span class="choice-title">
@@ -86,10 +93,11 @@ let nextRegistrationId = 0;
           </label>
           <label class="choice" [class.selected]="target() === 'phone'">
             <input type="radio" [name]="ids.target" value="phone" [checked]="target() === 'phone'" (change)="choose('phone')" />
+            <span class="choice-radio" aria-hidden="true"></span>
             <mat-icon class="choice-icon" aria-hidden="true">smartphone</mat-icon>
             <span class="choice-text">
               <span class="choice-title">
-                My phone
+                Your phone
                 <span class="choice-badge" *ngIf="recommended === 'phone'">Recommended</span>
               </span>
               <span class="choice-hint">Scan a QR code, then approve on your phone with Face ID or your fingerprint.</span>
@@ -157,10 +165,9 @@ let nextRegistrationId = 0;
         </div>
       </div>
 
-      <div class="error-message" *ngIf="errorMessage()" role="alert">
-        <mat-icon aria-hidden="true">error_outline</mat-icon>
-        <span>{{ errorMessage() }}</span>
-      </div>
+      <app-inline-alert class="error-message" *ngIf="errorMessage()" [dismissible]="true" (dismiss)="errorMessage.set('')">
+        {{ errorMessage() }}
+      </app-inline-alert>
     </mat-card>
   `,
   styles: [`
@@ -171,17 +178,18 @@ let nextRegistrationId = 0;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important;
     }
     .action-header h3 {
-      font-size: 16px;
+      font-size: 1rem;
       font-weight: 600;
       margin: 0 0 4px 0;
       color: var(--fintech-text);
     }
     .action-header p {
-      font-size: 13px;
+      font-size: 0.8125rem;
       line-height: 1.5;
       color: var(--fintech-text-secondary);
       margin: 0 0 16px 0;
     }
+    .notice { margin-bottom: 16px; }
     .setup-form {
       display: flex;
       flex-direction: column;
@@ -200,7 +208,7 @@ let nextRegistrationId = 0;
       grid-column: 1 / -1;
       padding: 0;
       margin-bottom: 8px;
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 500;
       color: var(--fintech-text-secondary);
     }
@@ -217,14 +225,33 @@ let nextRegistrationId = 0;
     }
     .choice:hover:not(.disabled) { border-color: var(--fintech-text-secondary); }
     .choice.selected { border-color: var(--fintech-primary); box-shadow: inset 0 0 0 1px var(--fintech-primary); }
-    .choice.disabled { cursor: not-allowed; opacity: 0.6; }
-    .choice:focus-within { outline: 2px solid var(--fintech-info); outline-offset: 2px; }
+    /* Unavailable: dashed and muted, without fading the hint below the text contrast. */
+    .choice.disabled { cursor: not-allowed; border-style: dashed; background: var(--fintech-surface-subtle); }
+    .choice.disabled .choice-title,
+    .choice.disabled .choice-icon { color: var(--fintech-text-secondary); }
+    .choice.disabled .choice-radio { border-color: var(--fintech-border-strong); }
+    /* The native radio is visually hidden, so its focus ring is drawn on the card. */
+    .choice:focus-within { outline: 2px solid var(--fintech-primary); outline-offset: 2px; }
     .choice input {
       position: absolute;
       opacity: 0;
       width: 1px;
       height: 1px;
       margin: 0;
+    }
+    .choice-radio {
+      flex-shrink: 0;
+      box-sizing: border-box;
+      width: 1.125rem;
+      height: 1.125rem;
+      margin-top: 3px;
+      border: 2px solid var(--fintech-text-secondary);
+      border-radius: 50%;
+    }
+    .choice.selected .choice-radio {
+      border-color: var(--fintech-primary);
+      box-shadow: inset 0 0 0 3px var(--fintech-surface);
+      background: var(--fintech-primary);
     }
     .choice-icon { color: var(--fintech-text); flex-shrink: 0; }
     .choice-text {
@@ -238,20 +265,20 @@ let nextRegistrationId = 0;
       flex-wrap: wrap;
       align-items: center;
       gap: 6px;
-      font-size: 14px;
+      font-size: 0.875rem;
       font-weight: 600;
       color: var(--fintech-text);
     }
     .choice-badge {
       padding: 2px 8px;
       border-radius: 10px;
-      background: var(--fintech-success-bg);
-      color: var(--fintech-success);
-      font-size: 11px;
+      background: var(--fintech-surface-muted);
+      color: var(--fintech-text);
+      font-size: 0.75rem;
       font-weight: 600;
     }
     .choice-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       line-height: 1.4;
       color: var(--fintech-text-secondary);
     }
@@ -261,7 +288,7 @@ let nextRegistrationId = 0;
       gap: 12px;
     }
     .action-form .fintech-btn {
-      margin-top: 22px;
+      margin-top: 1.5rem;
     }
     .name-input-group {
       flex: 1;
@@ -269,7 +296,7 @@ let nextRegistrationId = 0;
     }
     .name-input-group label {
       display: block;
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 500;
       color: var(--fintech-text-secondary);
       margin-bottom: 6px;
@@ -277,19 +304,21 @@ let nextRegistrationId = 0;
     .field-hint {
       display: block;
       margin-top: 6px;
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--fintech-text-secondary);
     }
     .device-name-input {
       width: 100%;
+      min-height: 44px;
       padding: 10px 14px;
-      border: 1px solid var(--fintech-border);
+      border: 1px solid var(--fintech-border-strong);
       border-radius: 10px;
-      font-size: 14px;
+      /* iOS Safari zooms on focus below 16px. */
+      font-size: max(1rem, 16px);
       box-sizing: border-box;
       background: var(--fintech-surface);
+      color: var(--fintech-text);
       transition: border-color 0.2s;
-      outline: none;
     }
     .device-name-input:focus {
       border-color: var(--fintech-primary);
@@ -299,7 +328,7 @@ let nextRegistrationId = 0;
     }
     .otp-input {
       font-family: var(--fintech-font-mono);
-      font-size: 20px;
+      font-size: max(1.25rem, 16px);
       letter-spacing: 8px;
       text-align: center;
     }
@@ -314,14 +343,14 @@ let nextRegistrationId = 0;
       gap: 12px;
       padding: 12px 16px;
       background: var(--fintech-info-bg);
-      border: 1px solid #bfdbfe;
+      border: 1px solid var(--fintech-info-border);
       border-radius: 10px;
     }
     .otp-icon {
       color: var(--fintech-info);
-      font-size: 28px;
-      width: 28px;
-      height: 28px;
+      font-size: 1.75rem;
+      width: 1.75rem;
+      height: 1.75rem;
       flex-shrink: 0;
     }
     .otp-banner-text {
@@ -331,12 +360,12 @@ let nextRegistrationId = 0;
       min-width: 0;
     }
     .otp-label {
-      font-size: 13px;
-      color: var(--fintech-text-secondary);
+      font-size: 0.8125rem;
+      color: var(--fintech-text);
       word-break: break-word;
     }
     .otp-code-display {
-      font-size: 18px;
+      font-size: 1.125rem;
       color: var(--fintech-info);
       font-family: var(--fintech-font-mono);
       letter-spacing: 2px;
@@ -349,33 +378,12 @@ let nextRegistrationId = 0;
     }
     .link-btn {
       color: var(--fintech-text-secondary) !important;
-      font-size: 13px;
+      font-size: 0.8125rem;
       padding: 4px 8px !important;
     }
-    .error-message, .limit-notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-size: 13px;
-      line-height: 1.4;
-    }
     .error-message {
+      display: block;
       margin-top: 16px;
-      background: var(--fintech-danger-bg);
-      color: var(--fintech-danger);
-    }
-    .limit-notice {
-      background: var(--fintech-info-bg);
-      color: var(--fintech-text);
-    }
-    .limit-notice mat-icon { color: var(--fintech-info); }
-    .error-message mat-icon, .limit-notice mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
     }
     .fintech-btn {
       border-radius: 24px !important;
@@ -385,16 +393,21 @@ let nextRegistrationId = 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      white-space: nowrap;
+      height: auto !important;
+      min-height: 44px;
+      flex-shrink: 0;
     }
     .fintech-btn.primary {
       background-color: var(--fintech-primary) !important;
-      color: white !important;
+      color: var(--fintech-on-primary) !important;
     }
     .fintech-btn:disabled {
-      background-color: var(--fintech-border) !important;
+      background-color: var(--fintech-surface-muted) !important;
       color: var(--fintech-text-secondary) !important;
       cursor: not-allowed !important;
+    }
+    @media (pointer: coarse) {
+      .link-btn { min-height: 44px; }
     }
     @media (max-width: 520px) {
       .choices { grid-template-columns: 1fr; }
@@ -412,7 +425,7 @@ export class DeviceRegistrationComponent implements OnInit {
 
   private transferService = inject(TransferService);
   private remoteSessions = inject(RemoteSessionService);
-  private snack = inject(MatSnackBar);
+  private notify = inject(NotifyService);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
 
@@ -439,6 +452,8 @@ export class DeviceRegistrationComponent implements OnInit {
   passkeys = signal<boolean | null>(null);
   pairing = signal<RemoteSession | null>(null);
   errorMessage = signal('');
+  /** The device was registered but not linked to the virtual bank account: shown after the form resets. */
+  linkWarning = signal('');
   deviceName = '';
   otpCode = '';
   maskedEmail = '';
@@ -467,8 +482,8 @@ export class DeviceRegistrationComponent implements OnInit {
   }
 
   get nameHint(): string {
-    if (this.target() === 'phone') return 'Leave it empty to name it after your phone, e.g. "My iPhone". We will email you a 6-digit verification code.';
-    return this.deviceName.trim() ? 'We will email you a 6-digit verification code.' : 'Enter a device name to continue.';
+    if (this.target() === 'phone') return 'Leave it empty to name it after your phone, for example "My iPhone". A 6-digit verification code will be sent to your email.';
+    return this.deviceName.trim() ? 'A 6-digit verification code will be sent to your email.' : 'Enter a device name to continue.';
   }
 
   get otpHint(): string {
@@ -508,6 +523,7 @@ export class DeviceRegistrationComponent implements OnInit {
     if (this.loading() || !this.canContinue) return;
     this.loading.set(true);
     this.errorMessage.set('');
+    this.linkWarning.set('');
 
     try {
       const res = await firstValueFrom(this.transferService.requestOtp(this.userId));
@@ -518,11 +534,11 @@ export class DeviceRegistrationComponent implements OnInit {
         this.pairing.set(null);
         this.step.set('otp');
         if (resend) {
-          this.snack.open('A new verification code has been sent.', 'Close', { duration: 3000, panelClass: 'fintech-snack-success' });
+          this.notify.success('A new verification code has been sent.');
         }
       });
     } catch (err) {
-      this.ngZone.run(() => this.errorMessage.set(httpErrorMessage(err, "Couldn't send the verification code. Try again.")));
+      this.ngZone.run(() => this.errorMessage.set(httpErrorMessage(err, "Unable to send the verification code. Try again.")));
     } finally {
       this.ngZone.run(() => {
         this.loading.set(false);
@@ -558,7 +574,7 @@ export class DeviceRegistrationComponent implements OnInit {
 
       const sdkOutputRegister = await withTimeout(
         scaWebauthn.register(initiateResponse.sdkInput),
-        30000
+        PASSKEY_TIMEOUT_MS
       );
 
       const finalizeResponse = await firstValueFrom(
@@ -575,12 +591,13 @@ export class DeviceRegistrationComponent implements OnInit {
         throw new Error('FINALIZE_FAILED');
       }
 
-      await this.associateVirtualBankAccount(scaWebauthn, initiateResponse.id);
+      const linkProblem = await this.associateVirtualBankAccount(scaWebauthn, initiateResponse.id);
 
       // A phone chosen earlier in this browser would otherwise keep approving instead of this new passkey.
       saveApprovalMode(this.userId, 'here');
       this.ngZone.run(() => {
         this.reset();
+        this.linkWarning.set(linkProblem);
         this.deviceRegistered.emit();
       });
 
@@ -618,7 +635,7 @@ export class DeviceRegistrationComponent implements OnInit {
           this.otpInput = '';
           this.errorMessage.set(INVALID_CODE_MESSAGE);
         } else {
-          this.errorMessage.set(httpErrorMessage(err, "Couldn't prepare the QR code. Try again."));
+          this.errorMessage.set(httpErrorMessage(err, "Unable to prepare the QR code. Try again."));
         }
       });
     } finally {
@@ -639,14 +656,14 @@ export class DeviceRegistrationComponent implements OnInit {
       return "The passkey was created but the registration couldn't be completed. Try again.";
     }
     if (code === 'TIMEOUT') {
-      return 'The passkey prompt timed out. Try again and answer the browser prompt within 30 seconds.';
+      return 'The passkey prompt timed out. Try again and answer the browser prompt within 5 minutes.';
     }
     if ((error as { code?: unknown } | null)?.code === 'SCA_UNAVAILABLE') {
       return this.canUsePhone
-        ? 'Passkeys are not available in this browser. Choose "My phone" to register your phone instead.'
+        ? 'Passkeys are not available in this browser. Choose "Your phone" to register your phone instead.'
         : 'Passkeys are not available on this device or browser.';
     }
-    return scaErrorMessage(error, "Couldn't register this device. Try again.");
+    return scaErrorMessage(error, "Unable to register this device. Try again.");
   }
 
   private clearOtp() {
@@ -655,19 +672,20 @@ export class DeviceRegistrationComponent implements OnInit {
     this.otpInput = '';
   }
 
-  private async associateVirtualBankAccount(scaWebauthn: ScaWebauthn, deviceId: string) {
+  /** Resolves to a message when the device is registered but couldn't be linked, otherwise to ''. */
+  private async associateVirtualBankAccount(scaWebauthn: ScaWebauthn, deviceId: string): Promise<string> {
     try {
       const assocResponse = await firstValueFrom(
         this.transferService.initiateDeviceAssociation(this.userId, deviceId)
       );
 
       if (!assocResponse?.associationRequired) {
-        return;
+        return '';
       }
 
       const sdkOutputAssoc = await withTimeout(
         scaWebauthn.authenticate(assocResponse.sdkInput!),
-        30000
+        PASSKEY_TIMEOUT_MS
       );
 
       await firstValueFrom(
@@ -675,14 +693,10 @@ export class DeviceRegistrationComponent implements OnInit {
           this.userId, deviceId, String(sdkOutputAssoc), assocResponse.virtualPiId!
         )
       );
+      return '';
     } catch (error) {
-      this.ngZone.run(() => {
-        this.snack.open(
-          scaErrorMessage(error, "The device is registered, but it couldn't be linked to your virtual bank account."),
-          'Close',
-          { duration: 6000, panelClass: 'fintech-snack-error' }
-        );
-      });
+      const detail = scaErrorMessage(error, 'Remove it and register it again to link it.');
+      return `The device is registered, but it couldn't be linked to the virtual bank account. ${detail}`;
     }
   }
 }

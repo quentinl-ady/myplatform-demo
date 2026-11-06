@@ -79,6 +79,7 @@ const CAPTURE_HELP: Record<CaptureMode, string> = {
       align-items: center;
       gap: 12px;
       width: 100%;
+      min-height: 44px;
       padding: 12px 14px;
       border: none;
       border-radius: 12px;
@@ -89,15 +90,15 @@ const CAPTURE_HELP: Record<CaptureMode, string> = {
       color: var(--fintech-text);
     }
     .advanced-toggle:hover { background: var(--fintech-bg); }
-    .advanced-icon { color: var(--fintech-text-secondary); flex-shrink: 0; }
+    .advanced-icon { color: var(--fintech-text-secondary); flex-shrink: 0; font-size: 1.5rem; width: 1.5rem; height: 1.5rem; }
     .advanced-heading { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-    .advanced-title { font-size: 14px; font-weight: 600; }
+    .advanced-title { font-size: 0.875rem; font-weight: 600; }
     .advanced-summary {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--fintech-text-secondary);
       overflow-wrap: anywhere;
     }
-    .advanced-chevron { color: var(--fintech-text-secondary); flex-shrink: 0; }
+    .advanced-chevron { color: var(--fintech-text-tertiary); flex-shrink: 0; font-size: 1.5rem; width: 1.5rem; height: 1.5rem; }
     .collapsed-error { padding: 0 14px 12px; margin: 0; }
     .advanced-body {
       display: flex;
@@ -123,15 +124,13 @@ const CAPTURE_HELP: Record<CaptureMode, string> = {
     .advanced-section legend {
       padding: 0;
       margin-bottom: 10px;
-      font-size: 12px;
+      font-size: 0.8125rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      color: var(--fintech-text-secondary);
+      color: var(--fintech-text);
     }
     .advanced-section .helper-text { margin: 0; }
     .delay-field { width: 100%; margin-top: 4px; }
-    .delay-input { max-width: 160px; }
+    .delay-input { max-width: 10rem; }
     .split-fields { display: block; width: 100%; margin-top: 8px; }
   `]
 })

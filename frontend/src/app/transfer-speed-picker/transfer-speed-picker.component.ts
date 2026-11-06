@@ -15,7 +15,7 @@ interface SpeedOption {
 }
 
 const SPEEDS: Omit<SpeedOption, 'route'>[] = [
-  { priority: 'regular', label: 'Regular', timing: '1-2 business days' },
+  { priority: 'regular', label: 'Regular', timing: '1–2 business days' },
   { priority: 'fast', label: 'Fast', timing: 'Same business day' },
   { priority: 'instant', label: 'Instant', timing: 'Within seconds' }
 ];
@@ -170,7 +170,7 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
       },
       error: (err: unknown) => {
         this.status = 'error';
-        this.errorMessage = httpErrorMessage(err, "Couldn't check the available transfer speeds. Try again.");
+        this.errorMessage = httpErrorMessage(err, "The available transfer speeds couldn't be checked. Try again.");
         this.onValidatorChange();
         this.cdr.markForCheck();
       }
