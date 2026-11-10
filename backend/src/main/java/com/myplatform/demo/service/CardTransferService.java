@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myplatform.demo.dto.CardTransferDTO;
 import org.springframework.beans.factory.annotation.Value;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -55,6 +58,35 @@ public class CardTransferService {
         );
 
         return parseTransfers(response.getBody());
+    }
+
+    /**
+     * A card payment of the account holder, empty when Adyen doesn't know it, or when it's another kind of transfer or
+     * belongs to another account holder.
+     */
+    public Optional<CardTransferDTO> getCardTransfer(String accountHolderId, String transferId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-API-Key", apiKey);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        URI uri = UriComponentsBuilder.fromUriString(TRANSFERS_URL).pathSegment(transferId).encode().build().toUri();
+        String body;
+        try {
+            body = restTemplate.exchange(uri, HttpMethod.GET, new HttpEntity<>(headers), String.class).getBody();
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        }
+        JsonNode node;
+        try {
+            node = objectMapper.readTree(body == null || body.isBlank() ? "{}" : body);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("The Transfers API returned malformed JSON", e);
+        }
+        JsonNode accountHolder = node.path("accountHolder");
+        if (!"issuedCard".equals(getText(node, "category")) || !accountHolder.isObject()
+                || !accountHolderId.equals(getText(accountHolder, "id"))) {
+            return Optional.empty();
+        }
+        return Optional.of(mapTransfer(node));
     }
 
     private List<CardTransferDTO> parseTransfers(String json) {

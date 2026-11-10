@@ -8,6 +8,7 @@ import com.adyen.service.exception.ApiException;
 import com.adyen.service.legalentitymanagement.*;
 import com.myplatform.demo.model.*;
 import com.myplatform.demo.model.User;
+import com.myplatform.demo.util.CompanyRecord;
 import com.myplatform.demo.util.PostalAddress;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,14 +44,20 @@ public class LegalEntityService {
         this.frontendUrl = frontendUrl;
     }
 
+    /** Created with the company record when the user imported it at sign-up, else with the name and country only. */
     public String createLegalEntity(User user) throws IOException, ApiException {
         Address address = new Address().country(user.getCountryCode());
+        CountryKycData companyRecord = Boolean.TRUE.equals(user.getCompanyImported())
+                ? CountryKycData.fromCode(user.getCountryCode())
+                : null;
 
         switch (user.getUserType()) {
             case "organization" -> {
-                Organization organization = new Organization()
-                        .legalName(user.getLegalEntityName())
-                        .registeredAddress(address);
+                Organization organization = companyRecord != null
+                        ? CompanyRecord.organization(user.getLegalEntityName(), companyRecord)
+                        : new Organization()
+                                .legalName(user.getLegalEntityName())
+                                .registeredAddress(address);
 
                 LegalEntityInfoRequiredType legalEntityInfoRequiredType = new LegalEntityInfoRequiredType()
                         .organization(organization)
@@ -72,10 +79,12 @@ public class LegalEntityService {
                 return response.getId();
             }
             case "soleProprietorship" -> {
-                SoleProprietorship soleProprietorship = new SoleProprietorship()
-                        .name(user.getLegalEntityName())
-                        .countryOfGoverningLaw(user.getCountryCode())
-                        .registeredAddress(address);
+                SoleProprietorship soleProprietorship = companyRecord != null
+                        ? CompanyRecord.soleProprietorship(user.getLegalEntityName(), companyRecord)
+                        : new SoleProprietorship()
+                                .name(user.getLegalEntityName())
+                                .countryOfGoverningLaw(user.getCountryCode())
+                                .registeredAddress(address);
 
                 LegalEntityInfoRequiredType legalEntityInfoRequiredType = new LegalEntityInfoRequiredType()
                         .soleProprietorship(soleProprietorship)
@@ -86,6 +95,10 @@ public class LegalEntityService {
                 Individual individual = new Individual()
                         .name(new Name().firstName(user.getFirstName()).lastName(user.getLastName()))
                         .residentialAddress(address);
+                if (companyRecord != null) {
+                    // A sole proprietorship has no phone in Adyen: the phone of the business is its owner's.
+                    individual.setPhone(CompanyRecord.phone(companyRecord));
+                }
 
                 LegalEntityInfoRequiredType legalEntityInfoRequiredTypeIndiv = new LegalEntityInfoRequiredType()
                         .individual(individual)

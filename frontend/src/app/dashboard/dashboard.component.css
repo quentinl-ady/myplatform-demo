@@ -19,6 +19,14 @@
   font-size: 0.9375rem;
   margin: 0;
 }
+.title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+.header-section .title-row h1 { margin: 0; }
 
 mat-card {
   background: var(--fintech-surface);
@@ -232,6 +240,21 @@ hr.divider {
 .quick-tile mat-icon { margin-bottom: 6px; }
 .quick-label { font-size: 0.875rem; font-weight: 600; }
 .quick-desc { font-size: 0.75rem; color: var(--fintech-text-secondary); }
+.demo-data {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: var(--fintech-radius);
+  border: 1px dashed var(--fintech-border-strong);
+  background: var(--fintech-surface-subtle);
+}
+.demo-data-icon { flex-shrink: 0; color: var(--fintech-text-secondary); }
+.demo-data-text { flex: 1; min-width: 0; }
+.demo-data-title { margin: 0 0 2px; font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); }
+.demo-data-text p { margin: 0; font-size: 0.8125rem; color: var(--fintech-text-secondary); }
+.alert-list { margin: 4px 0 0; padding-left: 18px; }
 
 /* Verification */
 .action-row {
@@ -471,4 +494,6 @@ hr.divider {
   .check-action { margin-left: 48px; width: calc(100% - 48px); }
   .status-item { flex-direction: column; align-items: flex-start; }
   .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .demo-data { flex-wrap: wrap; }
+  .demo-data .fintech-btn { width: 100%; }
 }

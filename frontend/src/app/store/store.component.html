@@ -3,7 +3,7 @@
   <div class="header-section">
     <div class="header-title">
       <h1>Stores</h1>
-      <p>Manage your physical or digital storefronts and configure their payment methods.</p>
+      <p>Your stores and their payment methods.</p>
     </div>
     <div class="header-actions">
       <span class="last-updated-label" *ngIf="lastUpdated && !isLoading">{{ getLastUpdatedLabel() }}</span>
@@ -153,7 +153,7 @@
 
     <app-inline-alert *ngIf="lastCreatedStore as created" kind="success" class="success-banner"
                       [title]="'Store ' + created.storeRef + ' created'" [dismissible]="true" (dismiss)="lastCreatedStore = null">
-      {{ created.city }}, {{ created.country }} · {{ created.paymentMethods.length }} payment method{{ created.paymentMethods.length === 1 ? '' : 's' }} requested. Verification can take a few minutes; select Refresh to see the latest status.
+      {{ created.city }}, {{ created.country }} · {{ created.paymentMethods.length }} payment method{{ created.paymentMethods.length === 1 ? '' : 's' }} requested. Verification takes a few minutes: select Refresh to update.
     </app-inline-alert>
 
     <mat-vertical-stepper [linear]="true" #stepper class="fintech-stepper">

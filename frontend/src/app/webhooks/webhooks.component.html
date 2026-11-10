@@ -3,7 +3,7 @@
   <div class="notif-header">
     <div class="notif-header-left">
       <h1>Notifications</h1>
-      <p class="notif-subtitle">Events sent by Adyen about your account, payments and transfers.</p>
+      <p class="notif-subtitle">Account, payment and transfer events.</p>
     </div>
     <div class="notif-header-right">
       <mat-button-toggle-group [value]="filter" (change)="setFilter($event.value)" appearance="standard"
@@ -49,7 +49,7 @@
         <div class="empty-state">
           <mat-icon class="empty-icon" aria-hidden="true">notifications_none</mat-icon>
           <p>No notifications yet</p>
-          <span class="empty-hint">Notifications appear here when Adyen sends events, for example after a payment or a verification update.</span>
+          <span class="empty-hint">Events appear here after a payment or a verification update.</span>
           <button mat-stroked-button type="button" (click)="openSimulator()">
             <mat-icon aria-hidden="true">science</mat-icon>
             Send a test event
@@ -125,7 +125,7 @@
             </div>
             <div class="detail-item">
               <dt class="detail-key">Source</dt>
-              <dd class="detail-value">{{ event.source === 'adyen' ? 'Adyen webhook' : 'Test event' }}</dd>
+              <dd class="detail-value">{{ event.source === 'adyen' ? 'Webhook' : 'Test event' }}</dd>
             </div>
             <div class="detail-item">
               <dt class="detail-key">Received</dt>
@@ -155,7 +155,7 @@
 
     <mat-card class="devtools-card" *ngIf="devToolsOpen" id="webhook-simulator">
       <label class="devtools-label" for="webhook-json">Webhook payload (JSON)</label>
-      <p class="devtools-hint" id="webhook-json-hint">Paste an Adyen webhook payload to simulate an incoming event.</p>
+      <p class="devtools-hint" id="webhook-json-hint">Paste a webhook payload to simulate an event.</p>
       <textarea
         id="webhook-json"
         class="json-editor"

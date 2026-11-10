@@ -164,6 +164,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.prefillFromQuery();
     this.route.parent?.paramMap.subscribe(params => {
       this.userId = params.get('id') || '';
       if (!this.userId) return;
@@ -174,6 +175,19 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.unmountPaymentDropin();
     this.unmountTokenizeDropin();
+  }
+
+  /** Opened from a bill paid with a single-use card: the payment the supplier takes from it. */
+  private prefillFromQuery(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const amount = Number(params.get('amount'));
+    const currency = (params.get('currency') || '').toUpperCase();
+    const reference = (params.get('reference') || '').trim();
+    const patch: Record<string, unknown> = {};
+    if (Number.isFinite(amount) && amount > 0) patch['amount'] = amount;
+    if (this.currencies.includes(currency)) patch['currencyCode'] = currency;
+    if (reference) patch['reference'] = reference.slice(0, 80);
+    if (Object.keys(patch).length) this.checkoutForm.patchValue(patch);
   }
 
   loadIssuingUserInfo(): void {
@@ -608,7 +622,7 @@ export class IssuingCheckoutComponent implements OnInit, OnDestroy {
     this.deleteError.set(null);
     const confirmed = await this.confirmService.confirm({
       title: 'Delete saved card?',
-      message: 'The card token is removed permanently. The card will need to be entered again for future payments.',
+      message: 'The card will need to be entered again. This cannot be undone.',
       details: [
         { label: 'Card', value: this.cardLabel(method) },
         { label: 'Expiry', value: `${method.expiryMonth}/${method.expiryYear}` },

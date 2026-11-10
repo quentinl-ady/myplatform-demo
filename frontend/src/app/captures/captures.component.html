@@ -3,7 +3,7 @@
   <div class="captures-header">
     <div>
       <h1>Captures</h1>
-      <p class="captures-subtitle">Checkout payments taken with delayed or manual capture. Capture all or part of a payment, or cancel it before it is captured.</p>
+      <p class="captures-subtitle">Capture or cancel payments taken with delayed or manual capture.</p>
     </div>
     <div class="captures-header-right">
       <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
@@ -32,7 +32,7 @@
       <div class="empty-state" *ngIf="payments().length === 0; else nothingOpen">
         <mat-icon class="empty-icon" aria-hidden="true">price_check</mat-icon>
         <p>No payments to capture yet</p>
-        <span class="empty-hint">On the Checkout page, open <strong>Advanced options</strong> and choose a delayed or manual capture. The payment then appears here.</span>
+        <span class="empty-hint">Choose a delayed or manual capture in the <strong>Advanced options</strong> of Checkout.</span>
         <a mat-stroked-button [routerLink]="['/', userId, 'checkout']">Go to Checkout</a>
       </div>
       <ng-template #nothingOpen>
@@ -129,13 +129,13 @@
           </dl>
 
           <p class="detail-note" *ngIf="p.state === 'PENDING_AUTHORISATION'">
-            The payment is pending. Adyen sends the final result with the authorisation webhook.
+            The payment is pending its final result.
           </p>
           <p class="detail-note" *ngIf="p.releasedAmount > 0">
-            Adyen released the remaining {{ p.releasedAmount | money:p.currency }} after the first partial capture, because multiple partial captures aren't enabled on the merchant account.
+            The remaining {{ p.releasedAmount | money:p.currency }} was released after the first partial capture.
           </p>
           <p class="detail-note" *ngIf="p.state === 'AUTO_CAPTURED'">
-            The capture delay is over, so Adyen has captured the payment. Adyen only sends a capture webhook for it when <strong>Delayed Capture</strong> is turned on in the webhook settings.
+            The capture delay is over, so the payment was captured automatically.
           </p>
 
           <section class="detail-section" *ngIf="p.splits.length">

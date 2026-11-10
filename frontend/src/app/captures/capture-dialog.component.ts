@@ -239,11 +239,11 @@ export class CaptureDialogComponent {
 
   get amountHelp(): string {
     if (this.alreadyCaptured > 0) {
-      return 'Adyen only accepts another capture when multiple partial captures are enabled on the merchant account. Otherwise, the rest was released after the first capture.';
+      return 'Only possible when multiple partial captures are enabled. Otherwise, the rest was released after the first capture.';
     }
     return this.isFullAmount
       ? 'The whole amount is captured.'
-      : 'By default, Adyen releases the rest of the authorisation after a partial capture. Ask Adyen Support to enable multiple partial captures to capture it later.';
+      : 'By default, the rest of the authorisation is released after a partial capture.';
   }
 
   get currentSplit(): string {

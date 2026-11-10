@@ -20,7 +20,7 @@
   <mat-card class="state-card" *ngIf="accountsState === 'missing'">
     <div class="state-icon" aria-hidden="true"><mat-icon>account_balance_wallet</mat-icon></div>
     <h2>Finish onboarding first</h2>
-    <p>Balance accounts are created during onboarding. Complete it, then come back here to manage funds.</p>
+    <p>Balance accounts are created during onboarding.</p>
     <a mat-flat-button class="fintech-btn primary" [routerLink]="['/', userId, 'dashboard']">Go to onboarding</a>
   </mat-card>
 
@@ -69,7 +69,7 @@
           <mat-spinner *ngIf="creatingAccount" diameter="18" aria-label="Creating account"></mat-spinner>
         </button>
       </div>
-      <p class="hint-text create-hint" id="new-account-currency-hint">This becomes the account's default currency. You can't change it once the account is created.</p>
+      <p class="hint-text create-hint" id="new-account-currency-hint">You can't change it later.</p>
       <app-inline-alert class="create-error" id="create-account-error" *ngIf="createError" title="Unable to create the account"
                         actionLabel="Try again" (action)="createBalanceAccount()" [dismissible]="true"
                         (dismiss)="createError = ''">{{ createError }}</app-inline-alert>
@@ -404,7 +404,7 @@
             </div>
             <div class="instant-check instant-no" *ngIf="cashoutForm.value.balanceAccountId && cashoutPendingBalance <= 0">
               <mat-icon aria-hidden="true">money_off</mat-icon>
-              <span>There are no pending funds on this balance account, so there is nothing to cash out.</span>
+              <span>No pending funds to cash out.</span>
             </div>
 
             <div class="form-row">
@@ -436,7 +436,7 @@
             </div>
             <div class="instant-check instant-no" *ngIf="!checkingInstant && instantAvailable === false" role="alert">
               <mat-icon aria-hidden="true">block</mat-icon>
-              <span>This bank account isn't eligible for instant cash out. Select another one or keep the funds on the balance account.</span>
+              <span>This bank account can't receive an instant cash out. Choose another one.</span>
             </div>
 
             <div class="form-group" *ngIf="cashoutForm.value.transferInstrumentId">

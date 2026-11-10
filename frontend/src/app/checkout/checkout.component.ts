@@ -630,7 +630,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     this.deleteError.set(null);
     const confirmed = await this.confirmService.confirm({
       title: 'Delete saved card?',
-      message: 'The card token is removed permanently. The shopper will need to enter the card again for future payments.',
+      message: 'The shopper will need to enter the card again. This cannot be undone.',
       details: [
         { label: 'Card', value: this.cardLabel(method) },
         { label: 'Expiry', value: `${method.expiryMonth}/${method.expiryYear}` },

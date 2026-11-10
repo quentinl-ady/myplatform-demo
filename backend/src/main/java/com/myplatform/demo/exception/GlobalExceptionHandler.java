@@ -116,14 +116,15 @@ public class GlobalExceptionHandler {
                 : HttpStatus.BAD_GATEWAY;
         log.warn("Adyen API error {} ({}): {}", upstreamStatus, errorCode, message);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("error", message != null ? message : "Adyen rejected the request (HTTP " + upstreamStatus + ").");
+        body.put("error", message != null ? message : "The request was rejected (HTTP " + upstreamStatus + ").");
         if (errorCode != null) {
             body.put("errorCode", errorCode);
         }
         return ResponseEntity.status(status).body(body);
     }
 
-    private static String messageFromBody(String body) {
+    /** The message of an Adyen error response, null when the body has none. */
+    public static String messageFromBody(String body) {
         JsonNode json = parse(body);
         if (json == null) {
             return null;

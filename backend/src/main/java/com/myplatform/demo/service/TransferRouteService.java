@@ -76,7 +76,7 @@ public class TransferRouteService {
             responseBody = restTemplate.exchange(CALCULATE_URL, HttpMethod.POST,
                     new HttpEntity<>(routeRequest.toJson(), headers), String.class).getBody();
         } catch (HttpClientErrorException e) {
-            throw new BadRequestException("Adyen could not calculate the transfer routes: " + adyenErrorDetail(e));
+            throw new BadRequestException("The transfer speeds couldn't be checked: " + adyenErrorDetail(e));
         }
         return toOptions(responseBody);
     }
@@ -92,27 +92,38 @@ public class TransferRouteService {
             throw new BadRequestException("Amount is required");
         }
 
-        TransferRouteOption route = calculateRoutes(balanceAccountId, recipientCountry, request).stream()
+        String reason = unavailableReason(calculateRoutes(balanceAccountId, recipientCountry, request), priority,
+                request.getAmount(), recipientCountry.getCurrency());
+        if (reason != null) {
+            throw new BadRequestException(reason);
+        }
+    }
+
+    /**
+     * Why a transfer of this amount can't take the route of this speed, among the routes to its beneficiary; null when
+     * it can.
+     */
+    public static String unavailableReason(List<TransferRouteOption> routes, String priority, long amount, String currency) {
+        TransferRouteOption route = routes.stream()
                 .filter(option -> option.getPriority().equals(priority))
                 .findFirst()
-                .orElseThrow(() -> new BadRequestException(
-                        StringUtils.capitalize(priority) + " transfers are not available for this beneficiary"));
-
-        long amount = request.getAmount();
-        String currency = recipientCountry.getCurrency();
+                .orElse(null);
+        if (route == null) {
+            return StringUtils.capitalize(priority) + " transfers are not available for this beneficiary";
+        }
         if (route.getMinAmount() != null && amount < route.getMinAmount()) {
-            throw new BadRequestException("The minimum amount for " + priority + " transfers to this beneficiary is "
-                    + formatAmount(route.getMinAmount(), currency));
+            return "The minimum amount for " + priority + " transfers to this beneficiary is "
+                    + formatAmount(route.getMinAmount(), currency);
         }
         if (route.getMaxAmount() != null && amount > route.getMaxAmount()) {
-            throw new BadRequestException("The maximum amount for " + priority + " transfers to this beneficiary is "
-                    + formatAmount(route.getMaxAmount(), currency));
+            return "The maximum amount for " + priority + " transfers to this beneficiary is "
+                    + formatAmount(route.getMaxAmount(), currency);
         }
         // Every recipient currency (EUR, GBP, USD) has two decimals.
         if (route.isWholeAmountsOnly() && amount % 100 != 0) {
-            throw new BadRequestException(StringUtils.capitalize(priority)
-                    + " transfers to this beneficiary only accept whole amounts");
+            return StringUtils.capitalize(priority) + " transfers to this beneficiary only accept whole amounts";
         }
+        return null;
     }
 
     private static BankAccountAccountIdentification accountIdentification(RecipientCountry recipientCountry,

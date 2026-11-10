@@ -4,10 +4,12 @@ import com.myplatform.demo.model.StoreCustomer;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface StoreCustomerRepository extends JpaRepository<StoreCustomer, Long> {
     StoreCustomer findByStoreRef(String storeRef);
     Optional<StoreCustomer> findByStoreId(String storeId);
+    List<StoreCustomer> findByUserIdOrderByIdAsc(String userId);
 }

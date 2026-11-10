@@ -14,8 +14,9 @@ import ScaWebauthn from '@adyen/bpscaweb';
 import { AccountStatement, BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
 import { AccountService, RemoteSessionService, TransferService } from "../services";
 import {
-  ApprovalChoice, ApprovalMode, InlineAlertComponent, MoneyPipe, NotifyService, approvalChoice, blobHttpErrorMessage,
-  httpErrorMessage, saveApprovalMode, scaErrorMessage
+  ApprovalChoice, ApprovalMode, InlineAlertComponent, MoneyPipe, NotifyService, StatementFormat, approvalChoice,
+  blobHttpErrorMessage, httpErrorMessage, saveApprovalMode, saveFile, scaErrorMessage, statementDownloadLabel,
+  statementFileName, statementPeriod
 } from '../shared';
 import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
 import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
@@ -83,7 +84,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   /** File name of the statement being downloaded. */
   downloadingStatement: string | null = null;
   statementError = '';
-  private failedStatement: AccountStatement | null = null;
+  private failedStatement: { statement: AccountStatement; format: StatementFormat } | null = null;
   private statementsRequest?: Subscription;
 
   accountState: LoadState = 'loading';
@@ -109,6 +110,8 @@ export class TransferComponent implements OnInit, OnDestroy {
 
   readonly formatDate = formatDate;
   readonly formatDateTime = formatDateTime;
+  readonly statementPeriod = statementPeriod;
+  readonly statementDownloadLabel = statementDownloadLabel;
   readonly speedLabel = speedLabel;
   readonly statusLabel = statusLabel;
   readonly readableLabel = readableLabel;
@@ -348,20 +351,24 @@ export class TransferComponent implements OnInit, OnDestroy {
     });
   }
 
-  downloadStatement(statement: AccountStatement) {
+  /** The PDF to read, or the CAMT.053 file for accounting software. */
+  downloadStatement(statement: AccountStatement, format: StatementFormat) {
     this.downloadingStatement = statement.fileName;
     this.statementError = '';
     this.failedStatement = null;
     this.cdr.detectChanges();
-    this.accountService.downloadStatement(this.userId, statement.fileName).subscribe({
+    const download = format === 'xml'
+      ? this.accountService.downloadStatementXml(this.userId, statement.fileName)
+      : this.accountService.downloadStatement(this.userId, statement.fileName);
+    download.subscribe({
       next: (blob) => {
-        this.saveFile(blob, statement.pdfFileName);
+        saveFile(blob, statementFileName(statement, format));
         this.downloadingStatement = null;
         this.cdr.detectChanges();
       },
       error: async (err) => {
         this.statementError = await blobHttpErrorMessage(err, "The statement couldn't be downloaded. Try again.");
-        this.failedStatement = statement;
+        this.failedStatement = { statement, format };
         this.downloadingStatement = null;
         this.cdr.detectChanges();
       }
@@ -369,7 +376,7 @@ export class TransferComponent implements OnInit, OnDestroy {
   }
 
   retryStatement() {
-    if (this.failedStatement) this.downloadStatement(this.failedStatement);
+    if (this.failedStatement) this.downloadStatement(this.failedStatement.statement, this.failedStatement.format);
   }
 
   dismissStatementError() {
@@ -377,28 +384,8 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.failedStatement = null;
   }
 
-  /** "19 Oct 2026" for a daily statement, "1 Oct 2026 – 31 Oct 2026" for a longer period. */
-  statementPeriod(statement: AccountStatement): string {
-    if (!statement.periodStart || !statement.periodEnd) {
-      return formatDateTime(statement.creationDate);
-    }
-    const start = formatDate(statement.periodStart);
-    return statement.periodStart === statement.periodEnd ? start : `${start} – ${formatDate(statement.periodEnd)}`;
-  }
-
   trackStatement(_: number, statement: AccountStatement): string {
     return statement.fileName;
-  }
-
-  private saveFile(blob: Blob, fileName: string) {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
   }
 
   isIncoming(tx: BankTransaction): boolean {

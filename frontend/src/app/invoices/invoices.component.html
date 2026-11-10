@@ -1,0 +1,423 @@
+<div class="invoices-wrapper">
+
+  <div class="invoices-header">
+    <div>
+      <h1>Invoices</h1>
+      <p class="invoices-subtitle">Send invoices with a payment link. They turn to Paid automatically.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-icon-button type="button" (click)="load()" [disabled]="loading()"
+              matTooltip="Refresh" aria-label="Refresh invoices">
+        <mat-icon [class.spinning]="loading() || refreshing()" aria-hidden="true">refresh</mat-icon>
+      </button>
+      <button mat-icon-button type="button" [matMenuTriggerFor]="pageMenu"
+              matTooltip="More actions" aria-label="More actions">
+        <mat-icon aria-hidden="true">more_vert</mat-icon>
+      </button>
+      <mat-menu #pageMenu="matMenu" xPosition="before">
+        <button mat-menu-item type="button" (click)="addCustomer()" [disabled]="loading() || !!loadError()">
+          <mat-icon aria-hidden="true">person_add</mat-icon>
+          <span>New customer</span>
+        </button>
+        <button mat-menu-item type="button" (click)="loadDemoData()" [disabled]="loadingDemo()">
+          <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+          <span>Load demo data</span>
+        </button>
+      </mat-menu>
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="newInvoice()" [disabled]="!settings()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        New invoice
+      </button>
+    </div>
+  </div>
+
+  <div class="demo-progress" *ngIf="loadingDemo()" role="status">
+    <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+    <span>Loading the demo data…</span>
+  </div>
+  <app-inline-alert *ngIf="demoError() as error" title="Unable to load the demo data" actionLabel="Try again"
+                    (action)="loadDemoData()" [dismissible]="true" (dismiss)="demoError.set(null)">{{ error }}</app-inline-alert>
+  <app-inline-alert *ngIf="demoWarnings().length" kind="warning" title="Part of the demo data couldn't be created"
+                    [dismissible]="true" (dismiss)="demoWarnings.set([])">
+    <ul class="alert-list">
+      <li *ngFor="let warning of demoWarnings()">{{ warning }}</li>
+    </ul>
+  </app-inline-alert>
+  <app-inline-alert *ngIf="!loading() && settings()?.paymentLinksIssue as issue" kind="info" [live]="false"
+                    title="Invoices can be saved as drafts only">{{ issue }}</app-inline-alert>
+
+  <dl class="kpis" *ngIf="!loading() && !loadError() && invoices().length">
+    <div class="kpi">
+      <dt>Outstanding</dt>
+      <dd class="kpi-value">{{ kpis().outstanding | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().outstandingCount ? plural(kpis().outstandingCount, 'invoice') + ' awaiting payment' : 'Nothing to collect' }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().overdueCount ? 'danger' : null">
+      <dt>Overdue</dt>
+      <dd class="kpi-value">{{ kpis().overdue | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().overdueCount ? plural(kpis().overdueCount, 'invoice') + ' past due' : 'Nothing overdue' }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().collectedCount ? 'success' : null">
+      <dt>Collected</dt>
+      <dd class="kpi-value">{{ kpis().collected | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ collectedHint(kpis()) }}</dd>
+    </div>
+  </dl>
+
+  <mat-card class="invoices-card" [attr.aria-busy]="loading()">
+
+    <div *ngIf="loading()" class="loading-spinner" role="status">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span class="cdk-visually-hidden">Loading invoices</span>
+    </div>
+
+    <app-inline-alert *ngIf="!loading() && loadError() as error" class="load-error" title="Unable to load invoices"
+                      actionLabel="Try again" (action)="load()">{{ error }}</app-inline-alert>
+
+    <mat-tab-group *ngIf="!loading() && !loadError()" class="invoice-tabs" mat-stretch-tabs="false" animationDuration="0ms"
+                   [selectedIndex]="tab()" (selectedIndexChange)="tab.set($event)">
+
+      <!-- Invoices -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Invoices <span class="tab-count" *ngIf="invoices().length">{{ invoices().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="invoices().length; else noInvoices">
+          <div class="list-toolbar">
+            <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
+                                     class="filter-toggle" aria-label="Show invoices">
+              <mat-button-toggle value="all">All</mat-button-toggle>
+              <mat-button-toggle value="unpaid">Unpaid<span *ngIf="counts().unpaid"> ({{ counts().unpaid }})</span></mat-button-toggle>
+              <mat-button-toggle value="draft">Drafts<span *ngIf="counts().draft"> ({{ counts().draft }})</span></mat-button-toggle>
+              <mat-button-toggle value="paid">Paid</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          <div class="empty-state compact" *ngIf="!visibleInvoices().length">
+            <mat-icon class="empty-icon" aria-hidden="true">task_alt</mat-icon>
+            <p>{{ emptyFilterText() }}</p>
+            <button mat-stroked-button type="button" (click)="setFilter('all')">Show all invoices</button>
+          </div>
+
+          <ul class="invoice-list" *ngIf="visibleInvoices().length" aria-label="Invoices">
+            <li *ngFor="let inv of visibleInvoices(); trackBy: trackById" class="invoice-item" [id]="'invoice-' + inv.id"
+                [class.expanded]="expandedId() === inv.id">
+              <div class="invoice-row">
+                <div class="invoice-main" role="button" tabindex="0"
+                     [attr.aria-expanded]="expandedId() === inv.id"
+                     [attr.aria-controls]="'invoice-detail-' + inv.id"
+                     (click)="toggle(inv, $event)"
+                     (keydown.enter)="toggle(inv, $event)"
+                     (keydown.space)="toggle(inv, $event)">
+                  <div class="invoice-icon" [attr.data-tone]="displayStatus(inv).tone" aria-hidden="true">
+                    <mat-icon>{{ displayStatus(inv).icon }}</mat-icon>
+                  </div>
+                  <div class="invoice-content">
+                    <div class="invoice-title">
+                      <span class="invoice-customer">{{ inv.customer.displayName }}</span>
+                      <span class="invoice-amount">{{ inv.total | money:inv.currency }}</span>
+                    </div>
+                    <div class="invoice-meta">
+                      <span class="invoice-number">{{ inv.number }}</span>
+                      <span class="state-chip" [attr.data-tone]="displayStatus(inv).tone">{{ displayStatus(inv).label }}</span>
+                      <span [class.overdue-text]="inv.status === 'OVERDUE'">{{ dueText(inv) }}</span>
+                      <span class="cycle-tag" *ngIf="inv.subscriptionCycle as cycle">
+                        <mat-icon aria-hidden="true">autorenew</mat-icon>Subscription, cycle {{ cycle }}
+                      </span>
+                    </div>
+                  </div>
+                  <mat-icon class="invoice-chevron" aria-hidden="true">{{ expandedId() === inv.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </div>
+
+                <div class="invoice-actions" *ngIf="inv.sendable">
+                  <button mat-flat-button type="button" class="action-btn primary" (click)="send(inv)"
+                          [disabled]="!!pending() || sendBlocked()"
+                          [attr.aria-label]="inv.status === 'DRAFT' ? 'Send ' + inv.number
+                            : (inv.paymentLink ? 'Send a new payment link for ' : 'Send a payment link for ') + inv.number">
+                    <mat-spinner *ngIf="isPending(inv, 'send')" diameter="16" aria-hidden="true"></mat-spinner>
+                    {{ isPending(inv, 'send') ? 'Sending…' : (inv.status === 'DRAFT' ? 'Send' : (inv.paymentLink ? 'Send new link' : 'Send payment link')) }}
+                  </button>
+                </div>
+              </div>
+
+              <app-inline-alert *ngIf="rowError()?.id === inv.id" class="row-error" [title]="rowError()!.title"
+                                [dismissible]="true" (dismiss)="rowError.set(null)">{{ rowError()!.message }}</app-inline-alert>
+
+              <div class="invoice-detail" *ngIf="expandedId() === inv.id" [id]="'invoice-detail-' + inv.id">
+                <div class="detail-columns">
+                  <dl class="detail-grid">
+                    <div class="detail-item wide">
+                      <dt>Bill to</dt>
+                      <dd class="customer-block">
+                        <span class="strong">{{ inv.customer.displayName }}</span>
+                        <span *ngIf="inv.customer.company">{{ inv.customer.name }}</span>
+                        <span>{{ inv.customer.email }}</span>
+                        <span *ngIf="addressOf(inv) as address">{{ address }}</span>
+                        <span *ngIf="inv.customer.vatNumber">{{ taxLabel() }} number {{ inv.customer.vatNumber }}</span>
+                      </dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Issue date</dt>
+                      <dd>{{ date(inv.issueDate) }}</dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Due date</dt>
+                      <dd>{{ date(inv.dueDate) }}</dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.sentAt">
+                      <dt>Sent</dt>
+                      <dd>{{ dateTime(inv.sentAt) }}</dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.paidAt">
+                      <dt>Paid</dt>
+                      <dd>{{ dateTime(inv.paidAt) }}<ng-container *ngIf="inv.paymentMethodName"> with {{ inv.paymentMethodName }}</ng-container></dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.voidedAt">
+                      <dt>Voided</dt>
+                      <dd>{{ dateTime(inv.voidedAt) }}</dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.subscriptionId">
+                      <dt>Subscription</dt>
+                      <dd>
+                        <a class="detail-link" [routerLink]="['/', userId, 'subscriptions']" [queryParams]="{ subscription: inv.subscriptionId }">
+                          Billing cycle {{ inv.subscriptionCycle }}
+                        </a>
+                      </dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.charge as charge">
+                      <dt>Charge to the saved payment method</dt>
+                      <dd class="customer-block">
+                        <span [class.danger-text]="charge.status === 'REFUSED' || charge.status === 'RESCUING'">{{ chargeText(charge) }}</span>
+                        <span class="muted-text" *ngIf="charge.chargedAt">{{ dateTime(charge.chargedAt) }}</span>
+                      </dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.pspReference">
+                      <dt>PSP reference</dt>
+                      <dd class="mono">{{ inv.pspReference }}</dd>
+                    </div>
+                    <div class="detail-item" *ngIf="inv.storeReference">
+                      <dt>Store</dt>
+                      <dd class="mono">{{ inv.storeReference }}</dd>
+                    </div>
+                  </dl>
+
+                  <section class="pay-panel" *ngIf="inv.paymentLink as link; else noLink" [attr.aria-labelledby]="'invoice-link-' + inv.id">
+                    <h3 class="pay-title" [id]="'invoice-link-' + inv.id">Payment link</h3>
+                    <!-- Dark modules on a white quiet zone in both color schemes: scanners need it. -->
+                    <svg *ngIf="qr() as code" class="qr" [attr.viewBox]="'0 0 ' + code.size + ' ' + code.size"
+                         role="img" [attr.aria-label]="'QR code of the payment link of ' + inv.number" shape-rendering="crispEdges">
+                      <rect [attr.width]="code.size" [attr.height]="code.size" fill="#fff"></rect>
+                      <path [attr.d]="code.path" fill="#000"></path>
+                    </svg>
+                    <p class="pay-caption" *ngIf="qr()">The customer can scan it to pay on their phone.</p>
+                    <div class="pay-status">
+                      <span class="state-chip" [attr.data-tone]="linkTone(link.status)">{{ linkStatusLabel(link.status) }}</span>
+                      <span *ngIf="link.expiresAt && awaitingPayment(inv)">Valid until {{ date(link.expiresAt) }}</span>
+                    </div>
+                    <a class="pay-url" [href]="link.url" target="_blank" rel="noopener">
+                      {{ link.url }}<span class="cdk-visually-hidden"> (opens in a new tab)</span>
+                    </a>
+                    <div class="pay-actions" *ngIf="awaitingPayment(inv)">
+                      <a mat-flat-button class="action-btn primary" [href]="link.url" target="_blank" rel="noopener">
+                        <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                        Open as customer<span class="cdk-visually-hidden"> (opens in a new tab)</span>
+                      </a>
+                      <button mat-stroked-button type="button" class="action-btn" *ngIf="canCopy" (click)="copyLink(inv)">
+                        <mat-icon aria-hidden="true">{{ copiedId() === inv.id ? 'check' : 'content_copy' }}</mat-icon>
+                        {{ copiedId() === inv.id ? 'Link copied' : 'Copy link' }}
+                      </button>
+                    </div>
+                  </section>
+                  <ng-template #noLink>
+                    <div class="pay-panel muted" *ngIf="inv.status === 'DRAFT'">
+                      <mat-icon aria-hidden="true">qr_code_2</mat-icon>
+                      <p>Sending the invoice creates its payment link.</p>
+                    </div>
+                  </ng-template>
+                </div>
+
+                <div class="table-scroll">
+                  <table class="lines-table">
+                    <caption class="cdk-visually-hidden">Lines of {{ inv.number }}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Description</th>
+                        <th scope="col" class="num">Quantity</th>
+                        <th scope="col" class="num">Unit price</th>
+                        <th scope="col" class="num">{{ taxLabel() }}</th>
+                        <th scope="col" class="num">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let line of inv.lines">
+                        <td class="description">{{ line.description }}</td>
+                        <td class="num">{{ line.quantity }}</td>
+                        <td class="num">{{ line.unitPrice | money:inv.currency }}</td>
+                        <td class="num">{{ formatRate(line.vatRate) }}</td>
+                        <td class="num">{{ line.netAmount | money:inv.currency }}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th scope="row" colspan="4">Subtotal</th>
+                        <td class="num">{{ inv.subtotal | money:inv.currency }}</td>
+                      </tr>
+                      <tr *ngFor="let group of inv.vat">
+                        <th scope="row" colspan="4">{{ taxLabel() }} {{ formatRate(group.rate) }} on {{ group.base | money:inv.currency }}</th>
+                        <td class="num">{{ group.tax | money:inv.currency }}</td>
+                      </tr>
+                      <tr class="total">
+                        <th scope="row" colspan="4">Total</th>
+                        <td class="num">{{ inv.total | money:inv.currency }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <p class="detail-notes" *ngIf="inv.notes"><span class="strong">Notes</span> {{ inv.notes }}</p>
+
+                <section class="detail-section" *ngIf="inv.events.length" [attr.aria-labelledby]="'invoice-history-' + inv.id">
+                  <h3 class="detail-heading" [id]="'invoice-history-' + inv.id">History</h3>
+                  <ol class="timeline">
+                    <li class="timeline-item" *ngFor="let event of inv.events; trackBy: trackEvent"
+                        [attr.data-tone]="eventView(event).tone">
+                      <mat-icon class="timeline-icon" aria-hidden="true">{{ eventView(event).icon }}</mat-icon>
+                      <div class="timeline-content">
+                        <div class="timeline-title">
+                          <span>{{ eventView(event).label }}</span>
+                          <time [attr.datetime]="event.occurredAt" [attr.title]="dateTime(event.occurredAt)">{{ timeAgo(event.occurredAt) }}</time>
+                        </div>
+                        <div class="timeline-detail" *ngIf="event.detail">{{ event.detail }}</div>
+                        <div class="timeline-ref mono" *ngIf="event.pspReference">PSP reference {{ event.pspReference }}</div>
+                      </div>
+                    </li>
+                  </ol>
+                </section>
+
+                <div class="detail-actions">
+                  <button mat-stroked-button type="button" class="action-btn" (click)="downloadPdf(inv)"
+                          [disabled]="downloadingId() === inv.id">
+                    <mat-spinner *ngIf="downloadingId() === inv.id" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="downloadingId() !== inv.id" aria-hidden="true">picture_as_pdf</mat-icon>
+                    {{ downloadingId() === inv.id ? 'Preparing the PDF…' : 'Download PDF' }}
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn" *ngIf="inv.editable" (click)="edit(inv)"
+                          [disabled]="!!pending()">
+                    <mat-icon aria-hidden="true">edit</mat-icon>
+                    Edit draft
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn danger" *ngIf="inv.voidable" (click)="voidInvoice(inv)"
+                          [disabled]="!!pending()">
+                    <mat-spinner *ngIf="isPending(inv, 'void')" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="!isPending(inv, 'void')" aria-hidden="true">block</mat-icon>
+                    {{ isPending(inv, 'void') ? 'Voiding…' : 'Void invoice…' }}
+                  </button>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </ng-container>
+
+        <ng-template #noInvoices>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">request_quote</mat-icon>
+            <p>No invoices yet</p>
+            <span class="empty-hint">Create an invoice, or load demo customers and invoices.</span>
+            <div class="empty-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadDemoData()" [disabled]="loadingDemo()">
+                <mat-spinner *ngIf="loadingDemo()" diameter="18" aria-hidden="true"></mat-spinner>
+                <mat-icon *ngIf="!loadingDemo()" aria-hidden="true">auto_awesome</mat-icon>
+                {{ loadingDemo() ? 'Loading demo data…' : 'Load demo data' }}
+              </button>
+              <button mat-stroked-button type="button" class="fintech-btn" (click)="newInvoice()" [disabled]="!settings()">New invoice</button>
+            </div>
+          </div>
+        </ng-template>
+      </mat-tab>
+
+      <!-- Customers -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Customers <span class="tab-count" *ngIf="customers().length">{{ customers().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="customers().length; else noCustomers">
+          <div class="list-toolbar">
+            <p class="toolbar-text">The customers you bill.</p>
+            <button mat-stroked-button type="button" class="action-btn" (click)="addCustomer()">
+              <mat-icon aria-hidden="true">person_add</mat-icon>
+              New customer
+            </button>
+          </div>
+
+          <ul class="customer-list" aria-label="Customers">
+            <li class="customer-item" *ngFor="let c of customers(); trackBy: trackCustomer">
+              <div class="customer-row">
+                <div class="customer-avatar" aria-hidden="true">{{ initialsOf(c) }}</div>
+                <div class="customer-content">
+                  <div class="customer-title">
+                    <span class="customer-name">{{ c.displayName }}</span>
+                    <span class="customer-due" *ngIf="c.outstanding > 0">{{ c.outstanding | money:c.currency }} due</span>
+                  </div>
+                  <div class="customer-meta">
+                    <span *ngIf="c.company">{{ c.name }}</span>
+                    <span>{{ c.email }}</span>
+                    <span *ngIf="c.country">{{ countryName(c.country) }}</span>
+                  </div>
+                  <div class="customer-meta">
+                    <span>{{ c.invoiceCount ? plural(c.invoiceCount, 'invoice') : 'No invoices yet' }}</span>
+                    <span *ngIf="c.vatNumber">{{ taxLabel() }} number {{ c.vatNumber }}</span>
+                  </div>
+                </div>
+                <div class="customer-actions">
+                  <button mat-stroked-button type="button" class="action-btn" (click)="newInvoice(c)" [disabled]="!settings()"
+                          [attr.aria-label]="'New invoice for ' + c.displayName">
+                    New invoice
+                  </button>
+                  <button mat-icon-button type="button" [matMenuTriggerFor]="customerMenu" [matMenuTriggerData]="{ customer: c }"
+                          [disabled]="deletingCustomerId() === c.id" [attr.aria-label]="'Actions for ' + c.displayName">
+                    <mat-spinner *ngIf="deletingCustomerId() === c.id" diameter="18" aria-label="Deleting the customer"></mat-spinner>
+                    <mat-icon *ngIf="deletingCustomerId() !== c.id" aria-hidden="true">more_vert</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <app-inline-alert *ngIf="customerError()?.id === c.id" class="row-error" title="Unable to delete the customer"
+                                [dismissible]="true" (dismiss)="customerError.set(null)">{{ customerError()!.message }}</app-inline-alert>
+            </li>
+          </ul>
+
+          <mat-menu #customerMenu="matMenu" xPosition="before">
+            <ng-template matMenuContent let-customer="customer">
+              <button mat-menu-item type="button" (click)="editCustomer(customer)">
+                <mat-icon aria-hidden="true">edit</mat-icon>
+                <span>Edit customer</span>
+              </button>
+              <!-- The invoices of a customer keep it. -->
+              <button mat-menu-item type="button" class="danger-item" *ngIf="!customer.invoiceCount" (click)="deleteCustomer(customer)">
+                <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                <span>Delete customer…</span>
+              </button>
+            </ng-template>
+          </mat-menu>
+        </ng-container>
+
+        <ng-template #noCustomers>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">group</mat-icon>
+            <p>No customers yet</p>
+            <span class="empty-hint">Add a customer, or load the demo data.</span>
+            <div class="empty-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="addCustomer()">
+                <mat-icon aria-hidden="true">person_add</mat-icon>
+                New customer
+              </button>
+              <button mat-stroked-button type="button" class="fintech-btn" (click)="loadDemoData()" [disabled]="loadingDemo()">Load demo data</button>
+            </div>
+          </div>
+        </ng-template>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+
+</div>

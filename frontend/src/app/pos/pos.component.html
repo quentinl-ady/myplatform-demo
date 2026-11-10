@@ -105,7 +105,7 @@
 
       <div class="empty-dropin" *ngIf="!isPaying() && !outcome()">
         <mat-icon aria-hidden="true">point_of_sale</mat-icon>
-        <p>Fill in the details and select Send to terminal. The terminal then asks the customer to present their card.</p>
+        <p>Select Send to terminal: it then asks the customer for their card.</p>
       </div>
 
       <div class="empty-dropin pending" *ngIf="isPaying()">
@@ -115,7 +115,7 @@
         <p class="elapsed">{{ elapsedSeconds() }} s elapsed</p>
         <p class="slow-hint" *ngIf="isSlow()">
           <mat-icon aria-hidden="true">schedule</mat-icon>
-          <span>This is taking longer than usual. Check the terminal screen; the customer may need to enter a PIN.</span>
+          <span>Taking longer than usual: the customer may need to enter a PIN.</span>
         </p>
 
         <app-inline-alert class="abort-alert" *ngIf="abortError()" title="Unable to cancel on the terminal"

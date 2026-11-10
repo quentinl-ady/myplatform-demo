@@ -206,7 +206,7 @@ export function captureNote(options: AdvancedPaymentOptions | undefined): string
     case 'MANUAL':
       return 'It is only authorised: capture or cancel it from the Captures page.';
     case 'DELAYED':
-      return `Adyen captures it automatically in ${options.captureDelayHours} ${options.captureDelayHours === 1 ? 'hour' : 'hours'}. You can capture or cancel it earlier from the Captures page.`;
+      return `It is captured automatically in ${options.captureDelayHours} ${options.captureDelayHours === 1 ? 'hour' : 'hours'}. Capture or cancel it earlier from the Captures page.`;
     default:
       return null;
   }

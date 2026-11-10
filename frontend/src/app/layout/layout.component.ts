@@ -14,7 +14,7 @@ import { ApiLogsComponent } from '../api-logs/api-logs.component';
 import { DEFAULT_PLATFORM_NAME, PageTitleStrategy } from './page-title.strategy';
 import { NotifyService, httpErrorMessage, httpStatus } from '../shared';
 
-type NavLock = 'embeddedPayment' | 'bankAccount' | 'capital' | 'issuing';
+type NavLock = 'embeddedPayment' | 'bankAccount' | 'capital' | 'issuing' | 'bankOrIssuing';
 
 interface NavItem {
   label: string;
@@ -87,6 +87,15 @@ export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
         { label: 'Point of sale', icon: 'computer', path: 'pos', lock: 'embeddedPayment' },
         { label: 'Pay by Link', icon: 'link', path: 'paybylink', lock: 'embeddedPayment' },
         { label: 'Stores', icon: 'store', path: 'store', lock: 'embeddedPayment' }
+      ]
+    },
+    {
+      title: 'Invoicing & accounting',
+      items: [
+        { label: 'Invoices', icon: 'request_quote', path: 'invoices' },
+        { label: 'Subscriptions', icon: 'autorenew', path: 'subscriptions' },
+        { label: 'Bills', icon: 'receipt', path: 'bills', lock: 'bankOrIssuing' },
+        { label: 'Accounting', icon: 'menu_book', path: 'accounting' }
       ]
     },
     {
@@ -287,6 +296,9 @@ export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
         if (!this.bankEnabled) return 'Enable Bank when creating the account to use business accounts';
         if (this.bankStatusFailed) return 'Unable to check the business bank account. Reload the page to try again.';
         return 'Create the business bank account on the Onboarding page to unlock this';
+      case 'bankOrIssuing':
+        // The bills page tells why a payment method isn't available yet, e.g. no business bank account.
+        return this.bankEnabled || this.issuingEnabled ? null : 'Enable Bank or Issuing when creating the account to pay bills';
       default:
         return null;
     }

@@ -28,15 +28,18 @@ public class WebhookService {
     private final WebhookEventRepository webhookEventRepository;
     private final UserRepository userRepository;
     private final StoreCustomerRepository storeCustomerRepository;
+    private final InvoiceService invoiceService;
     private final ObjectMapper objectMapper;
 
     public WebhookService(WebhookEventRepository webhookEventRepository,
                           UserRepository userRepository,
                           StoreCustomerRepository storeCustomerRepository,
+                          InvoiceService invoiceService,
                           ObjectMapper objectMapper) {
         this.webhookEventRepository = webhookEventRepository;
         this.userRepository = userRepository;
         this.storeCustomerRepository = storeCustomerRepository;
+        this.invoiceService = invoiceService;
         this.objectMapper = objectMapper;
     }
 
@@ -384,6 +387,10 @@ public class WebhookService {
         // 4. Standard notifications: notificationItems[].NotificationRequestItem
         JsonNode notificationItem = extractStandardNotificationItem(root);
         if (notificationItem != null) {
+            // Invoices: their payment link, their number, or the payment that paid them
+            Optional<String> invoiceUserId = invoiceService.userIdOf(notificationItem);
+            if (invoiceUserId.isPresent()) return invoiceUserId.get();
+
             // Try additionalData.store (storeRef)
             JsonNode additionalData = notificationItem.get("additionalData");
             if (additionalData != null) {

@@ -3,7 +3,7 @@
   <div class="page-header">
     <div>
       <h1>Relayed authorisation</h1>
-      <p class="subtitle">Choose how often card payments sent through relayed authorisation are approved.</p>
+      <p class="subtitle">Choose how often card payments are approved.</p>
     </div>
   </div>
 
@@ -85,7 +85,7 @@
         <mat-icon aria-hidden="true">webhook</mat-icon>
         <h2 id="ra-webhook-title">Webhook endpoint</h2>
       </div>
-      <p class="info-text">Configure this URL in your Adyen Customer Area under <strong>Financial products → Relayed authorisation</strong>.</p>
+      <p class="info-text">Set this URL as the relayed authorisation endpoint.</p>
       <div class="url-row">
         <code class="url-value">{{ webhookUrl }}</code>
         <button mat-icon-button type="button" (click)="copyWebhookUrl()" matTooltip="Copy URL" aria-label="Copy webhook URL">
@@ -98,9 +98,9 @@
       <div class="info-steps">
         <h3>How it works</h3>
         <ol>
-          <li>Adyen sends a relayed authorisation webhook when a card payment is attempted.</li>
-          <li>This server randomly approves or refuses the transaction based on the configured percentage.</li>
-          <li>The response (<code>Authorised</code> or <code>Refused</code>) is sent back to Adyen within the 2-second deadline.</li>
+          <li>Each card payment sends a request to this URL.</li>
+          <li>The server approves or refuses it at random, using the percentage above.</li>
+          <li>It answers <code>Authorised</code> or <code>Refused</code> within 2 seconds.</li>
         </ol>
       </div>
     </section>

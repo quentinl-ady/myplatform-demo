@@ -12,7 +12,8 @@
     "e2e": "ng e2e",
     "e2e:pw": "npx playwright test --config=playwright.config.ts",
     "e2e:pw:headed": "npx playwright test --config=playwright.config.ts --headed",
-    "e2e:pw:ui": "npx playwright test --config=playwright.config.ts --ui"
+    "e2e:pw:ui": "npx playwright test --config=playwright.config.ts --ui",
+    "e2e:invoicing": "npx playwright test --config=playwright.config.ts invoicing-accounting"
   },
   "private": true,
   "dependencies": {

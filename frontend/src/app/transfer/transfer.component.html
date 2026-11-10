@@ -28,7 +28,7 @@
           <mat-icon *ngIf="!downloadingStatement" iconPositionEnd aria-hidden="true">expand_more</mat-icon>
         </button>
         <mat-menu #statementsMenu="matMenu">
-          <p class="statements-menu-title">Account statements (PDF)</p>
+          <p class="statements-menu-title">Account statements: PDF, or XML (CAMT.053) for accounting</p>
           <div class="statements-menu-state" *ngIf="statementsState === 'loading'" role="status">
             <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
             Loading statements…
@@ -38,18 +38,19 @@
             <span>Unable to load statements. Try again</span>
           </button>
           <p class="statements-menu-state" *ngIf="statementsState === 'ready' && !statements.length">
-            No statements yet. New ones appear here as soon as Adyen generates them.
+            No statements yet.
           </p>
           <ng-container *ngIf="statementsState === 'ready'">
-            <button mat-menu-item type="button" *ngFor="let s of statements; trackBy: trackStatement"
-                    (click)="downloadStatement(s)"
-                    [attr.aria-label]="'Download the ' + (s.currency ? s.currency + ' ' : '') + 'statement for ' + statementPeriod(s) + ' as a PDF'">
-              <mat-icon aria-hidden="true">download</mat-icon>
-              <span class="statement-item">
+            <div class="statement-row" *ngFor="let s of statements; trackBy: trackStatement">
+              <span class="statement-item" aria-hidden="true">
                 <span>{{ statementPeriod(s) }}</span>
                 <span class="statement-currency" *ngIf="s.currency">{{ s.currency }}</span>
               </span>
-            </button>
+              <button mat-menu-item type="button" class="statement-format" (click)="downloadStatement(s, 'pdf')"
+                      [attr.aria-label]="statementDownloadLabel(s, 'pdf')">PDF</button>
+              <button mat-menu-item type="button" class="statement-format" (click)="downloadStatement(s, 'xml')"
+                      [attr.aria-label]="statementDownloadLabel(s, 'xml')">XML</button>
+            </div>
           </ng-container>
         </mat-menu>
       </div>
@@ -66,7 +67,7 @@
         </div>
         <div class="warning-text">
           <h2>No trusted device registered</h2>
-          <p>Register this device to view your bank transactions. You will use it to securely access your account data with strong customer authentication (SCA).</p>
+          <p>Register this device to view your bank transactions.</p>
         </div>
       </div>
       <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
@@ -93,14 +94,14 @@
       <!-- Loading -->
       <div class="loading-state" *ngIf="isLoadingTransactions && !transactionsRemoteStart" role="status">
         <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
-        <p>Loading transactions… Approve the request with your passkey if your browser asks.</p>
+        <p>Loading transactions… Approve with your passkey if asked.</p>
       </div>
 
       <!-- Approval on the phone -->
       <div class="phone-approval" *ngIf="transactionsRemoteStart">
         <h3>Approve on your phone to see your transactions</h3>
         <app-remote-session-panel [userId]="userId" [start]="transactionsRemoteStart"
-                                  instructions="Scan this QR code with your phone, then approve there. Your transactions appear here right after."
+                                  instructions="Scan this QR code with your phone, then approve there."
                                   (completed)="onTransactionsApprovedOnPhone($event)"></app-remote-session-panel>
         <app-approval-switch *ngIf="approval.canSwitch" mode="phone" (switchTo)="switchApproval($event)"></app-approval-switch>
       </div>

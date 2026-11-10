@@ -1,7 +1,6 @@
 package com.myplatform.demo.service;
 
 import com.itextpdf.io.font.constants.StandardFonts;
-import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
@@ -29,39 +28,29 @@ import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
-import com.itextpdf.styledxmlparser.resolver.resource.IResourceRetriever;
-import com.itextpdf.svg.converter.SvgConverter;
-import com.itextpdf.svg.processors.impl.SvgConverterProperties;
 import com.myplatform.demo.util.CamtStatement;
 import com.myplatform.demo.util.CamtStatement.Entry;
 import com.myplatform.demo.util.CamtStatement.Moment;
 import com.myplatform.demo.util.CamtStatement.Statement;
+import com.myplatform.demo.util.PdfSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
 import java.util.Currency;
 import java.util.HashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -76,8 +65,6 @@ public class AccountStatementPdfService {
 
     private static final Logger log = LoggerFactory.getLogger(AccountStatementPdfService.class);
 
-    /** The same default logo as the frontend. */
-    private static final String DEFAULT_LOGO = "/default-platform-logo.svg";
     /** The statements of this demo come from Adyen's test environment: the badge keeps them from passing for real ones. */
     private static final String TEST_ONLY = "TEST ONLY – NOT A REAL BANK STATEMENT";
     private static final String ADYEN_WEBSITE = "www.adyen.com";
@@ -109,22 +96,6 @@ public class AccountStatementPdfService {
 
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
-    /** Letters that Unicode doesn't split into a base letter and an accent. */
-    private static final Map<Character, String> UNDECOMPOSABLE = Map.of(
-            'Ł', "L", 'ł', "l", 'Đ', "D", 'đ', "d", 'Ħ', "H", 'ħ', "h", 'ı', "i");
-
-    /** A logo is user content: its SVG must not make the server fetch anything. */
-    private static final IResourceRetriever OFFLINE = new IResourceRetriever() {
-        @Override
-        public InputStream getInputStreamByUrl(URL url) {
-            return null;
-        }
-
-        @Override
-        public byte[] getByteArrayByUrl(URL url) {
-            return null;
-        }
-    };
 
     /**
      * The platform that offers the account. Adyen doesn't provide it, the statement must show it.
@@ -543,30 +514,7 @@ public class AccountStatementPdfService {
 
         /** The branding logo, or the default one when the platform has none; null when it can't be drawn. */
         private Image logo() {
-            String dataUrl = platform.logoDataUrl();
-            try {
-                if (!notBlank(dataUrl)) {
-                    try (InputStream in = AccountStatementPdfService.class.getResourceAsStream(DEFAULT_LOGO)) {
-                        return in != null ? svg(in) : null;
-                    }
-                }
-                byte[] bytes = decode(dataUrl);
-                if (isSvg(bytes)) {
-                    return svg(new ByteArrayInputStream(bytes));
-                }
-                if (!ImageDataFactory.isSupportedType(bytes)) {
-                    log.warn("Statement PDF created without the platform logo: unsupported image format");
-                    return null;
-                }
-                return new Image(ImageDataFactory.create(bytes));
-            } catch (Exception e) {
-                log.warn("Statement PDF created without the platform logo: {}", e.getMessage());
-                return null;
-            }
-        }
-
-        private Image svg(InputStream in) throws IOException {
-            return new Image(SvgConverter.convertToXObject(in, pdf, new SvgConverterProperties().setResourceRetriever(OFFLINE)));
+            return PdfSupport.logo(pdf, platform.logoDataUrl(), "Statement PDF");
         }
 
         private Paragraph linkLine(String prefix, String text, String uri) {
@@ -601,31 +549,8 @@ public class AccountStatementPdfService {
             return new Cell().setBorder(Border.NO_BORDER).setPadding(0);
         }
 
-        /** The standard font draws Western European text: other letters lose their accent, or become "?". */
         private String clean(String value) {
-            if (value == null) {
-                return "";
-            }
-            StringBuilder text = new StringBuilder(value.length());
-            value.codePoints().forEach(codePoint -> {
-                if (Character.isWhitespace(codePoint) || Character.isISOControl(codePoint)) {
-                    text.append(' ');
-                } else if (regular.containsGlyph(codePoint)) {
-                    text.appendCodePoint(codePoint);
-                } else {
-                    text.append(replacement(codePoint));
-                }
-            });
-            return text.toString();
-        }
-
-        private String replacement(int codePoint) {
-            String replacement = codePoint <= Character.MAX_VALUE ? UNDECOMPOSABLE.get((char) codePoint) : null;
-            if (replacement == null) {
-                replacement = Normalizer.normalize(new String(Character.toChars(codePoint)), Normalizer.Form.NFD)
-                        .replaceAll("\\p{M}", "");
-            }
-            return !replacement.isEmpty() && replacement.codePoints().allMatch(regular::containsGlyph) ? replacement : "?";
+            return PdfSupport.clean(regular, value);
         }
     }
 
@@ -796,24 +721,4 @@ public class AccountStatementPdfService {
         return iban == null ? null : iban.replaceAll("\\s+", "").replaceAll("(.{4})(?!$)", "$1 ");
     }
 
-    private static boolean notBlank(String value) {
-        return value != null && !value.isBlank();
-    }
-
-    /** Branding logos are data URLs, e.g. data:image/png;base64,iVBOR... */
-    private static byte[] decode(String dataUrl) {
-        String value = dataUrl.trim();
-        int comma = value.indexOf(',');
-        if (!value.startsWith("data:") || comma < 0) {
-            return Base64.getMimeDecoder().decode(value);
-        }
-        String data = value.substring(comma + 1);
-        return value.substring(0, comma).endsWith(";base64")
-                ? Base64.getMimeDecoder().decode(data)
-                : URLDecoder.decode(data, StandardCharsets.UTF_8).getBytes(StandardCharsets.UTF_8);
-    }
-
-    private static boolean isSvg(byte[] bytes) {
-        return new String(bytes, 0, Math.min(bytes.length, 2048), StandardCharsets.UTF_8).contains("<svg");
-    }
 }

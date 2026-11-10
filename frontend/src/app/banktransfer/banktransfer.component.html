@@ -18,7 +18,7 @@
       </div>
       <div class="warning-text">
         <h2>No trusted device registered</h2>
-        <p>Register this device before you make transfers. You will use it to approve each transfer with strong customer authentication (SCA).</p>
+        <p>Register this device to approve your transfers.</p>
       </div>
     </div>
     <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
@@ -116,7 +116,7 @@
               <div class="form-group">
                 <label for="oneshot-reference">Internal reference (optional)</label>
                 <input id="oneshot-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. INV-2026-001" />
-                <span class="hint-text">Only visible to you. Demo: enter "noNameMatch" or "partialNameMatch" to test the name check results.</span>
+                <span class="hint-text">Only visible to you. Enter "noNameMatch" or "partialNameMatch" to test the name check.</span>
               </div>
 
               <div class="form-group">
@@ -173,7 +173,7 @@
               <mat-icon>schedule_send</mat-icon>
             </div>
             <h3>No scheduled transfers yet</h3>
-            <p>Create a recurring transfer to pay suppliers or move money automatically.</p>
+            <p>Pay suppliers or move money on a schedule.</p>
           </div>
 
           <ul class="so-list" *ngIf="!soLoading && standingOrders.length > 0">
@@ -281,7 +281,7 @@
               <div class="form-group">
                 <label for="so-reference">Internal reference (optional)</label>
                 <input id="so-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. Rent office" />
-                <span class="hint-text">Only visible to you. Demo: enter "noNameMatch" or "partialNameMatch" to test the name check results.</span>
+                <span class="hint-text">Only visible to you. Enter "noNameMatch" or "partialNameMatch" to test the name check.</span>
               </div>
 
               <div class="form-group">
@@ -410,7 +410,6 @@
         <p>The name on the account is slightly different from the one you entered.</p>
         <p>You entered: <br><strong>{{ vopBeneficiaryName }}</strong></p>
         <p>Name on the account: <br><strong>{{ suggestedName }}</strong></p>
-        <p class="modal-note">Use the name on the account, edit the details, or cancel.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="acceptSuggestedName()" cdkFocusInitial>Use the name on the account</button>
@@ -431,8 +430,8 @@
         </h3>
       </div>
       <div class="modal-body">
-        <p>The name on the destination account <strong>does not match</strong> the beneficiary name you entered.</p>
-        <p class="modal-note">Sending money to the wrong account can result in loss of funds. Only continue if you are sure the details are correct.</p>
+        <p>The name on the account <strong>doesn't match</strong> the name you entered.</p>
+        <p class="modal-note">Money sent to the wrong account may be lost. Only continue if you're sure.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Continue anyway</button>
@@ -463,7 +462,7 @@
         </dl>
         <p class="modal-note" *ngIf="!oneshotRemoteStart">Approve with the passkey of your trusted device to send the money.</p>
         <app-remote-session-panel *ngIf="oneshotRemoteStart" [userId]="userId" [start]="oneshotRemoteStart"
-                                  instructions="Scan this QR code with your phone, then approve the transfer there to send the money."
+                                  instructions="Scan this QR code with your phone, then approve the transfer there."
                                   (completed)="onOneshotApprovedOnPhone()"></app-remote-session-panel>
         <app-approval-switch *ngIf="approval.canSwitch" [mode]="oneshotRemoteStart ? 'phone' : 'here'" [disabled]="isOneshotProcessing"
                              (switchTo)="switchOneshotApproval($event)"></app-approval-switch>
@@ -493,9 +492,9 @@
           <div class="recap-row"><dt>Beneficiary</dt><dd>{{ order.counterparty.bankAccount.accountHolder.fullName }}</dd></div>
           <div class="recap-row"><dt>Schedule</dt><dd>{{ getScheduleLabel(order.schedule) }}</dd></div>
         </dl>
-        <p *ngIf="!soRemoteStart">Strong customer authentication (SCA) is required to create this scheduled transfer. Approve it with the passkey of your trusted device.</p>
+        <p *ngIf="!soRemoteStart">Approve with the passkey of your trusted device.</p>
         <app-remote-session-panel *ngIf="soRemoteStart" [userId]="userId" [start]="soRemoteStart"
-                                  instructions="Scan this QR code with your phone, then approve the scheduled transfer there to create it."
+                                  instructions="Scan this QR code with your phone, then approve the scheduled transfer there."
                                   (completed)="onSoApprovedOnPhone()"></app-remote-session-panel>
         <div class="sca-banner" *ngIf="scaStatus" role="status">
           <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>

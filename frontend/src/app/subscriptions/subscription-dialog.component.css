@@ -1,0 +1,41 @@
+.rescue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 12px;
+}
+.rescue .helper-text,
+.rescue-off { margin: 0; }
+.rescue-days { max-width: 14rem; }
+
+.summary-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--fintech-surface-subtle);
+}
+.summary-box mat-icon {
+  flex-shrink: 0;
+  color: var(--fintech-primary);
+}
+.summary-box p {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fintech-text-secondary);
+}
+.summary-box .summary-amount {
+  margin-bottom: 4px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .summary-box { border: 1px solid CanvasText; }
+}

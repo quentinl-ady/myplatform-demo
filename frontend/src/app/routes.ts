@@ -78,6 +78,26 @@ const routeConfig: Routes = [
         title: 'Captures'
       },
       {
+        path: 'invoices',
+        loadComponent: () => import('./invoices/invoices.component').then(m => m.InvoicesComponent),
+        title: 'Invoices'
+      },
+      {
+        path: 'subscriptions',
+        loadComponent: () => import('./subscriptions/subscriptions.component').then(m => m.SubscriptionsComponent),
+        title: 'Subscriptions'
+      },
+      {
+        path: 'bills',
+        loadComponent: () => import('./bills/bills.component').then(m => m.BillsComponent),
+        title: 'Bills'
+      },
+      {
+        path: 'accounting',
+        loadComponent: () => import('./accounting/accounting.component').then(m => m.AccountingComponent),
+        title: 'Accounting'
+      },
+      {
          path: 'paybylink',
          loadComponent: () => import('./paybylink/paybylink.component').then(m => m.PayByLinkComponent),
          title: 'Pay by Link'

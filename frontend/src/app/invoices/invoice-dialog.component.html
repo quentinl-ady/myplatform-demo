@@ -1,0 +1,134 @@
+<h2 mat-dialog-title class="dialog-title">{{ title }}</h2>
+<mat-dialog-content class="invoice-dialog-content">
+  <form [formGroup]="form" id="invoice-form" class="dialog-form" (ngSubmit)="submit(false)" novalidate>
+
+    <div class="field-row three">
+      <div class="field">
+        <label for="invoice-customer">Customer</label>
+        <select id="invoice-customer" class="fintech-input" formControlName="customerId"
+                [attr.aria-invalid]="!!customerError"
+                [attr.aria-describedby]="customerError ? 'invoice-customer-error' : (selectedCustomer() ? 'invoice-customer-help' : null)">
+          <option [ngValue]="null" disabled>{{ customers().length ? 'Choose a customer' : 'No customers yet' }}</option>
+          <option *ngFor="let c of customers()" [ngValue]="c.id">{{ c.displayName }}{{ c.company ? ' · ' + c.name : '' }}</option>
+        </select>
+        <span class="helper-text error" id="invoice-customer-error" *ngIf="customerError as error">{{ error }}</span>
+        <span class="helper-text" id="invoice-customer-help" *ngIf="!customerError && selectedCustomer() as c">{{ c.email }}</span>
+        <button type="button" class="text-btn add-customer" (click)="addCustomer()">
+          <mat-icon aria-hidden="true">person_add</mat-icon>New customer
+        </button>
+      </div>
+      <div class="field">
+        <label for="invoice-issue-date">Issue date</label>
+        <input id="invoice-issue-date" type="date" class="fintech-input" formControlName="issueDate" />
+      </div>
+      <div class="field">
+        <label for="invoice-due-date">Due date</label>
+        <input id="invoice-due-date" type="date" class="fintech-input" formControlName="dueDate"
+               [attr.min]="form.value.issueDate || null"
+               [attr.aria-invalid]="!!datesError"
+               [attr.aria-describedby]="datesError ? 'invoice-due-date-error' : 'invoice-due-date-help'" />
+        <span class="helper-text error" id="invoice-due-date-error" *ngIf="datesError as error">{{ error }}</span>
+        <span class="helper-text" id="invoice-due-date-help" *ngIf="!datesError">{{ termsText }}</span>
+      </div>
+    </div>
+
+    <fieldset class="lines-section">
+      <legend>Lines</legend>
+      <div class="lines-head" aria-hidden="true">
+        <span>Description</span>
+        <span>Quantity</span>
+        <span>Unit price ({{ currency }})</span>
+        <span>{{ taxLabel }}</span>
+        <span class="right">Amount</span>
+        <span></span>
+      </div>
+
+      <div class="line" *ngFor="let line of lines.controls; let i = index" [formGroup]="asGroup(line)"
+           role="group" [attr.aria-label]="'Line ' + (i + 1)">
+        <div class="line-field">
+          <label class="line-label" [for]="'invoice-line-' + i + '-description'">Description</label>
+          <input [id]="'invoice-line-' + i + '-description'" class="fintech-input" formControlName="description" maxlength="200"
+                 placeholder="Product or service"
+                 [attr.aria-invalid]="lineInvalid(i, 'description')"
+                 [attr.aria-describedby]="lineError(i) ? 'invoice-line-' + i + '-error' : null" />
+        </div>
+        <div class="line-field">
+          <label class="line-label" [for]="'invoice-line-' + i + '-quantity'">Quantity</label>
+          <input [id]="'invoice-line-' + i + '-quantity'" type="number" inputmode="numeric" min="1" step="1"
+                 class="fintech-input" formControlName="quantity"
+                 [attr.aria-invalid]="lineInvalid(i, 'quantity')"
+                 [attr.aria-describedby]="lineError(i) ? 'invoice-line-' + i + '-error' : null" />
+        </div>
+        <div class="line-field">
+          <label class="line-label" [for]="'invoice-line-' + i + '-price'">Unit price ({{ currency }})</label>
+          <input [id]="'invoice-line-' + i + '-price'" type="number" inputmode="decimal" min="0" [step]="priceStep"
+                 class="fintech-input" formControlName="unitPrice" placeholder="0.00"
+                 [attr.aria-invalid]="lineInvalid(i, 'unitPrice')"
+                 [attr.aria-describedby]="lineError(i) ? 'invoice-line-' + i + '-error' : null" />
+        </div>
+        <div class="line-field">
+          <label class="line-label" [for]="'invoice-line-' + i + '-rate'">{{ taxLabel }}</label>
+          <select [id]="'invoice-line-' + i + '-rate'" class="fintech-input" formControlName="vatRate">
+            <option *ngFor="let rate of rates" [ngValue]="rate">{{ formatRate(rate) }}</option>
+          </select>
+        </div>
+        <div class="line-amount">
+          <span class="line-label">Amount</span>
+          <span>{{ lineTotals()[i] ? (lineTotals()[i]!.net | money:currency) : '—' }}</span>
+        </div>
+        <button type="button" mat-icon-button class="line-remove" (click)="removeLine(i)" [disabled]="lines.length === 1"
+                [attr.aria-label]="'Remove line ' + (i + 1)">
+          <mat-icon aria-hidden="true">delete_outline</mat-icon>
+        </button>
+        <span class="helper-text error line-error" [id]="'invoice-line-' + i + '-error'" *ngIf="lineError(i) as error">{{ error }}</span>
+      </div>
+
+      <button type="button" class="text-btn" (click)="addLine()" [disabled]="lines.length >= maxLines">
+        <mat-icon aria-hidden="true">add</mat-icon>Add line
+      </button>
+    </fieldset>
+
+    <div class="summary">
+      <div class="field notes">
+        <label for="invoice-notes">Notes <span class="optional">(optional)</span></label>
+        <textarea id="invoice-notes" class="fintech-input" formControlName="notes" rows="3" maxlength="1000"
+                  aria-describedby="invoice-notes-help"></textarea>
+        <span class="helper-text" id="invoice-notes-help">Printed on the invoice, for example a purchase order number.</span>
+      </div>
+      <dl class="totals">
+        <div class="totals-row">
+          <dt>Subtotal</dt>
+          <dd>{{ totals().net | money:currency }}</dd>
+        </div>
+        <div class="totals-row" *ngFor="let group of totals().vat">
+          <dt>{{ taxLabel }} {{ formatRate(group.rate) }}</dt>
+          <dd>{{ group.tax | money:currency }}</dd>
+        </div>
+        <div class="totals-row" *ngIf="!totals().vat.length">
+          <dt>{{ taxLabel }}</dt>
+          <dd>{{ 0 | money:currency }}</dd>
+        </div>
+        <div class="totals-row total">
+          <dt>Total</dt>
+          <dd>{{ totals().gross | money:currency }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <app-inline-alert *ngIf="!settings.paymentLinksReady && settings.paymentLinksIssue as issue" kind="info" [live]="false"
+                      title="Invoices can be saved as drafts only">{{ issue }}</app-inline-alert>
+    <app-inline-alert *ngIf="error() as message" [title]="errorTitle()" [dismissible]="true"
+                      (dismiss)="error.set(null)">{{ message }}</app-inline-alert>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end" class="dialog-actions">
+  <button type="button" class="dialog-btn secondary" (click)="close()" [disabled]="!!submitting()">Cancel</button>
+  <button type="submit" form="invoice-form" class="dialog-btn secondary" [disabled]="!!submitting()">
+    <mat-spinner *ngIf="submitting() === 'draft'" diameter="16" aria-hidden="true"></mat-spinner>
+    <span>{{ submitting() === 'draft' ? 'Saving…' : 'Save draft' }}</span>
+  </button>
+  <button type="button" class="dialog-btn" (click)="submit(true)" [disabled]="!!submitting() || !settings.paymentLinksReady">
+    <mat-spinner *ngIf="submitting() === 'send'" diameter="16" aria-hidden="true"></mat-spinner>
+    <span>{{ submitting() === 'send' ? 'Sending…' : 'Save and send' }}</span>
+  </button>
+</mat-dialog-actions>

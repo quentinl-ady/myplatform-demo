@@ -5,3 +5,5 @@ export * from './dates';
 export * from './devices';
 export * from './inline-alert.component';
 export * from './notify.service';
+export * from './files';
+export * from './statements';

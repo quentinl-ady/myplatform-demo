@@ -1,0 +1,509 @@
+<div class="accounting-wrapper">
+
+  <div class="accounting-header">
+    <div>
+      <h1>Accounting</h1>
+      <p class="accounting-subtitle">Your invoices, bills and account movements as a double-entry journal, ready to export.</p>
+    </div>
+    <div class="header-actions">
+      <mat-button-toggle-group class="period-toggle" [value]="days()" (change)="setDays($event.value)"
+                               [disabled]="loading()" aria-label="Period of the journal">
+        <mat-button-toggle *ngFor="let period of periods" [value]="period">{{ period }} days</mat-button-toggle>
+      </mat-button-toggle-group>
+      <button mat-icon-button type="button" (click)="refresh()" [disabled]="loading()"
+              matTooltip="Refresh" aria-label="Refresh the journal">
+        <mat-icon [class.spinning]="loading()" aria-hidden="true">refresh</mat-icon>
+      </button>
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="exportCsv()"
+              [disabled]="!ledger() || loading() || exporting()">
+        <mat-spinner *ngIf="exporting()" diameter="18" aria-hidden="true"></mat-spinner>
+        <mat-icon *ngIf="!exporting()" aria-hidden="true">download</mat-icon>
+        {{ exporting() ? 'Exporting…' : 'Export CSV' }}
+      </button>
+    </div>
+  </div>
+
+  <p class="period-line" *ngIf="ledger() as l">
+    <span>{{ periodLabel() }}</span>
+    <span>{{ loading() ? 'Updating…' : 'Updated ' + dateTime(l.generatedAt) }}</span>
+  </p>
+
+  <app-inline-alert *ngIf="exportError() as error" title="Unable to export the journal" actionLabel="Try again"
+                    (action)="exportCsv()" [dismissible]="true" (dismiss)="exportError.set(null)">{{ error }}</app-inline-alert>
+  <div class="demo-progress" *ngIf="loadingDemo()" role="status">
+    <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+    <span>Loading the demo data…</span>
+  </div>
+  <app-inline-alert *ngIf="demoError() as error" title="Unable to load the demo data" actionLabel="Try again"
+                    (action)="loadDemoData()" [dismissible]="true" (dismiss)="demoError.set(null)">{{ error }}</app-inline-alert>
+  <app-inline-alert *ngIf="demoWarnings().length" kind="warning" title="Part of the demo data couldn't be created"
+                    [dismissible]="true" (dismiss)="demoWarnings.set([])">
+    <ul class="alert-list">
+      <li *ngFor="let warning of demoWarnings()">{{ warning }}</li>
+    </ul>
+  </app-inline-alert>
+  <app-inline-alert *ngIf="ledger()?.warnings?.length" kind="warning" [live]="false" title="The journal may be incomplete">
+    <ul class="alert-list">
+      <li *ngFor="let warning of ledger()!.warnings">{{ warning }}</li>
+    </ul>
+  </app-inline-alert>
+
+  <dl class="kpis" *ngIf="ledger() as l">
+    <div class="kpi">
+      <dt>Entries</dt>
+      <dd class="kpi-value">{{ l.summary.entries }}</dd>
+      <dd class="kpi-hint">{{ entriesHint(l) }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="matchTone(l)">
+      <dt>Matched automatically</dt>
+      <dd class="kpi-value">{{ l.summary.matchRate === null ? '—' : l.summary.matchRate + '%' }}</dd>
+      <dd class="kpi-hint">{{ matchHint(l) }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="l.summary.toReview ? 'warning' : null">
+      <dt>To review</dt>
+      <dd class="kpi-value">{{ l.summary.toReview }}</dd>
+      <dd class="kpi-hint" *ngIf="!l.summary.toReview">Nothing booked to Suspense</dd>
+      <dd class="kpi-hint" *ngIf="l.summary.toReview">
+        Booked to Suspense (1900).
+        <button type="button" class="link-btn" (click)="showToReview()">Show {{ l.summary.toReview === 1 ? 'it' : 'them' }}</button>
+      </dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="l.summary.balanced ? 'success' : 'danger'">
+      <dt>Debits = credits</dt>
+      <dd class="kpi-value">
+        <mat-icon class="kpi-icon" aria-hidden="true">{{ l.summary.balanced ? 'task_alt' : 'error_outline' }}</mat-icon>
+        {{ l.summary.balanced ? 'Balanced' : 'Unbalanced' }}
+      </dd>
+      <dd class="kpi-hint">{{ balanceHint(l) }}</dd>
+    </div>
+  </dl>
+
+  <mat-card class="accounting-card" [attr.aria-busy]="loading()">
+
+    <div *ngIf="loading() && !ledger()" class="loading-state" role="status">
+      <mat-spinner diameter="32" aria-hidden="true"></mat-spinner>
+      <span>Loading the journal…</span>
+    </div>
+
+    <app-inline-alert *ngIf="!loading() && loadError() as error" class="load-error" title="Unable to build the journal"
+                      actionLabel="Try again" (action)="load()">{{ error }}</app-inline-alert>
+
+    <mat-tab-group *ngIf="ledger() as l" class="ledger-tabs" mat-stretch-tabs="false" animationDuration="0ms"
+                   [selectedIndex]="tab()" (selectedIndexChange)="onTabChange($event)">
+
+      <!-- Journal -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Journal <span class="tab-count" *ngIf="entries().length">{{ entries().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="entries().length || pending().length; else noEntries">
+          <div class="list-toolbar">
+            <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
+                                     class="filter-toggle" aria-label="Show entries">
+              <mat-button-toggle value="all">All</mat-button-toggle>
+              <mat-button-toggle value="SAL" [matTooltip]="journalName('SAL')">Sales<span *ngIf="counts().sales"> ({{ counts().sales }})</span></mat-button-toggle>
+              <mat-button-toggle value="PUR" [matTooltip]="journalName('PUR')">Purchases<span *ngIf="counts().purchases"> ({{ counts().purchases }})</span></mat-button-toggle>
+              <mat-button-toggle value="BNK" [matTooltip]="journalName('BNK')">Bank<span *ngIf="counts().bank"> ({{ counts().bank }})</span></mat-button-toggle>
+              <mat-button-toggle value="TO_REVIEW">To review<span *ngIf="counts().toReview"> ({{ counts().toReview }})</span></mat-button-toggle>
+            </mat-button-toggle-group>
+            <div class="search-box">
+              <mat-icon class="search-icon" aria-hidden="true">search</mat-icon>
+              <input #search type="search" placeholder="Search entries" autocomplete="off"
+                     aria-label="Search entries by description, customer, supplier, document, account or reference"
+                     [value]="query()" (input)="query.set(search.value)">
+            </div>
+          </div>
+
+          <div class="empty-state compact" *ngIf="!visibleEntries().length && entries().length">
+            <mat-icon class="empty-icon" aria-hidden="true">{{ filter() === 'TO_REVIEW' && !query() ? 'task_alt' : 'search_off' }}</mat-icon>
+            <p>{{ filter() === 'TO_REVIEW' && !query() ? 'Nothing to review' : 'No entries match' }}</p>
+            <button mat-stroked-button type="button" (click)="clearFilters()">Show all entries</button>
+          </div>
+
+          <ul class="entry-list" *ngIf="visibleEntries().length" aria-label="Journal entries">
+            <li *ngFor="let entry of visibleEntries(); trackBy: trackEntry" class="entry-item"
+                [class.expanded]="expandedEntryId() === entry.id">
+              <div class="entry-main" role="button" tabindex="0"
+                   [attr.aria-expanded]="expandedEntryId() === entry.id"
+                   [attr.aria-controls]="'entry-detail-' + entry.id"
+                   (click)="toggleEntry(entry, $event)"
+                   (keydown.enter)="toggleEntry(entry, $event)"
+                   (keydown.space)="toggleEntry(entry, $event)">
+                <div class="entry-icon" [attr.data-tone]="statusView(entry.status).tone" aria-hidden="true">
+                  <mat-icon>{{ kindView(entry.kind).icon }}</mat-icon>
+                </div>
+                <div class="entry-content">
+                  <div class="entry-title">
+                    <span class="entry-description">{{ entry.description }}</span>
+                    <span class="entry-amount">{{ entry.amount | money:entry.currency }}</span>
+                  </div>
+                  <div class="entry-meta">
+                    <time [attr.datetime]="entry.date">{{ date(entry.date) }}</time>
+                    <span class="journal-chip" [attr.title]="journalName(entry.journal)">{{ entry.journal }}</span>
+                    <span class="state-chip" *ngIf="entry.status !== 'DOCUMENT'" [attr.data-tone]="statusView(entry.status).tone">{{ statusView(entry.status).label }}</span>
+                    <span class="mono strong-text" *ngIf="entry.document">{{ entry.document }}</span>
+                    <span *ngIf="entry.partner">{{ entry.partner }}</span>
+                  </div>
+                </div>
+                <mat-icon class="entry-chevron" aria-hidden="true">{{ expandedEntryId() === entry.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+
+              <div class="entry-detail" *ngIf="expandedEntryId() === entry.id" [id]="'entry-detail-' + entry.id">
+                <p class="entry-note" *ngIf="entry.note" [attr.data-tone]="statusView(entry.status).tone">
+                  <mat-icon aria-hidden="true">{{ entry.status === 'TO_REVIEW' ? 'help_outline' : 'auto_fix_high' }}</mat-icon>
+                  <span>{{ entry.note }}</span>
+                </p>
+
+                <div class="table-scroll">
+                  <table class="lines-table">
+                    <caption class="cdk-visually-hidden">Lines of entry {{ entry.id }}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Account</th>
+                        <th scope="col" class="num">Debit</th>
+                        <th scope="col" class="num">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let line of entry.lines">
+                        <th scope="row">
+                          <span class="account-code mono">{{ line.account }}</span>
+                          <span>{{ line.accountName }}</span>
+                          <span class="line-label" *ngIf="line.label">{{ line.label }}</span>
+                        </th>
+                        <td class="num">{{ line.debit ? (line.debit | money:entry.currency) : '' }}</td>
+                        <td class="num">{{ line.credit ? (line.credit | money:entry.currency) : '' }}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr class="total">
+                        <th scope="row">Total</th>
+                        <td class="num">{{ debitsOf(entry) | money:entry.currency }}</td>
+                        <td class="num">{{ creditsOf(entry) | money:entry.currency }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <dl class="detail-grid">
+                  <div class="detail-item">
+                    <dt>Type</dt>
+                    <dd>{{ kindView(entry.kind).label }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Entry</dt>
+                    <dd class="mono">{{ entry.id }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="entry.transferId">
+                    <dt>Transfer ID</dt>
+                    <dd class="mono">{{ entry.transferId }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="entry.pspReference">
+                    <dt>PSP reference</dt>
+                    <dd class="mono">{{ entry.pspReference }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="entry.balanceAccountId">
+                    <dt>Balance account</dt>
+                    <dd class="mono">{{ entry.balanceAccountId }}</dd>
+                  </div>
+                </dl>
+
+                <div class="detail-actions" *ngIf="entry.invoiceId || entry.billId || isCardExpense(entry)">
+                  <a *ngIf="entry.invoiceId" mat-stroked-button class="action-btn" [routerLink]="['/', userId, 'invoices']"
+                     [queryParams]="{ invoice: entry.invoiceId }">
+                    <mat-icon aria-hidden="true">request_quote</mat-icon>
+                    Open the invoice
+                  </a>
+                  <a *ngIf="entry.billId" mat-stroked-button class="action-btn" [routerLink]="['/', userId, 'bills']">
+                    <mat-icon aria-hidden="true">receipt</mat-icon>
+                    Go to bills
+                  </a>
+                  <a *ngIf="isCardExpense(entry)" mat-stroked-button class="action-btn" [routerLink]="['/', userId, 'card-transactions']">
+                    <mat-icon aria-hidden="true">credit_card</mat-icon>
+                    {{ entry.status === 'TO_REVIEW' ? 'Classify in Card transactions' : 'Go to card transactions' }}
+                  </a>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <section class="pending-section" *ngIf="showPending()" aria-labelledby="pending-title">
+            <h2 class="section-title" id="pending-title">
+              Not booked yet <span class="tab-count">{{ pending().length }}</span>
+            </h2>
+            <p class="section-text">These movements join the journal once booked.</p>
+            <ul class="pending-list">
+              <li *ngFor="let movement of pending(); trackBy: trackPending" class="pending-item">
+                <time class="pending-date" [attr.datetime]="movement.date">{{ date(movement.date) }}</time>
+                <span class="pending-description">
+                  {{ movement.description }}<span class="mono" *ngIf="movement.document"> · {{ movement.document }}</span>
+                </span>
+                <span class="state-chip" data-tone="warning">{{ pendingStatusLabel(movement.status) }}</span>
+                <span class="pending-amount">{{ movement.amount | money:movement.currency:'exceptZero' }}</span>
+              </li>
+            </ul>
+          </section>
+        </ng-container>
+
+        <ng-template #noEntries>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">menu_book</mat-icon>
+            <p>No entries in the last {{ days() }} days</p>
+            <span class="empty-hint">Invoices, bills and account movements show here once booked. Or load the demo data.</span>
+            <div class="empty-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadDemoData()" [disabled]="loadingDemo()">
+                <mat-spinner *ngIf="loadingDemo()" diameter="18" aria-hidden="true"></mat-spinner>
+                <mat-icon *ngIf="!loadingDemo()" aria-hidden="true">auto_awesome</mat-icon>
+                {{ loadingDemo() ? 'Loading demo data…' : 'Load demo data' }}
+              </button>
+              <button *ngIf="days() < maxDays" mat-stroked-button type="button" class="fintech-btn"
+                      (click)="setDays(maxDays)">Show {{ maxDays }} days</button>
+              <a mat-stroked-button class="fintech-btn" [routerLink]="['/', userId, 'invoices']">Go to invoices</a>
+            </div>
+          </div>
+        </ng-template>
+      </mat-tab>
+
+      <!-- Payouts -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Payouts <span class="tab-count" *ngIf="payouts().length">{{ payouts().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="payouts().length; else noPayouts">
+          <div class="list-toolbar">
+            <p class="toolbar-text">Each payout with the movements it pays out, to reconcile with your bank statement.</p>
+          </div>
+
+          <ul class="entry-list" aria-label="Payouts">
+            <li *ngFor="let payout of payouts(); trackBy: trackPayout" class="entry-item"
+                [class.expanded]="expandedPayoutId() === payout.transferId">
+              <div class="entry-main" role="button" tabindex="0"
+                   [attr.aria-expanded]="expandedPayoutId() === payout.transferId"
+                   [attr.aria-controls]="'payout-detail-' + payout.transferId"
+                   (click)="togglePayout(payout, $event)"
+                   (keydown.enter)="togglePayout(payout, $event)"
+                   (keydown.space)="togglePayout(payout, $event)">
+                <div class="entry-icon" [attr.data-tone]="payoutCheck(payout).tone" aria-hidden="true">
+                  <mat-icon>{{ payout.destination.startsWith('Bank account') ? 'account_balance' : 'sync_alt' }}</mat-icon>
+                </div>
+                <div class="entry-content">
+                  <div class="entry-title">
+                    <span class="entry-description">Payout to {{ payout.destination }}</span>
+                    <span class="entry-amount">{{ payout.amount | money:payout.currency }}</span>
+                  </div>
+                  <div class="entry-meta">
+                    <time [attr.datetime]="payout.date">{{ date(payout.date) }}</time>
+                    <span>From {{ payout.balanceAccount }} <span class="mono">({{ payout.account }})</span></span>
+                    <span>{{ plural(payout.items.length, 'movement') }}</span>
+                    <span class="state-chip" [attr.data-tone]="payoutCheck(payout).tone">{{ payoutCheck(payout).label }}</span>
+                  </div>
+                </div>
+                <mat-icon class="entry-chevron" aria-hidden="true">{{ expandedPayoutId() === payout.transferId ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+
+              <div class="entry-detail" *ngIf="expandedPayoutId() === payout.transferId" [id]="'payout-detail-' + payout.transferId">
+                <div class="table-scroll">
+                  <table class="lines-table">
+                    <caption class="cdk-visually-hidden">Movements paid out on {{ date(payout.date) }}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Date</th>
+                        <th scope="col">Movement</th>
+                        <th scope="col" class="num">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let item of payout.items">
+                        <td class="nowrap">{{ date(item.date) }}</td>
+                        <td>
+                          <span>{{ item.description }}</span>
+                          <span class="line-label mono" *ngIf="item.document">{{ item.document }}</span>
+                        </td>
+                        <td class="num">{{ item.amount | money:payout.currency:'exceptZero' }}</td>
+                      </tr>
+                      <tr *ngIf="!payout.items.length">
+                        <td colspan="3" class="muted">No movements read since the previous payout.</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th scope="row" colspan="2">Sum of the movements</th>
+                        <td class="num">{{ payout.itemsTotal | money:payout.currency }}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row" colspan="2">Payout</th>
+                        <td class="num">{{ payout.amount | money:payout.currency }}</td>
+                      </tr>
+                      <tr class="total" [attr.data-tone]="payoutCheck(payout).tone">
+                        <th scope="row" colspan="2">
+                          <mat-icon class="check-icon" aria-hidden="true">{{ payoutCheck(payout).icon }}</mat-icon>
+                          Difference
+                        </th>
+                        <td class="num">{{ payout.difference | money:payout.currency:'exceptZero' }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <app-inline-alert *ngIf="payoutExplanation(payout) as explanation" kind="info" [live]="false">{{ explanation }}</app-inline-alert>
+
+                <dl class="detail-grid">
+                  <div class="detail-item">
+                    <dt>Transfer ID</dt>
+                    <dd class="mono">{{ payout.transferId }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Balance account</dt>
+                    <dd class="mono">{{ payout.balanceAccountId }}</dd>
+                  </div>
+                </dl>
+              </div>
+            </li>
+          </ul>
+        </ng-container>
+
+        <ng-template #noPayouts>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">account_balance</mat-icon>
+            <p>No payouts in the last {{ days() }} days</p>
+            <span class="empty-hint">Payouts and sweeps show here with the movements they pay out.</span>
+            <button *ngIf="days() < maxDays" mat-stroked-button type="button" class="fintech-btn"
+                    (click)="setDays(maxDays)">Show {{ maxDays }} days</button>
+          </div>
+        </ng-template>
+      </mat-tab>
+
+      <!-- Exports -->
+      <mat-tab label="Exports">
+        <div class="exports">
+
+          <section class="export-section" aria-labelledby="export-journal-title">
+            <div class="export-head">
+              <mat-icon class="export-icon" aria-hidden="true">table_view</mat-icon>
+              <div>
+                <h2 class="section-title" id="export-journal-title">Journal (CSV)</h2>
+                <p class="section-text">One row per entry line, oldest first. Import it as a general journal.</p>
+              </div>
+            </div>
+            <dl class="export-facts">
+              <div>
+                <dt>Period</dt>
+                <dd>{{ periodLabel() }}, {{ plural(l.summary.entries, 'entry', 'entries') }}</dd>
+              </div>
+              <div>
+                <dt>Columns</dt>
+                <dd>Date, Journal, Entry, Account, Account name, Partner, Description, Debit, Credit, Currency, Document, Reference</dd>
+              </div>
+              <div>
+                <dt>Format</dt>
+                <dd>UTF-8, comma-separated, amounts in major units with a dot</dd>
+              </div>
+            </dl>
+            <div class="export-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="exportCsv()"
+                      [disabled]="loading() || exporting()">
+                <mat-spinner *ngIf="exporting()" diameter="18" aria-hidden="true"></mat-spinner>
+                <mat-icon *ngIf="!exporting()" aria-hidden="true">download</mat-icon>
+                {{ exporting() ? 'Exporting…' : 'Download CSV' }}
+              </button>
+            </div>
+          </section>
+
+          <section class="export-section" aria-labelledby="export-statements-title">
+            <div class="export-head">
+              <mat-icon class="export-icon" aria-hidden="true">receipt_long</mat-icon>
+              <div>
+                <h2 class="section-title" id="export-statements-title">Bank statements (CAMT.053)</h2>
+                <p class="section-text">One statement per day with movements. Import the XML in your accounting software; the PDF is for reading.</p>
+              </div>
+            </div>
+
+            <div class="statements-state" *ngIf="statementsState() === 'loading'" role="status">
+              <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+              Loading statements…
+            </div>
+            <app-inline-alert *ngIf="statementsState() === 'error'" title="Unable to load the statements"
+                              actionLabel="Try again" (action)="loadStatements()"></app-inline-alert>
+            <p class="statements-state" *ngIf="statementsState() === 'noBank'">
+              Statements need a business bank account.
+            </p>
+            <p class="statements-state" *ngIf="statementsState() === 'ready' && !statements().length">
+              No statements yet.
+            </p>
+
+            <ul class="statement-list" *ngIf="statementsState() === 'ready' && statements().length" aria-label="Bank statements">
+              <li *ngFor="let s of statements(); trackBy: trackStatement" class="statement-item">
+                <div class="statement-row">
+                  <span class="statement-period">{{ statementPeriod(s) }}</span>
+                  <span class="currency-chip" *ngIf="s.currency">{{ s.currency }}</span>
+                  <div class="statement-actions">
+                    <button mat-stroked-button type="button" class="action-btn" (click)="downloadStatement(s, 'pdf')"
+                            [disabled]="!!downloading()" [attr.aria-label]="statementDownloadLabel(s, 'pdf')">
+                      <mat-spinner *ngIf="isDownloading(s, 'pdf')" diameter="16" aria-hidden="true"></mat-spinner>
+                      <mat-icon *ngIf="!isDownloading(s, 'pdf')" aria-hidden="true">picture_as_pdf</mat-icon>
+                      PDF
+                    </button>
+                    <button mat-stroked-button type="button" class="action-btn" (click)="downloadStatement(s, 'xml')"
+                            [disabled]="!!downloading()" [attr.aria-label]="statementDownloadLabel(s, 'xml')">
+                      <mat-spinner *ngIf="isDownloading(s, 'xml')" diameter="16" aria-hidden="true"></mat-spinner>
+                      <mat-icon *ngIf="!isDownloading(s, 'xml')" aria-hidden="true">code</mat-icon>
+                      XML
+                    </button>
+                  </div>
+                </div>
+                <app-inline-alert *ngIf="statementError()?.fileName === s.fileName" class="row-error"
+                                  title="Unable to download the statement" [dismissible]="true"
+                                  (dismiss)="statementError.set(null)">{{ statementError()!.message }}</app-inline-alert>
+              </li>
+            </ul>
+          </section>
+
+          <section class="export-section" aria-labelledby="export-chart-title">
+            <div class="export-head">
+              <mat-icon class="export-icon" aria-hidden="true">account_tree</mat-icon>
+              <div>
+                <h2 class="section-title" id="export-chart-title">Chart of accounts</h2>
+                <p class="section-text">The journal's accounts and their totals over the period. Each balance account is a sub-account of 1200.</p>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="lines-table chart-table">
+                <caption class="cdk-visually-hidden">Chart of accounts, with the totals from {{ periodLabel() }}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Account</th>
+                    <th scope="col" class="num">Debit</th>
+                    <th scope="col" class="num">Credit</th>
+                    <th scope="col" class="num">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of chart()" [class.unused]="row.currency === null">
+                    <th scope="row">
+                      <span class="account-code mono">{{ row.code }}</span>
+                      <span>{{ row.name }}</span>
+                    </th>
+                    <td class="num">{{ row.currency ? (row.debit | money:row.currency) : '—' }}</td>
+                    <td class="num">{{ row.currency ? (row.credit | money:row.currency) : '—' }}</td>
+                    <td class="num">{{ row.currency ? balanceText(row.balance, row.currency) : '—' }}</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="total" *ngFor="let total of l.summary.totals">
+                    <th scope="row">Total{{ l.summary.totals.length > 1 ? ' ' + total.currency : '' }}</th>
+                    <td class="num">{{ total.debit | money:total.currency }}</td>
+                    <td class="num">{{ total.credit | money:total.currency }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </section>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+
+</div>

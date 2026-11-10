@@ -22,7 +22,9 @@ mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radi
 /* Statements menu: it opens in an overlay, so these rules target the elements of the template */
 .statements-menu-title { margin: 0; padding: 4px 16px 8px; font-size: 0.75rem; font-weight: 600; color: var(--fintech-text-secondary); }
 .statements-menu-state { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 16px 12px; font-size: 0.8125rem; line-height: 1.4; color: var(--fintech-text-secondary); }
-.statement-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.statement-row { display: flex; align-items: center; gap: 4px; padding-left: 16px; }
+.statement-item { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; font-size: 0.875rem; color: var(--fintech-text); }
+.statement-format.mat-mdc-menu-item { flex: none; width: auto; min-width: 3.5rem; padding: 0 12px; justify-content: center; font-weight: 600; }
 .statement-currency { padding: 2px 8px; border-radius: 999px; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); font-size: 0.75rem; font-weight: 600; }
 
 /* No device warning */

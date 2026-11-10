@@ -54,7 +54,7 @@
           <span class="field-hint">
             The card spends the funds of this account, in its default currency<ng-container *ngIf="currency">: <strong>{{ currency }}</strong></ng-container>.
           </span>
-          <span class="field-error" *ngIf="balanceAccounts.length === 0">No balance account found. A balance account is required to issue a card.</span>
+          <span class="field-error" *ngIf="balanceAccounts.length === 0">No balance account: one is needed to issue a card.</span>
           <span class="field-error" *ngIf="balanceAccounts.length > 0 && form.get('balanceAccountId')?.invalid && form.get('balanceAccountId')?.touched">Select a balance account.</span>
         </div>
 
@@ -105,8 +105,8 @@
           <span class="optional-badge">Recommended</span>
         </div>
         <p class="section-description">
-          Some online payments ask the cardholder for a one-time code (3D Secure). The code is sent by SMS, or by email
-          if there's no mobile number. Without either, those payments are declined.
+          Some online payments ask for a one-time code (3D Secure), sent by SMS or email.
+          Without either, those payments are declined.
         </p>
 
         <div class="form-group">

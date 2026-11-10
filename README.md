@@ -28,6 +28,42 @@ MyPlatform Demo simulates a **marketplace / SaaS platform** that onboards sub-me
 | **Payouts** | Sweep/payout config to external bank accounts · Regular & instant |
 | **Platform Experience** | Transactions overview · Reports · Payouts · Disputes · Pay By Link · Capital |
 | **Security** | SCA device registration & management via WebAuthn (`@adyen/bpscaweb`) |
+| **Invoicing & accounting** | Invoices paid by Pay by Link (PDF with QR code) · Subscriptions charged with stored tokens (ContAuth) and Auto Rescue · Supplier bills paid in one SCA-approved batch or by single-use virtual card · Card expenses with receipts · Matched accounting journal, payout breakdown, CSV and CAMT.053 exports · Onboarding prefilled with the imported company record · Demo data. See [Invoicing & accounting](#invoicing--accounting) |
+
+---
+
+## Invoicing & accounting
+
+With Adyen, a business runs the whole cycle in one system, from the invoice to the reconciled journal entry. The pages sit in the **Invoicing & accounting** section of the menu, and the dashboard links to them.
+
+| Page | What it shows |
+|------|---------------|
+| **Invoices** | Customers and invoices, numbered per account (`INV-2026-0001`), with VAT per line. **Send** creates a payment link: the invoice number as reference, line items with VAT, and an expiry at the due date (70 days at most). The PDF carries the platform branding, a *Pay now* button and a QR code. The invoice turns *Paid* on the AUTHORISATION webhook, or when the page reads the payment link. |
+| **Subscriptions** | Monthly or yearly plans. The first invoice is paid by a link that stores the payment method (`storePaymentMethodMode=enabled`, `recurringProcessingModel=Subscription`). **Run billing cycle now** charges the token with `shopperInteraction=ContAuth`. Each cycle creates its invoice. A refused cycle puts the subscription *Past due*; |
+| **Bills** | Suppliers and their bills, with expense categories (62xx). Several bills are paid in one batch of transfers approved with a single SCA on *Batch transfers*, after a Verification of Payee check of each supplier. The transfer speeds offered are the routes Adyen calculates to the bank of each supplier (`transferRoutes/calculate`), within their amount limits. A bill can also be paid by a single-use virtual card (`maxTransactions = 1`, `maxTotalAmount` = the bill), charged on *Test issued cards*. Needs Bank or Issuing. |
+| **Card transactions** | Each card spend gets a category, a VAT rate, a note and a receipt (image or PDF, 2 MB at most). A *Receipt missing* badge flags the others. |
+| **Accounting** | Journal of the last 30 days by default, built from the Transfers API and matched with invoices, bills and card expenses, with a debit = credit check and the automatic matching rate. Each payout is broken down into the movements since the previous one. Exports: the journal as CSV, the account statements as CAMT.053 XML. |
+| **Onboarding** | At sign-up, organizations and sole proprietorships can **Import company**: registered address, registration number, VAT number and phone, from the Adyen TEST data of `CountryKycData`. The legal entity is created with them, so the hosted onboarding only asks for the rest, and the Onboarding page shows a *Prefilled from your system* badge. |
+
+
+### Webhooks
+
+Send the standard webhooks and the balance platform transfer webhooks (`balancePlatform.transfer.updated`) to `POST /api/webhooks/adyen`. Without them, for example when running locally, invoices and bills read their status from Adyen (`GET /paymentLinks/{id}`, `GET /btl/v4/transfers/{id}`) when their page opens.
+
+### Backend endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/customers/{userId}` | Customers |
+| `/api/invoices/{userId}` | Invoices: send, void, PDF |
+| `/api/subscriptions/{userId}` | Subscriptions: run a cycle, stop Auto Rescue, cancel |
+| `/api/suppliers/{userId}` | Suppliers |
+| `/api/bills/{userId}` | Bills: payee checks, transfer speeds, payment by transfer or by card |
+| `/api/card-expenses/{userId}` | Card expenses and receipts |
+| `/api/ledger/{userId}` | Journal and payouts; `/export` for the CSV |
+| `/api/statements/{userId}/download-xml` | CAMT.053 account statement |
+| `POST /api/demo-data/{userId}` | Demo data |
+| `/api/auth/company-record?country=FR` | Company record imported at sign-up |
 
 ---
 
@@ -122,7 +158,10 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 | **SCA Devices** | `/registeredDevices/{id}` | PATCH | `TransferService` | Manage SCA devices |
 | **SCA Devices** | `/registeredDevices/{id}` | DELETE | `TransferService` | Manage SCA devices |
 | **Transfers** | `/btl/v4/transfers` | POST | `TransferService` (with SCA headers) | Manage transfers |
-| **Transfers** | `/btl/v4/transfers` | GET | `CardTransferService` | Manage transfers |
+| **Transfers** | `/btl/v4/transfers` | GET | `CardTransferService`, `LedgerService` (accounting journal) | Manage transfers |
+| **Transfers** | `/btl/v4/transfers/{id}` | GET | `TransferService` (status of bill payments) | Manage transfers |
+| **Transfers** | `/btl/v4/transfers/approve` | POST | `TransferService` (batch approved with one SCA) | Manage transfers |
+| **Transfers** | `/btl/v4/transfers/cancel` | POST | `TransferService` (bill payment cancelled) | Manage transfers |
 | **Bank Validation** | `/validateBankAccountIdentification` | POST | `BankValidationService` | Manage bank account validation |
 | **CoP** | `/bcl/v2/verifyCounterpartyName` | POST | `BankValidationService` | Manage confirmation of payee |
 | **Auth Sessions** | `authe/api/v1/sessions` | POST | `AdyenSessionService` (platform product) | Manage authentication sessions |
@@ -158,12 +197,18 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 | **Management - Terminals** | `/terminals` | GET | `StoreManagementService` | Management API - Terminals |
 | **Terminal (Cloud)** | Cloud sync payment | POST | `PosService` | Terminal API |
 | **Recurring** | `/disable` | POST | `PaymentCheckoutService` | Recurring API |
+| **Checkout - Payment Links** | `/v71/paymentLinks` | POST | `InvoiceService` (invoices, first payment of subscriptions) | Checkout API |
+| **Checkout - Payment Links** | `/v71/paymentLinks/{id}` | GET, PATCH | `InvoiceService` (status, expiry) | Checkout API |
+| **Checkout - Payments** | `/v71/payments` | POST | `InvoiceService` (subscription cycles, ContAuth) | Checkout API |
+| **Checkout - Cancels** | `/v71/cancels` | POST | `InvoiceService` (stop Auto Rescue) | Checkout API |
+| **Recurring** | `/listRecurringDetails` | POST | `SubscriptionService` (token of a subscription) | Recurring API |
 
 > **Roles to enable in Customer Area** (Settings > Users > API credentials > Roles):
 >
 > | Customer Area role name | Used for |
 > |---|---|
-> | `Checkout webservice role` | Create payment sessions (`/v71/sessions`) |
+> | `Checkout webservice role` | Create payment sessions (`/v71/sessions`), payment links, subscription charges and cancels |
+> | `Recurring role` | List & disable stored payment methods |
 > | `Management API - Stores read and write` | Create stores |
 > | `Management API - Payment methods read and write` | Request & list payment methods per store |
 > | `Management API - Split configuration read and write` | Create & list split configurations |
@@ -198,26 +243,31 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 ```
 myplatform-demo/
 ├── backend/
-│   └── src/main/java/com/myplatform/demo/
-│       ├── controller/          21 REST controllers
-│       ├── service/             22 services (Adyen API + business logic)
-│       ├── model/               JPA entities
-│       ├── dto/                 Data Transfer Objects
-│       ├── repository/          Spring Data repositories
-│       ├── configuration/       Config beans
-│       ├── exception/           Error handling
-│       └── util/                PDF generation
+│   ├── src/main/java/com/myplatform/demo/
+│   │   ├── controller/          32 REST controllers
+│   │   ├── service/             43 services (Adyen API + business logic)
+│   │   ├── model/               JPA entities
+│   │   ├── dto/                 Data Transfer Objects
+│   │   ├── repository/          Spring Data repositories
+│   │   ├── configuration/       Config beans
+│   │   ├── exception/           Error handling
+│   │   └── util/                PDF generation, invoicing & accounting logic (VAT, ledger rules, CSV)
+│   └── src/test/java/           JUnit tests of the pure logic
 │
 ├── frontend/src/app/
-│       ├── login / signup       Authentication & registration
+│       ├── login / signup       Authentication & registration (company import)
 │       ├── layout               Sidebar + topbar shell
-│       ├── dashboard            Onboarding, KYC, bank account, external accounts
+│       ├── dashboard            Onboarding, KYC, bank account, external accounts, demo data
+│       ├── invoices             Customers & invoices (Pay by Link, PDF)
+│       ├── subscriptions        Subscriptions (token charges, Auto Rescue)
+│       ├── bills                Suppliers & bills (batch transfers, single-use cards)
+│       ├── accounting           Journal, payouts, CSV & CAMT.053 exports
 │       ├── checkout             Adyen Web SDK payment
 │       ├── payment              Transactions (Platform Experience)
 │       ├── transfer             Bank transfers + SCA WebAuthn
 │       ├── card-create          Virtual card issuance
 │       ├── card-list            Card management & data reveal
-│       ├── card-transactions    Card transaction history
+│       ├── card-transactions    Card transaction history, expenses & receipts
 │       ├── issuing-checkout     Test Issued Cards (Visa/MC only)
 │       ├── store                Store & payment method setup
 │       ├── payout               Payout configuration
@@ -273,6 +323,7 @@ Edit `backend/src/main/resources/application.properties`:
 | `adyen.issuing.merchantAccount` | Merchant account for issuing payments |
 | `adyen.issuing.clientKey` | Client key for issuing checkout frontend |
 | `adyen.issuing.userId` | Platform userId used for issuing payment context |
+| `app.subscriptions.auto-rescue` | `true` only if Adyen enabled Auto Rescue on the merchant account (default `false`). Subscriptions paid by card then offer Auto Rescue: their charges carry `autoRescue` and `maxDaysToRescue`, and the test outcomes include rescue scenarios |
 
 ### 3. Start the backend
 
@@ -313,7 +364,6 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push & PR:
 |-----|-------|---------|
 | **Backend** | Java 17 (Temurin) | `./mvnw compile -B` |
 | **Frontend** | Node.js 22 | `npm ci && npm run build` |
-
 ---
 
 ## Tech Stack
@@ -331,3 +381,4 @@ GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push & PR:
 | Database | SQLite | 3.42 |
 | PDF generation | iText | 8.0 |
 | JWT | jose4j | 0.9.3 |
+| Tests | JUnit 5 + AssertJ (`spring-boot-starter-test`) | Spring Boot 3.2 |

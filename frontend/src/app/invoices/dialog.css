@@ -1,0 +1,88 @@
+/* Shared by the invoice and customer dialogs. */
+.dialog-title {
+  font-family: var(--fintech-font);
+  font-weight: 700;
+  color: var(--fintech-text);
+}
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 4px;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.field-row.three {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+.field { min-width: 0; }
+.field > label .optional {
+  font-weight: 400;
+  color: var(--fintech-text-secondary);
+}
+select.fintech-input {
+  appearance: none;
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 15px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+textarea.fintech-input {
+  min-height: 72px;
+  resize: vertical;
+}
+.text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  border: none;
+  background: none;
+  padding: 4px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.text-btn mat-icon { font-size: 1.125rem; }
+.dialog-actions {
+  gap: 8px;
+  padding: 8px 24px 20px;
+  flex-wrap: wrap;
+}
+.dialog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  border: none;
+  border-radius: 24px;
+  padding: 10px 24px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--fintech-primary);
+  color: var(--fintech-on-primary);
+}
+.dialog-btn.secondary { background: var(--fintech-surface-muted); color: var(--fintech-text); }
+.dialog-btn:disabled { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); cursor: default; }
+.dialog-btn mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+@media (max-width: 600px) {
+  .field-row,
+  .field-row.three { grid-template-columns: 1fr; }
+}
+@media (pointer: coarse) {
+  .dialog-btn,
+  .text-btn { min-height: 44px; }
+}
+@media (forced-colors: active) {
+  .dialog-btn { border: 1px solid ButtonText; }
+}

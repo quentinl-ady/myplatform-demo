@@ -1,0 +1,111 @@
+<h2 mat-dialog-title class="dialog-title">New subscription</h2>
+<mat-dialog-content>
+  <form [formGroup]="form" id="subscription-form" class="dialog-form" (ngSubmit)="submit()" novalidate>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="subscription-customer">Customer</label>
+        <select id="subscription-customer" class="fintech-input" formControlName="customerId"
+                [attr.aria-invalid]="!!customerError"
+                [attr.aria-describedby]="customerError ? 'subscription-customer-error' : (selectedCustomer() ? 'subscription-customer-help' : null)">
+          <option [ngValue]="null" disabled>{{ customers().length ? 'Choose a customer' : 'No customers yet' }}</option>
+          <option *ngFor="let c of customers()" [ngValue]="c.id">{{ c.displayName }}{{ c.company ? ' · ' + c.name : '' }}</option>
+        </select>
+        <span class="helper-text error" id="subscription-customer-error" *ngIf="customerError as error">{{ error }}</span>
+        <span class="helper-text" id="subscription-customer-help" *ngIf="!customerError && selectedCustomer() as c">The invoices go to {{ c.email }}.</span>
+        <button type="button" class="text-btn" (click)="addCustomer()">
+          <mat-icon aria-hidden="true">person_add</mat-icon>New customer
+        </button>
+      </div>
+      <div class="field">
+        <label for="subscription-plan">Plan</label>
+        <input id="subscription-plan" class="fintech-input" formControlName="plan" maxlength="120" list="subscription-plans"
+               placeholder="e.g. Website care plan" autocomplete="off"
+               [attr.aria-invalid]="!!planError"
+               [attr.aria-describedby]="planError ? 'subscription-plan-error' : 'subscription-plan-help'" />
+        <datalist id="subscription-plans">
+          <option *ngFor="let plan of planSuggestions" [value]="plan"></option>
+        </datalist>
+        <span class="helper-text error" id="subscription-plan-error" *ngIf="planError as error">{{ error }}</span>
+        <span class="helper-text" id="subscription-plan-help" *ngIf="!planError">Each invoice shows it with the period it bills.</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="field-label" id="subscription-frequency-label">Billing</span>
+      <mat-button-toggle-group class="choice-toggle" aria-labelledby="subscription-frequency-label" formControlName="frequency">
+        <mat-button-toggle value="MONTHLY">Monthly</mat-button-toggle>
+        <mat-button-toggle value="YEARLY">Yearly</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    <div class="field-row three">
+      <div class="field">
+        <label for="subscription-price">Price per {{ period() }} ({{ currency }}, excl. {{ taxLabel }})</label>
+        <input id="subscription-price" type="number" inputmode="decimal" min="0" [step]="priceStep"
+               class="fintech-input" formControlName="price" placeholder="0.00"
+               [attr.aria-invalid]="!!priceError"
+               [attr.aria-describedby]="priceError ? 'subscription-price-error' : null" />
+        <span class="helper-text error" id="subscription-price-error" *ngIf="priceError as error">{{ error }}</span>
+      </div>
+      <div class="field">
+        <label for="subscription-rate">{{ taxLabel }}</label>
+        <select id="subscription-rate" class="fintech-input" formControlName="vatRate">
+          <option *ngFor="let rate of rates" [ngValue]="rate">{{ formatRate(rate) }}</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="subscription-start">Start date</label>
+        <input id="subscription-start" type="date" class="fintech-input" formControlName="startDate"
+               [attr.min]="minStart" [attr.max]="maxStart" aria-describedby="subscription-start-help" />
+        <span class="helper-text" id="subscription-start-help">{{ startHelp }}</span>
+      </div>
+    </div>
+
+    <section class="rescue" *ngIf="settings.autoRescueAvailable; else noRescue" aria-label="Auto Rescue">
+      <mat-slide-toggle formControlName="autoRescue" aria-describedby="subscription-rescue-help">
+        Retry refused card charges with Auto Rescue
+      </mat-slide-toggle>
+      <p class="helper-text" id="subscription-rescue-help">
+        Refused card charges are retried at the best time. SEPA Direct Debit charges aren't retried.
+      </p>
+      <div class="field rescue-days" *ngIf="autoRescue()">
+        <label for="subscription-rescue-days">Retry for (days)</label>
+        <input id="subscription-rescue-days" type="number" inputmode="numeric" min="1" [attr.max]="settings.maxRescueDays" step="1"
+               class="fintech-input" formControlName="rescueDays"
+               [attr.aria-invalid]="!!rescueError"
+               [attr.aria-describedby]="rescueError ? 'subscription-rescue-days-error' : 'subscription-rescue-days-help'" />
+        <span class="helper-text error" id="subscription-rescue-days-error" *ngIf="rescueError as error">{{ error }}</span>
+        <span class="helper-text" id="subscription-rescue-days-help" *ngIf="!rescueError">
+          From 1 to {{ settings.maxRescueDays }} days. Recommended: {{ settings.defaultRescueDays }}.
+        </span>
+      </div>
+    </section>
+    <ng-template #noRescue>
+      <p class="helper-text rescue-off">
+        Auto Rescue isn't enabled: a refused charge makes the subscription past due.
+      </p>
+    </ng-template>
+
+    <div class="summary-box">
+      <mat-icon aria-hidden="true">autorenew</mat-icon>
+      <div aria-live="polite">
+        <p class="summary-amount" *ngIf="amounts() as a; else noPrice">{{ a.gross | money:currency }} per {{ period() }}, {{ taxLabel }} included</p>
+        <ng-template #noPrice><p class="summary-amount">Enter the price of the plan</p></ng-template>
+        <p>The first invoice is sent now with a payment link. The payment method used is then charged each cycle.</p>
+      </div>
+    </div>
+
+    <app-inline-alert *ngIf="settings.issue as issue" kind="info" [live]="false"
+                      title="Subscriptions can't start yet">{{ issue }}</app-inline-alert>
+    <app-inline-alert *ngIf="error() as message" title="Unable to create the subscription" [dismissible]="true"
+                      (dismiss)="error.set(null)">{{ message }}</app-inline-alert>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end" class="dialog-actions">
+  <button type="button" class="dialog-btn secondary" (click)="close()" [disabled]="submitting()">Cancel</button>
+  <button type="submit" form="subscription-form" class="dialog-btn" [disabled]="submitting() || !!settings.issue">
+    <mat-spinner *ngIf="submitting()" diameter="16" aria-hidden="true"></mat-spinner>
+    <span>{{ submitting() ? 'Creating…' : 'Create and send first invoice' }}</span>
+  </button>
+</mat-dialog-actions>

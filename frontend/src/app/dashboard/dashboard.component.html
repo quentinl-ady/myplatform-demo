@@ -1,7 +1,13 @@
 <div class="fintech-wrapper">
 
   <header class="header-section">
-    <h1>Onboarding</h1>
+    <div class="title-row">
+      <h1>Onboarding</h1>
+      <span *ngIf="user()?.companyImported" class="status-chip" data-tone="info">
+        <mat-icon aria-hidden="true">cloud_done</mat-icon>
+        Prefilled from your system
+      </span>
+    </div>
     <p>Verify your business and set up the products enabled for your account.</p>
   </header>
 
@@ -73,6 +79,30 @@
           <span class="quick-desc">{{ qa.description }}</span>
         </a>
       </div>
+      <div class="demo-data">
+        <mat-icon class="demo-data-icon" aria-hidden="true">auto_awesome</mat-icon>
+        <div class="demo-data-text">
+          <h3 class="demo-data-title">Demo data</h3>
+          <p>Sample customers, invoices, a subscription, suppliers and bills.</p>
+        </div>
+        <a *ngIf="demoLoaded(); else loadDemoButton" mat-flat-button class="fintech-btn secondary"
+           [routerLink]="['/', userId, 'invoices']">Open invoices</a>
+        <ng-template #loadDemoButton>
+          <button mat-flat-button type="button" class="fintech-btn secondary" (click)="loadDemoData()" [disabled]="loadingDemo()">
+            <mat-spinner *ngIf="loadingDemo()" diameter="18" aria-hidden="true"></mat-spinner>
+            {{ loadingDemo() ? 'Loading demo data…' : 'Load demo data' }}
+          </button>
+        </ng-template>
+      </div>
+      <app-inline-alert *ngIf="demoError() as error" class="alert-after" title="Unable to load the demo data"
+                        actionLabel="Try again" (action)="loadDemoData()" [dismissible]="true"
+                        (dismiss)="demoError.set(null)">{{ error }}</app-inline-alert>
+      <app-inline-alert *ngIf="demoWarnings().length" class="alert-after" kind="warning"
+                        title="Part of the demo data couldn't be created" [dismissible]="true" (dismiss)="demoWarnings.set([])">
+        <ul class="alert-list">
+          <li *ngFor="let warning of demoWarnings()">{{ warning }}</li>
+        </ul>
+      </app-inline-alert>
     </section>
 
     <!-- Verification status -->
@@ -80,7 +110,7 @@
       <div class="card-head">
         <div>
           <h2 id="verification-title" class="mat-h3 card-title">Verification status</h2>
-          <p class="card-subtitle">Adyen enables each product once your business is verified.</p>
+          <p class="card-subtitle">Each product is enabled once your business is verified.</p>
         </div>
         <button mat-flat-button type="button" class="fintech-btn secondary" (click)="checkOnboarding()" [disabled]="loading()">
           <mat-spinner *ngIf="loading()" diameter="18"></mat-spinner>
@@ -130,7 +160,7 @@
       <div class="action-row">
         <div class="action-text">
           <h3 class="mat-h4">Hosted onboarding</h3>
-          <p>Add or update your business details on Adyen's secure onboarding page. It opens in a new tab.</p>
+          <p>Add or update your business details on the secure onboarding page.</p>
         </div>
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="openHostedOnboarding()" [disabled]="openingOnboarding()">
           <mat-spinner *ngIf="openingOnboarding()" diameter="18"></mat-spinner>
@@ -190,8 +220,8 @@
               <h3 class="mat-h4">{{ bs.bankingAllowed ? 'Ready to create' : 'Not available yet' }}</h3>
               <p id="bank-provision-help">
                 {{ bs.bankingAllowed
-                  ? 'Banking is enabled on the account. The business bank account can be created now.'
-                  : 'Adyen enables banking once your verification is complete. This card updates automatically.' }}
+                  ? 'You can create the business bank account now.'
+                  : 'Banking is enabled once your verification is complete.' }}
               </p>
               <p class="bank-capability" *ngIf="!bs.bankingAllowed && status()?.bankingStatus as banking">
                 Banking verification: <strong>{{ getCapabilityStatus(banking).label }}</strong>

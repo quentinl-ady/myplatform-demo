@@ -49,7 +49,7 @@
     <div class="empty-state" *ngIf="!isLoading && !transfersError && transfers.length === 0">
       <mat-icon aria-hidden="true">receipt_long</mat-icon>
       <h2>No transactions yet</h2>
-      <p *ngIf="getSelectedCard() as card">Payments made with the card ending {{ card.lastFour }} appear here. Use the card online or from Test issued cards, then select Refresh.</p>
+      <p *ngIf="getSelectedCard() as card">Payments with the card ending {{ card.lastFour }} appear here. Try it from Test issued cards, then select Refresh.</p>
     </div>
 
     <!-- A list of buttons: each row opens the transaction details. The column header is visual only. -->
@@ -68,6 +68,9 @@
             <span class="col-merchant">
               <span class="merchant-name">{{ t.merchantName || 'Unknown merchant' }}</span>
               <span class="merchant-mcc" *ngIf="t.mcc">{{ t.mcc }} · {{ getMccLabel(t.mcc) }}</span>
+              <span class="merchant-booking" *ngIf="bookingLabel(t) as booking">
+                <mat-icon aria-hidden="true">{{ t.billId ? 'receipt' : 'bookmark' }}</mat-icon>{{ booking }}
+              </span>
             </span>
             <span class="col-type">
               <span class="channel-badge" [class.ecom]="t.processingType === 'ecommerce'" [class.pos]="t.processingType === 'pos'">
@@ -77,6 +80,7 @@
             <span class="col-status">
               <span class="status-badge" [ngClass]="'st-' + t.status">{{ statusLabel(t.status) }}</span>
               <span class="tx-reason" *ngIf="t.reason && t.reason !== 'approved'">{{ humanize(t.reason) }}</span>
+              <span class="receipt-badge" *ngIf="receiptMissing(t)">Receipt missing</span>
             </span>
             <span class="col-amount" [class.credit]="isCredit(t)">
               <span class="amount-value">{{ formatAmount(signedAmount(t), t.currency) }}</span>
@@ -162,6 +166,154 @@
               <dd class="value mono">{{ selectedTransfer.reference }}</dd>
             </div>
           </dl>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedTransfer.billId">
+          <h3>Accounting</h3>
+          <p class="booking-status" data-tone="success">
+            <mat-icon aria-hidden="true">receipt</mat-icon>
+            <span>Paid with the single-use card of bill <strong>{{ selectedTransfer.billNumber || selectedTransfer.billId }}</strong>. The journal books it to 2100 Accounts payable, matched to the bill.</span>
+          </p>
+          <a mat-stroked-button class="fintech-btn secondary" [routerLink]="['/', userId, 'bills']">
+            <mat-icon aria-hidden="true">receipt</mat-icon>
+            Go to bills
+          </a>
+        </div>
+
+        <div class="detail-section" *ngIf="!selectedTransfer.billId && (canClassify(selectedTransfer) || selectedTransfer.expense)">
+          <h3>Expense</h3>
+
+          <div class="expense-loading" *ngIf="!expenseSettings && isLoadingExpenseSettings" role="status">
+            <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+            <span>Loading the expense categories…</span>
+          </div>
+          <app-inline-alert *ngIf="!expenseSettings && !isLoadingExpenseSettings && expenseSettingsError"
+                            title="Unable to load the expense categories" actionLabel="Try again"
+                            (action)="loadExpenseSettings()">{{ expenseSettingsError }}</app-inline-alert>
+
+          <ng-container *ngIf="expenseSettings as settings">
+            <p class="booking-status" [attr.data-tone]="selectedTransfer.expense ? 'success' : 'warning'">
+              <mat-icon aria-hidden="true">{{ selectedTransfer.expense ? 'task_alt' : 'help_outline' }}</mat-icon>
+              <span *ngIf="selectedTransfer.expense as expense">The journal books it to <strong>{{ expense.category }} {{ expense.categoryName }}</strong>.</span>
+              <span *ngIf="!selectedTransfer.expense">Not classified yet: the journal books it to 1900 Suspense until you choose its category.</span>
+            </p>
+
+            <form class="expense-form" (ngSubmit)="saveExpense()">
+              <div class="expense-fields">
+                <div class="expense-field category">
+                  <label for="expense-category" class="field-label">Category</label>
+                  <select id="expense-category" name="category" class="fintech-input" [(ngModel)]="expenseCategory"
+                          [disabled]="!!expenseBusy"
+                          [attr.aria-describedby]="!selectedTransfer.expense && selectedTransfer.suggestedCategory === expenseCategory ? 'expense-category-hint' : null">
+                    <option *ngFor="let category of expenseCategories" [ngValue]="category.code">{{ category.code }} · {{ category.name }}</option>
+                  </select>
+                  <span class="field-hint" id="expense-category-hint"
+                        *ngIf="!selectedTransfer.expense && selectedTransfer.suggestedCategory === expenseCategory">Suggested from the merchant category</span>
+                </div>
+                <div class="expense-field">
+                  <label for="expense-rate" class="field-label">{{ settings.taxLabel }} rate</label>
+                  <select id="expense-rate" name="vatRate" class="fintech-input" [(ngModel)]="expenseVatRate" [disabled]="!!expenseBusy">
+                    <option *ngFor="let rate of expenseRates" [ngValue]="rate">{{ formatRate(rate) }}</option>
+                  </select>
+                </div>
+                <div class="expense-field note">
+                  <label for="expense-note" class="field-label">Note <span class="optional">(optional)</span></label>
+                  <input id="expense-note" name="note" class="fintech-input" type="text" autocomplete="off"
+                         placeholder="Lunch with a customer, train to Lyon…" [maxlength]="maxNote"
+                         [(ngModel)]="expenseNote" [disabled]="!!expenseBusy">
+                </div>
+              </div>
+
+              <dl class="expense-amounts" *ngIf="expenseAmounts(selectedTransfer) as amounts">
+                <div>
+                  <dt>Excluding {{ settings.taxLabel }}</dt>
+                  <dd>{{ money(amounts.net, selectedTransfer.currency) }}</dd>
+                </div>
+                <div>
+                  <dt>{{ settings.taxLabel }} {{ formatRate(expenseVatRate) }}</dt>
+                  <dd>{{ money(amounts.tax, selectedTransfer.currency) }}</dd>
+                </div>
+                <div class="total">
+                  <dt>Paid</dt>
+                  <dd>{{ money(amounts.gross, selectedTransfer.currency) }}</dd>
+                </div>
+              </dl>
+
+              <app-inline-alert *ngIf="expenseError" title="Unable to save the expense" [dismissible]="true"
+                                (dismiss)="expenseError = null">{{ expenseError }}</app-inline-alert>
+
+              <div class="expense-actions" *ngIf="confirming !== 'remove'">
+                <button mat-flat-button type="submit" class="fintech-btn primary"
+                        [disabled]="!!expenseBusy || !expenseChanged(selectedTransfer)">
+                  <mat-spinner *ngIf="expenseBusy === 'save'" diameter="18" aria-hidden="true"></mat-spinner>
+                  {{ expenseBusy === 'save' ? 'Saving…' : selectedTransfer.expense ? 'Save changes' : 'Classify' }}
+                </button>
+                <button #removeButton *ngIf="selectedTransfer.expense" mat-stroked-button type="button" class="fintech-btn secondary"
+                        (click)="askConfirm('remove')" [disabled]="!!expenseBusy">
+                  <mat-spinner *ngIf="expenseBusy === 'remove'" diameter="18" aria-hidden="true"></mat-spinner>
+                  {{ expenseBusy === 'remove' ? 'Removing…' : 'Remove category' }}
+                </button>
+              </div>
+              <div class="confirm-bar" *ngIf="confirming === 'remove'" role="group" aria-labelledby="confirm-remove-text">
+                <span id="confirm-remove-text">Remove the category{{ selectedTransfer.expense?.receipt ? ' and the receipt' : '' }}? The journal books the payment to Suspense again.</span>
+                <div class="confirm-actions">
+                  <button #confirmButton mat-flat-button type="button" class="fintech-btn danger" (click)="removeExpense()">Remove</button>
+                  <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelConfirm()">Cancel</button>
+                </div>
+              </div>
+            </form>
+
+            <div class="receipt-box" [class.missing]="receiptMissing(selectedTransfer)">
+              <h4 class="receipt-title">Receipt</h4>
+              <ng-container *ngIf="selectedTransfer.expense?.receipt as receipt; else noReceipt">
+                <div class="receipt-file">
+                  <mat-icon aria-hidden="true">{{ isPdf(receipt.contentType) ? 'picture_as_pdf' : 'image' }}</mat-icon>
+                  <div class="receipt-info">
+                    <span class="receipt-name">{{ receipt.name }}</span>
+                    <span class="receipt-meta">{{ fileSize(receipt.size) }}<ng-container *ngIf="receipt.uploadedAt"> · added {{ formatDateTime(receipt.uploadedAt) }}</ng-container></span>
+                  </div>
+                </div>
+                <div class="receipt-actions" *ngIf="confirming !== 'deleteReceipt'">
+                  <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="downloadReceipt()" [disabled]="!!expenseBusy">
+                    <mat-spinner *ngIf="expenseBusy === 'download'" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="expenseBusy !== 'download'" aria-hidden="true">download</mat-icon>
+                    Download
+                  </button>
+                  <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="receiptInput.click()" [disabled]="!!expenseBusy">
+                    <mat-spinner *ngIf="expenseBusy === 'upload'" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="expenseBusy !== 'upload'" aria-hidden="true">upload_file</mat-icon>
+                    {{ expenseBusy === 'upload' ? 'Replacing…' : 'Replace' }}
+                  </button>
+                  <button #deleteReceiptButton mat-stroked-button type="button" class="fintech-btn secondary"
+                          (click)="askConfirm('deleteReceipt')" [disabled]="!!expenseBusy">
+                    <mat-spinner *ngIf="expenseBusy === 'deleteReceipt'" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="expenseBusy !== 'deleteReceipt'" aria-hidden="true">delete</mat-icon>
+                    Delete
+                  </button>
+                </div>
+                <div class="confirm-bar" *ngIf="confirming === 'deleteReceipt'" role="group" aria-labelledby="confirm-receipt-text">
+                  <span id="confirm-receipt-text">Delete the receipt {{ receipt.name }}?</span>
+                  <div class="confirm-actions">
+                    <button #confirmButton mat-flat-button type="button" class="fintech-btn danger" (click)="deleteReceipt()">Delete</button>
+                    <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="cancelConfirm()">Cancel</button>
+                  </div>
+                </div>
+              </ng-container>
+              <ng-template #noReceipt>
+                <p class="receipt-empty">
+                  {{ receiptMissing(selectedTransfer) ? 'Receipt missing. Add it for your accountant' : 'No receipt' }}: a PDF or an image, up to {{ receiptLimit() }}.
+                </p>
+                <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="receiptInput.click()" [disabled]="!!expenseBusy">
+                  <mat-spinner *ngIf="expenseBusy === 'upload'" diameter="16" aria-hidden="true"></mat-spinner>
+                  <mat-icon *ngIf="expenseBusy !== 'upload'" aria-hidden="true">upload_file</mat-icon>
+                  {{ expenseBusy === 'upload' ? 'Adding…' : 'Add receipt' }}
+                </button>
+              </ng-template>
+              <input #receiptInput type="file" hidden [accept]="receiptAccept()" (change)="onReceiptChosen($event)">
+              <app-inline-alert *ngIf="receiptError" title="Receipt not saved" [dismissible]="true"
+                                (dismiss)="receiptError = null">{{ receiptError }}</app-inline-alert>
+            </div>
+          </ng-container>
         </div>
 
         <div class="detail-section" *ngIf="selectedTransfer.merchantName">

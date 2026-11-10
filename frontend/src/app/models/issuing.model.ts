@@ -1,3 +1,5 @@
+import { CardExpense } from './card-expense.model';
+
 export interface TransactionRuleRequest {
   type: string;
   value?: number;
@@ -111,4 +113,11 @@ export interface CardTransfer {
   validationFacts: CardTransferValidationFact[];
   events: CardTransferEvent[];
   transactionRulesResult: CardTransferRulesResult;
+  /** The expense account the merchant category code suggests, e.g. 6240. */
+  suggestedCategory?: string | null;
+  /** How the user classified the payment, null when they didn't. */
+  expense?: CardExpense | null;
+  /** The bill the single-use card of the payment pays, null for another card. */
+  billId?: number | null;
+  billNumber?: string | null;
 }

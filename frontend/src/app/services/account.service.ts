@@ -62,4 +62,12 @@ export class AccountService {
       responseType: 'blob'
     });
   }
+
+  /** The CAMT.053 file as Adyen generated it, for accounting software. */
+  downloadStatementXml(userId: string, fileName: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/api/statements/${userId}/download-xml`, {
+      params: {fileName},
+      responseType: 'blob'
+    });
+  }
 }

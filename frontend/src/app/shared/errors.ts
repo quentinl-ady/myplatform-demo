@@ -63,7 +63,7 @@ function extractMessage(body: unknown, depth = 0): string | null {
 }
 
 const WEBAUTHN_MESSAGES: Record<string, string> = {
-  NotAllowedError: 'Authentication was cancelled or timed out. Try again and approve the request with your passkey (Touch ID, Face ID, Windows Hello or a security key).',
+  NotAllowedError: 'Authentication was cancelled or timed out. Try again with your passkey.',
   InvalidStateError: 'A passkey for this account is already registered on this device.',
   NotSupportedError: 'This browser or device does not support passkeys.',
   SecurityError: 'Passkeys are blocked on this page. Open the app on its HTTPS address and try again.',

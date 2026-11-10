@@ -46,6 +46,8 @@ public class User {
     private Boolean issuing;
     private String bankAccountId;
     private String bankAccountNumber;
+    /** True when the company details of the legal entity were imported at sign-up. */
+    private Boolean companyImported;
 
     @Column(columnDefinition = "integer default 100")
     private Integer approvalPercentage = 100;

@@ -141,6 +141,84 @@
   margin-top: 8px;
 }
 
+/* --- COMPANY IMPORT --- */
+.company-import {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--fintech-bg);
+  margin-bottom: 8px;
+}
+.company-import .field-label {
+  margin-top: 0;
+}
+.company-import .hint {
+  margin: 0;
+}
+.company-import-btn,
+.company-remove {
+  align-self: flex-start;
+  border-radius: 24px;
+}
+.company-import-btn mat-spinner {
+  display: inline-block;
+  --mdc-circular-progress-active-indicator-color: currentColor;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.company-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--fintech-surface);
+  border: 1px solid var(--fintech-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+.company-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fintech-success);
+}
+.company-preview-title mat-icon {
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.company-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+.company-fields .company-wide {
+  grid-column: 1 / -1;
+}
+.company-fields dt {
+  font-size: 0.75rem;
+  color: var(--fintech-text-secondary);
+}
+.company-fields dd {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+  color: var(--fintech-text);
+  overflow-wrap: anywhere;
+}
+.company-fields .mono {
+  font-family: var(--fintech-font-mono);
+  font-size: 0.8125rem;
+}
+.company-line {
+  display: block;
+}
+
 /* --- SUBMIT --- */
 .submit-area {
   display: flex;
@@ -184,5 +262,8 @@
   .country-row {
     flex-direction: column;
     gap: 0;
+  }
+  .company-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

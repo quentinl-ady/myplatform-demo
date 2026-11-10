@@ -41,6 +41,12 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   return date ? DATE_TIME_FORMAT.format(date) : '';
 }
 
+/** "15 Oct 2026" */
+export function formatDate(value: string | Date | null | undefined): string {
+  const date = value instanceof Date ? value : parseServerDate(value);
+  return date ? DATE_FORMAT.format(date) : '';
+}
+
 /** "Just now", "5 min ago", "3 hours ago", "2 days ago", then "15 Oct 2026". */
 export function formatTimeAgo(value: string | Date | null | undefined, now: Date = new Date()): string {
   const date = value instanceof Date ? value : parseServerDate(value);

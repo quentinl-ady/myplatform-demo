@@ -30,7 +30,7 @@
 
     <!-- Registration of this phone -->
     <ng-container *ngIf="type() === 'pairing'">
-      <p class="lead">This phone becomes a trusted device of this account: to approve a transfer with it, scan the QR code your computer shows.</p>
+      <p class="lead">This phone becomes a trusted device. To approve a transfer, scan the QR code on your computer.</p>
       <dl class="rows">
         <div class="row"><dt>Phone name</dt><dd>{{ summary()['deviceName'] || defaultName }}</dd></div>
         <div class="row"><dt>Browser</dt><dd>{{ label }}</dd></div>

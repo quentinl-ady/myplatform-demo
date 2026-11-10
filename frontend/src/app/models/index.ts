@@ -12,3 +12,8 @@ export * from './standing-order.model';
 export * from './branding.model';
 export * from './webhook.model';
 export * from './api-log.model';
+export * from './invoice.model';
+export * from './subscription.model';
+export * from './ledger.model';
+export * from './bill.model';
+export * from './card-expense.model';

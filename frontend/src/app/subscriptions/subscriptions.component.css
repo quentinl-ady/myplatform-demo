@@ -1,0 +1,92 @@
+/* On top of the styles of the invoices page. */
+
+.per {
+  font-weight: 400;
+  color: var(--fintech-text-secondary);
+}
+.plan-name {
+  color: var(--fintech-text);
+  overflow-wrap: anywhere;
+}
+
+.pay-icon {
+  font-size: 2rem;
+  width: 2rem;
+  height: 2rem;
+  color: var(--fintech-text-tertiary);
+}
+.pay-text {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--fintech-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Billing cycles */
+.cycles-table td { vertical-align: top; }
+.nowrap { white-space: nowrap; }
+.invoice-link {
+  color: var(--fintech-text);
+  text-underline-offset: 2px;
+}
+.cycle-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.cycle-note {
+  font-size: 0.75rem;
+  color: var(--fintech-text-secondary);
+}
+.cycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 6px;
+}
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link-btn:disabled {
+  color: var(--fintech-text-secondary);
+  cursor: default;
+}
+.link-btn:focus-visible {
+  outline: 2px solid var(--fintech-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Test outcomes. Menu items come from this template, so these rules reach the overlay. */
+.outcome-item {
+  height: auto;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.outcome-label {
+  display: block;
+  font-weight: 600;
+}
+.outcome-hint {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  white-space: normal;
+  color: var(--fintech-text-secondary);
+}
+
+@media (pointer: coarse) {
+  .link-btn { min-height: 44px; }
+}

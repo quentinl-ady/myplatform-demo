@@ -2,7 +2,7 @@
 
   <div class="header-section">
     <h1>Checkout</h1>
-    <p>Test the Adyen Drop-in: take a payment, save a card with a zero-amount authorisation, or charge a saved card.</p>
+    <p>Take a payment, save a card, or charge a saved card.</p>
   </div>
 
   <div class="loading-state" *ngIf="loading()" role="status">
@@ -96,7 +96,7 @@
       <mat-card class="dropin-card" [class.active]="dropinActive() || paymentOutcome()">
         <div class="empty-dropin" *ngIf="!dropinActive() && !paymentOutcome() && !submitting()">
           <mat-icon aria-hidden="true">shopping_cart_checkout</mat-icon>
-          <p>Enter the payment details, then select <strong>Continue to payment</strong> to load the payment form.</p>
+          <p>The payment form appears here.</p>
         </div>
 
         <div class="empty-dropin" *ngIf="submitting() && !dropinActive()" role="status">
@@ -126,7 +126,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Save a card (zero-amount authorisation)</h2>
-        <p class="section-desc">Store a card for future payments with a zero-amount authorisation. The card is saved for unscheduled card-on-file payments.</p>
+        <p class="section-desc">Save a card for later payments.</p>
 
         <form [formGroup]="tokenizeForm" (ngSubmit)="onTokenizeSubmit()" class="fintech-form" novalidate>
 
@@ -174,7 +174,7 @@
       <mat-card class="dropin-card" [class.active]="tokenizeDropinActive() || tokenizeOutcome()">
         <div class="empty-dropin" *ngIf="!tokenizeDropinActive() && !tokenizeOutcome() && !submittingTokenize()">
           <mat-icon aria-hidden="true">credit_card</mat-icon>
-          <p>Enter the details, then select <strong>Continue to card details</strong> to load the card form.</p>
+          <p>The card form appears here.</p>
         </div>
 
         <div class="empty-dropin" *ngIf="submittingTokenize() && !tokenizeDropinActive()" role="status">
@@ -204,7 +204,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Saved cards</h2>
-        <p class="section-desc">Select a saved card and charge it from the server as an unscheduled card-on-file payment, without the shopper.</p>
+        <p class="section-desc">Charge a saved card without the shopper.</p>
 
         <form [formGroup]="tokenPaymentForm" *ngIf="isEmbeddedPayment" novalidate>
           <div class="form-group">

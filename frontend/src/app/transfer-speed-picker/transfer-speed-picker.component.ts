@@ -6,19 +6,11 @@ import { MaterialModule } from '../material.module';
 import { TransferPriority, TransferRouteOption, TransferRouteRequest } from '../models';
 import { TransferService } from '../services';
 import { currencyExponent, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
+import { TRANSFER_SPEEDS, TransferSpeed } from './transfer-speeds';
 
-interface SpeedOption {
-  priority: TransferPriority;
-  label: string;
-  timing: string;
+interface SpeedOption extends TransferSpeed {
   route: TransferRouteOption | null;
 }
-
-const SPEEDS: Omit<SpeedOption, 'route'>[] = [
-  { priority: 'regular', label: 'Regular', timing: '1–2 business days' },
-  { priority: 'fast', label: 'Fast', timing: 'Same business day' },
-  { priority: 'instant', label: 'Instant', timing: 'Within seconds' }
-];
 
 let nextPickerId = 0;
 
@@ -27,7 +19,7 @@ let nextPickerId = 0;
   standalone: true,
   imports: [CommonModule, MaterialModule],
   templateUrl: './transfer-speed-picker.component.html',
-  styleUrl: './transfer-speed-picker.component.css',
+  styleUrls: ['./transfer-speeds.css', './transfer-speed-picker.component.css'],
   providers: [
     { provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => TransferSpeedPickerComponent), multi: true },
     { provide: NG_VALIDATORS, useExisting: forwardRef(() => TransferSpeedPickerComponent), multi: true }
@@ -79,7 +71,7 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
   }
 
   get selectedLabel(): string {
-    return SPEEDS.find(speed => speed.priority === this.value)?.label ?? '';
+    return TRANSFER_SPEEDS.find(speed => speed.priority === this.value)?.label ?? '';
   }
 
   get amountError(): string {
@@ -89,10 +81,10 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
 
     const speed = this.selectedLabel.toLowerCase();
     if (route.minAmount !== null && amount < route.minAmount) {
-      return `The minimum amount for ${speed} transfers to this beneficiary is ${this.formatAmount(route.minAmount)}.`;
+      return `The minimum for ${speed} transfers is ${this.formatAmount(route.minAmount)}.`;
     }
     if (route.maxAmount !== null && amount > route.maxAmount) {
-      return `The maximum amount for ${speed} transfers to this beneficiary is ${this.formatAmount(route.maxAmount)}.`;
+      return `The maximum for ${speed} transfers is ${this.formatAmount(route.maxAmount)}.`;
     }
     if (route.wholeAmountsOnly && amount % Math.pow(10, currencyExponent(this.currency)) !== 0) {
       return `${this.selectedLabel} transfers to this beneficiary only accept whole amounts.`;
@@ -156,7 +148,7 @@ export class TransferSpeedPickerComponent implements ControlValueAccessor, Valid
 
     this.routesSub = this.transferService.calculateTransferRoutes(this.userId, this.beneficiary).subscribe({
       next: routes => {
-        this.options = SPEEDS.map(speed => ({ ...speed, route: routes.find(route => route.priority === speed.priority) ?? null }));
+        this.options = TRANSFER_SPEEDS.map(speed => ({ ...speed, route: routes.find(route => route.priority === speed.priority) ?? null }));
         this.status = 'loaded';
         // Only an empty value gets a default: a speed the user picked, or the one saved on a
         // scheduled transfer, stays as is and is reported if this beneficiary cannot receive it.

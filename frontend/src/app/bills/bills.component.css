@@ -1,0 +1,107 @@
+/* On top of the styles of the invoices page. */
+
+.bill-select {
+  flex-shrink: 0;
+  width: 40px;
+  margin: 0 -8px 0 -10px;
+  display: flex;
+  justify-content: center;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 8px 20px 8px 10px;
+  border-bottom: 1px solid var(--fintech-border);
+  background: var(--fintech-surface-subtle);
+}
+.selection-text {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  font-variant-numeric: tabular-nums;
+}
+.selection-pay { margin-left: auto !important; }
+
+.bill-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22rem;
+}
+
+.payee-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.pay-icon {
+  font-size: 2rem;
+  width: 2rem;
+  height: 2rem;
+  color: var(--fintech-text-tertiary);
+}
+.pay-text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  overflow-wrap: anywhere;
+}
+
+/* The single-use card, as the supplier would see it. */
+.virtual-card {
+  width: 100%;
+  max-width: 14rem;
+  aspect-ratio: 1.586;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  text-align: left;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1f2937 0%, #475569 100%);
+}
+.virtual-card.closed { opacity: 0.5; }
+.virtual-card-brand {
+  align-self: flex-end;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+.virtual-card-number {
+  font-family: var(--fintech-font-mono);
+  font-size: 0.9375rem;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.virtual-card-meta {
+  display: flex;
+  gap: 16px;
+  font-family: var(--fintech-font-mono);
+  font-size: 0.75rem;
+}
+
+.test-tag {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--fintech-purple-bg);
+  color: var(--fintech-purple);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .bill-summary { display: none; }
+  .selection-bar { padding: 8px 12px 8px 4px; }
+}
+
+@media (forced-colors: active) {
+  .virtual-card { border: 1px solid CanvasText; }
+}

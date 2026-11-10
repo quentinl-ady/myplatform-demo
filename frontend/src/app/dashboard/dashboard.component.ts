@@ -9,7 +9,8 @@ import { firstValueFrom } from 'rxjs';
 
 import { OnboardingPart, OnboardingResponse, User, BankAccountStatus, BusinessLine, WebhookEvent } from '../models';
 import {
-  AccountService, OnboardingService, SessionService, ActivityService, TransferService, IssuingService, WebhookService
+  AccountService, OnboardingService, SessionService, ActivityService, TransferService, IssuingService, WebhookService,
+  DemoDataService, demoDataSummary
 } from '../services';
 import { MaterialModule } from '../material.module';
 import { INDUSTRY_CODES } from '../industry-codes';
@@ -76,6 +77,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private transferService = inject(TransferService);
   private issuingService = inject(IssuingService);
   private webhookService = inject(WebhookService);
+  private demoDataService = inject(DemoDataService);
   private route = inject(ActivatedRoute);
   private notify = inject(NotifyService);
   private fb = inject(FormBuilder);
@@ -106,6 +108,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly businessLinesError = signal<string | null>(null);
   readonly loadingKyc = signal(false);
   readonly validateKycError = signal<string | null>(null);
+  readonly loadingDemo = signal(false);
+  readonly demoLoaded = signal(false);
+  readonly demoError = signal<string | null>(null);
+  readonly demoWarnings = signal<string[]>([]);
   readonly salesChannelError = signal<string | null>(null);
   readonly addBusinessLineError = signal<string | null>(null);
   submitting = false;
@@ -152,8 +158,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const actions: QuickAction[] = [
       { label: 'Transactions', description: 'Review payments', icon: 'receipt_long', link: ['/', id, 'transactions'] },
       { label: 'Checkout', description: 'Make a test payment', icon: 'shopping_cart', link: ['/', id, 'checkout'] },
+      { label: 'Invoices', description: 'Bill customers by payment link', icon: 'request_quote', link: ['/', id, 'invoices'] },
+      { label: 'Subscriptions', description: 'Charge customers every cycle', icon: 'autorenew', link: ['/', id, 'subscriptions'] },
+      ...(u.bank || u.issuing
+        ? [{ label: 'Bills', description: 'Pay suppliers in one batch', icon: 'receipt', link: ['/', id, 'bills'] }]
+        : []),
+      { label: 'Accounting', description: 'Matched journal and exports', icon: 'menu_book', link: ['/', id, 'accounting'] },
       { label: 'Reports', description: 'Download financial reports', icon: 'description', link: ['/', id, 'report'] },
-      { label: 'Notifications', description: 'See events from Adyen', icon: 'notifications', link: ['/', id, 'notifications'] }
+      { label: 'Notifications', description: 'Account and payment events', icon: 'notifications', link: ['/', id, 'notifications'] }
     ];
     if (u.bank && this.bankStatus()?.bankAccountCreated) {
       actions.push({ label: 'Business account', description: 'Balance and transfers', icon: 'account_balance', link: ['/', id, 'business-account'] });
@@ -214,6 +226,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.cardCount.set(null);
     this.paymentReceived.set(null);
     this.businessLines.set([]);
+    this.demoLoaded.set(false);
+    this.demoError.set(null);
+    this.demoWarnings.set([]);
   }
 
   loadUser() {
@@ -313,16 +328,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
       case 'invalid':
         return { label: 'Action required', description: 'Information is missing or incorrect. Continue onboarding to fix it.', tone: 'danger', icon: 'error_outline' };
       case 'pending':
-        return { label: 'In review', description: 'Adyen is verifying your information.', tone: 'warning', icon: 'schedule' };
+        return { label: 'In review', description: 'Your information is being verified.', tone: 'warning', icon: 'schedule' };
       case 'rejected':
       case 'reject':
         return { label: 'Rejected', description: 'Verification was rejected. Contact support to find out why.', tone: 'danger', icon: 'block' };
       case 'valid':
         return part.allowed
           ? { label: 'Active', description: 'Verified and ready to use.', tone: 'success', icon: 'check_circle' }
-          : { label: 'Verified, not allowed yet', description: 'Verification is complete. Adyen has not enabled this capability yet.', tone: 'warning', icon: 'hourglass_empty' };
+          : { label: 'Verified, not allowed yet', description: 'Verified, waiting to be enabled.', tone: 'warning', icon: 'hourglass_empty' };
       default:
-        return { label: 'Unknown', description: 'Adyen returned a status this page does not recognize. Refresh to check again.', tone: 'neutral', icon: 'help_outline' };
+        return { label: 'Unknown', description: 'Unrecognized status. Refresh to check again.', tone: 'neutral', icon: 'help_outline' };
     }
   }
 
@@ -330,7 +345,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const base = {
       id: 'verification',
       title: 'Complete verification',
-      description: 'Provide your business details to verify your account (KYC).'
+      description: this.user()?.companyImported
+        ? 'Your company details came from your system. Add the rest to verify your account (KYC).'
+        : 'Provide your business details to verify your account (KYC).'
     };
     const continueAction = { label: 'Continue onboarding', run: () => this.openHostedOnboarding() };
     const s = this.status();
@@ -658,6 +675,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.creatingBankAccount.set(false);
         this.bankCreateError.set(httpErrorMessage(err, 'Unable to create the bank account. Try again.'));
+      }
+    });
+  }
+
+  /** Creates what's missing, so loading it again doesn't duplicate anything. */
+  loadDemoData() {
+    const userId = this.userId;
+    if (!userId || this.loadingDemo()) return;
+    this.loadingDemo.set(true);
+    this.demoError.set(null);
+    this.demoWarnings.set([]);
+    this.demoDataService.load(userId).subscribe({
+      next: (result) => {
+        this.loadingDemo.set(false);
+        if (userId !== this.userId) return;
+        this.demoLoaded.set(true);
+        this.demoWarnings.set(result.warnings ?? []);
+        this.notify.success(demoDataSummary(result));
+      },
+      error: (err) => {
+        this.loadingDemo.set(false);
+        this.demoError.set(httpErrorMessage(err, 'Unable to load the demo data. Try again.'));
       }
     });
   }

@@ -25,4 +25,5 @@ public class UserDTO {
     private Boolean capital;
     private Boolean issuing;
     private String activityReason;
+    private Boolean companyImported;
 }

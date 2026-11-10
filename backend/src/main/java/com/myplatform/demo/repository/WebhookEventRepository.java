@@ -17,6 +17,8 @@ public interface WebhookEventRepository extends JpaRepository<WebhookEvent, Long
 
     List<WebhookEvent> findByResourceIdInOrderByReceivedAtAsc(Collection<String> resourceIds);
 
+    List<WebhookEvent> findByEventTypeAndRawJsonContainingOrderByReceivedAtAsc(String eventType, String fragment);
+
     List<WebhookEvent> findTop50ByUserIdOrderByReceivedAtDesc(String userId);
 
     List<WebhookEvent> findByUserIdAndAcknowledgedFalseOrderByReceivedAtDesc(String userId);

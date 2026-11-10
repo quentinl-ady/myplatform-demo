@@ -1,0 +1,104 @@
+<h2 mat-dialog-title class="dialog-title">{{ title }}</h2>
+<mat-dialog-content>
+  <div class="dialog-form">
+    <p class="dialog-note">Names are checked with each supplier's bank. You then approve the transfers on Batch transfers.</p>
+
+    <div class="check-progress" *ngIf="checking()" role="status">
+      <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+      <span>Checking the payees with their banks…</span>
+    </div>
+    <app-inline-alert *ngIf="!checking() && checkError() as message" title="Unable to verify the payees"
+                      actionLabel="Try again" (action)="runChecks()">{{ message }}</app-inline-alert>
+    <app-inline-alert *ngIf="renameError() as message" title="Unable to update the supplier"
+                      [dismissible]="true" (dismiss)="renameError.set(null)">{{ message }}</app-inline-alert>
+
+    <ul class="payee-list" *ngIf="checks() && !checking()" aria-label="Bills to pay">
+      <li class="payee-item" *ngFor="let row of rows(); trackBy: trackRow" [class.excluded]="!isIncluded(row)">
+        <div class="payee-head">
+          <div class="payee-who">
+            <span class="payee-name">{{ row.check?.supplierName ?? row.bill.supplier.name }}</span>
+            <span class="payee-meta">
+              <span class="mono">{{ row.bill.number }}</span>
+              <span class="mono" *ngIf="row.check?.bankAccount ?? row.bill.supplier.bankAccount as account">{{ account }}</span>
+            </span>
+          </div>
+          <span class="payee-amount">{{ row.bill.total | money:row.bill.currency }}</span>
+        </div>
+        <ng-container *ngIf="row.check as check">
+          <div class="payee-result">
+            <span class="state-chip" [attr.data-tone]="payeeCheckView(check.result).tone">
+              <mat-icon aria-hidden="true">{{ payeeCheckView(check.result).icon }}</mat-icon>{{ payeeCheckView(check.result).label }}
+            </span>
+            <span class="payee-description" *ngIf="check.description">{{ check.description }}</span>
+          </div>
+          <div class="payee-actions" *ngIf="check.result === 'partialNameMatch' && check.name">
+            <button type="button" class="text-btn" (click)="useVerifiedName(check)" [disabled]="renamingSupplierId() !== null || submitting()">
+              <mat-spinner *ngIf="renamingSupplierId() === check.supplierId" diameter="14" aria-hidden="true"></mat-spinner>
+              <mat-icon *ngIf="renamingSupplierId() !== check.supplierId" aria-hidden="true">drive_file_rename_outline</mat-icon>
+              Use “{{ check.name }}” as the name of the supplier
+            </button>
+          </div>
+          <mat-checkbox class="payee-risk" *ngIf="check.result === 'noNameMatch'" [disabled]="submitting()"
+                        [checked]="acceptedRisks().has(row.bill.id)" (change)="toggleRisk(row.bill, $event.checked)">
+            Pay anyway: I confirmed these bank details with the supplier
+          </mat-checkbox>
+          <span class="helper-text error" *ngIf="check.result === 'error'">Left out: check again later.</span>
+        </ng-container>
+        <span class="helper-text error" *ngIf="speedIssue(row) as issue">{{ issue }}</span>
+      </li>
+    </ul>
+
+    <div class="pay-speeds" *ngIf="checks() && !checking()">
+      <span class="field-label" id="pay-speed-label">Transfer speed</span>
+
+      <div class="speed-status" *ngIf="loadingRoutes()" role="status">
+        <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+        <span>Checking the available transfer speeds…</span>
+      </div>
+
+      <div class="speed-status error" *ngIf="!loadingRoutes() && routesError() as message" role="alert">
+        <mat-icon aria-hidden="true">error</mat-icon>
+        <span>{{ message }}</span>
+        <button type="button" class="retry-btn" (click)="loadRoutes()">Try again</button>
+      </div>
+
+      <ng-container *ngIf="!loadingRoutes() && routes()">
+        <div class="speed-status error" *ngIf="!transferType()" role="alert">
+          <mat-icon aria-hidden="true">block</mat-icon>
+          <span>No transfer speed is available.</span>
+        </div>
+
+        <div class="speed-options" role="radiogroup" aria-labelledby="pay-speed-label" *ngIf="transferType()">
+          <label class="speed-option" *ngFor="let speed of speedChoices()"
+                 [class.selected]="speed.billCount > 0 && transferType() === speed.priority"
+                 [class.unavailable]="!speed.billCount">
+            <input type="radio" name="pay-speed" [value]="speed.priority"
+                   [checked]="speed.billCount > 0 && transferType() === speed.priority"
+                   [disabled]="submitting() || !speed.billCount"
+                   (change)="transferType.set(speed.priority)" />
+            <mat-icon class="speed-check" *ngIf="speed.billCount > 0 && transferType() === speed.priority" aria-hidden="true">check_circle</mat-icon>
+            <span class="speed-label">{{ speed.label }}</span>
+            <span class="speed-timing">{{ speed.billCount ? speed.timing : 'Not available' }}</span>
+            <span class="speed-limits" *ngIf="speed.billCount && speed.billCount < bills.length">For {{ speed.billCount }} of {{ bills.length }} bills</span>
+          </label>
+        </div>
+      </ng-container>
+    </div>
+
+    <app-inline-alert *ngIf="error() as message" [title]="message" [dismissible]="true" (dismiss)="error.set(null)">
+      <ul class="alert-list" *ngIf="failures().length">
+        <li *ngFor="let item of failures()">{{ item.number }}: {{ item.error }}</li>
+      </ul>
+    </app-inline-alert>
+  </div>
+</mat-dialog-content>
+<mat-dialog-actions align="end" class="dialog-actions">
+  <span class="pay-summary" *ngIf="checks() && !checking()">
+    {{ included().length }} of {{ bills.length }} {{ bills.length === 1 ? 'bill' : 'bills' }} · {{ includedTotal() | money:currency }}
+  </span>
+  <button type="button" class="dialog-btn secondary" mat-dialog-close [disabled]="submitting()">Cancel</button>
+  <button type="button" class="dialog-btn" (click)="submit()" [disabled]="!canSubmit()">
+    <mat-spinner *ngIf="submitting()" diameter="16" aria-hidden="true"></mat-spinner>
+    <span>{{ submitting() ? 'Creating the transfers…' : submitLabel() }}</span>
+  </button>
+</mat-dialog-actions>

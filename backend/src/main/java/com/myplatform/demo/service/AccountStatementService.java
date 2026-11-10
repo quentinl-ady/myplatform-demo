@@ -75,6 +75,10 @@ public class AccountStatementService {
     public record StatementPdf(byte[] content, String fileName) {
     }
 
+    /** A statement as the CAMT.053 XML file Adyen generated, and the name to save it under. */
+    public record StatementXml(byte[] content, String fileName) {
+    }
+
     public AccountStatementService(AccountStatementRepository statementRepository,
                                    UserRepository userRepository,
                                    UserBrandingRepository brandingRepository,
@@ -162,7 +166,7 @@ public class AccountStatementService {
         } catch (IllegalArgumentException e) {
             log.warn("Couldn't read the account statement {}: {}", fileName, e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Adyen sent this statement in a format that couldn't be read.");
+                    "This statement's format couldn't be read.");
         }
         try {
             return new StatementPdf(pdfService.render(camt, holder(user, camt), platform(user.getId())),
@@ -171,6 +175,11 @@ public class AccountStatementService {
             log.error("Couldn't create the PDF of the account statement {}", fileName, e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Couldn't create the PDF of this statement.");
         }
+    }
+
+    /** The statement as Adyen generated it, for accounting software that imports CAMT.053 files. */
+    public StatementXml downloadXml(String userId, String fileName) {
+        return new StatementXml(downloadXml(user(userId), fileName), fileName);
     }
 
     /**
@@ -197,7 +206,8 @@ public class AccountStatementService {
         return new LegalEntityService.Identity(name, null, List.of());
     }
 
-    private AccountStatementPdfService.Platform platform(String userId) {
+    /** The platform as the documents of the user show it: the name and logo of its branding. */
+    public AccountStatementPdfService.Platform platform(String userId) {
         UserBranding branding = brandingRepository.findById(userId).orElse(null);
         String name = branding != null && branding.getPlatformName() != null && !branding.getPlatformName().isBlank()
                 ? branding.getPlatformName().trim()
@@ -218,7 +228,7 @@ public class AccountStatementService {
         }
         if (reportUser.isBlank() || reportPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Statement downloads aren't set up on this server: adyen.report.user and adyen.report.password are missing.");
+                    "Statement downloads aren't set up on this server: the report user and password are missing.");
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setBasicAuth(reportUser, reportPassword, StandardCharsets.UTF_8);
@@ -227,16 +237,16 @@ public class AccountStatementService {
                     new HttpEntity<>(headers), byte[].class).getBody();
             return file != null ? file : new byte[0];
         } catch (HttpClientErrorException.NotFound e) {
-            throw new ResourceNotFoundException("Adyen no longer has this statement.");
+            throw new ResourceNotFoundException("This statement is no longer available.");
         } catch (HttpClientErrorException.Unauthorized | HttpClientErrorException.Forbidden e) {
             log.warn("Adyen refused the report user for {}: HTTP {}", fileName, e.getStatusCode().value());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Adyen refused the report credentials: check adyen.report.user and adyen.report.password.");
+                    "The report credentials were refused: check the report user and password of the backend.");
         } catch (HttpStatusCodeException e) {
             // Adyen also answers 500 for a statement it doesn't have.
             log.warn("Adyen couldn't send the statement {}: HTTP {}", fileName, e.getStatusCode().value());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Adyen couldn't send this statement (HTTP " + e.getStatusCode().value() + "). Try again later.");
+                    "This statement couldn't be downloaded (HTTP " + e.getStatusCode().value() + "). Try again later.");
         }
     }
 

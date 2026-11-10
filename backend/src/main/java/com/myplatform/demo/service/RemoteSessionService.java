@@ -389,7 +389,7 @@ public class RemoteSessionService {
 
     private static Map<String, Object> challenge(String authParam1) {
         if (authParam1 == null || authParam1.isBlank()) {
-            throw new BadRequestException("Adyen didn't return the authentication challenge. Try again.");
+            throw new BadRequestException("The authentication challenge couldn't be created. Try again.");
         }
         return Map.of("status", "sca_required", "authParam1", authParam1);
     }

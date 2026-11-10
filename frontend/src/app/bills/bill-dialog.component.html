@@ -1,0 +1,100 @@
+<h2 mat-dialog-title class="dialog-title">{{ title }}</h2>
+<mat-dialog-content>
+  <form [formGroup]="form" id="bill-form" class="dialog-form" (ngSubmit)="submit()" novalidate>
+
+    <div class="field-row three">
+      <div class="field">
+        <label for="bill-supplier">Supplier</label>
+        <select id="bill-supplier" class="fintech-input" formControlName="supplierId"
+                [attr.aria-invalid]="!!supplierError"
+                [attr.aria-describedby]="supplierError ? 'bill-supplier-error' : (selectedSupplier() ? 'bill-supplier-help' : null)">
+          <option [ngValue]="null" disabled>{{ suppliers().length ? 'Choose a supplier' : 'No suppliers yet' }}</option>
+          <option *ngFor="let s of suppliers()" [ngValue]="s.id">{{ s.name }}</option>
+        </select>
+        <span class="helper-text error" id="bill-supplier-error" *ngIf="supplierError as error">{{ error }}</span>
+        <span class="helper-text" id="bill-supplier-help" *ngIf="!supplierError && selectedSupplier() as s">{{ supplierHint(s) }}</span>
+        <button type="button" class="text-btn add-customer" (click)="addSupplier()">
+          <mat-icon aria-hidden="true">add_business</mat-icon>New supplier
+        </button>
+      </div>
+      <div class="field">
+        <label for="bill-issue-date">Issue date</label>
+        <input id="bill-issue-date" type="date" class="fintech-input" formControlName="issueDate" />
+      </div>
+      <div class="field">
+        <label for="bill-due-date">Due date</label>
+        <input id="bill-due-date" type="date" class="fintech-input" formControlName="dueDate"
+               [attr.min]="form.value.issueDate || null"
+               [attr.aria-invalid]="!!datesError"
+               [attr.aria-describedby]="datesError ? 'bill-due-date-error' : 'bill-due-date-help'" />
+        <span class="helper-text error" id="bill-due-date-error" *ngIf="datesError as error">{{ error }}</span>
+        <span class="helper-text" id="bill-due-date-help" *ngIf="!datesError">{{ termsText }}</span>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label for="bill-reference">Supplier's invoice number <span class="optional">(optional)</span></label>
+        <input id="bill-reference" class="fintech-input" formControlName="supplierReference" maxlength="40"
+               aria-describedby="bill-reference-help" />
+        <span class="helper-text" id="bill-reference-help">Sent with the transfer.</span>
+      </div>
+      <div class="field">
+        <label for="bill-category">Category</label>
+        <select id="bill-category" class="fintech-input" formControlName="category" aria-describedby="bill-category-help">
+          <option *ngFor="let c of categories" [value]="c.code">{{ c.code }} · {{ c.name }}</option>
+        </select>
+        <span class="helper-text" id="bill-category-help">The expense account it's booked to.</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="bill-description">Description <span class="optional">(optional)</span></label>
+      <input id="bill-description" class="fintech-input" formControlName="description" maxlength="200"
+             placeholder="What the bill is for" />
+    </div>
+
+    <div class="summary">
+      <div class="field-row">
+        <div class="field">
+          <label for="bill-subtotal">Amount excluding {{ taxLabel }} ({{ currency }})</label>
+          <input id="bill-subtotal" type="number" inputmode="decimal" min="0" [step]="amountStep"
+                 class="fintech-input" formControlName="subtotal" placeholder="0.00"
+                 [attr.aria-invalid]="!!amountError"
+                 [attr.aria-describedby]="amountError ? 'bill-subtotal-error' : null" />
+          <span class="helper-text error" id="bill-subtotal-error" *ngIf="amountError as error">{{ error }}</span>
+        </div>
+        <div class="field">
+          <label for="bill-rate">{{ taxLabel }}</label>
+          <select id="bill-rate" class="fintech-input" formControlName="vatRate">
+            <option *ngFor="let rate of rates" [ngValue]="rate">{{ formatRate(rate) }}</option>
+          </select>
+        </div>
+      </div>
+      <dl class="totals">
+        <div class="totals-row">
+          <dt>Subtotal</dt>
+          <dd>{{ amounts() ? (amounts()!.net | money:currency) : '—' }}</dd>
+        </div>
+        <div class="totals-row">
+          <dt>{{ taxLabel }} {{ formatRate(form.value.vatRate) }}</dt>
+          <dd>{{ amounts() ? (amounts()!.tax | money:currency) : '—' }}</dd>
+        </div>
+        <div class="totals-row total">
+          <dt>Total to pay</dt>
+          <dd>{{ amounts() ? (amounts()!.gross | money:currency) : '—' }}</dd>
+        </div>
+      </dl>
+    </div>
+
+    <app-inline-alert *ngIf="error() as message" [title]="editing ? 'Unable to save the bill' : 'Unable to record the bill'"
+                      [dismissible]="true" (dismiss)="error.set(null)">{{ message }}</app-inline-alert>
+  </form>
+</mat-dialog-content>
+<mat-dialog-actions align="end" class="dialog-actions">
+  <button type="button" class="dialog-btn secondary" mat-dialog-close [disabled]="submitting()">Cancel</button>
+  <button type="submit" form="bill-form" class="dialog-btn" [disabled]="submitting()">
+    <mat-spinner *ngIf="submitting()" diameter="16" aria-hidden="true"></mat-spinner>
+    <span>{{ submitting() ? 'Saving…' : (editing ? 'Save bill' : 'Record bill') }}</span>
+  </button>
+</mat-dialog-actions>

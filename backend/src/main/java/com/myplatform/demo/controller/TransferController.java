@@ -234,7 +234,7 @@ public class TransferController {
     }
 
     @PostMapping("/batch/cancel")
-    public ResponseEntity<Map<String, Object>> cancelBatchTransfers(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<TransferService.CancelResult> cancelBatchTransfers(@RequestBody Map<String, Object> payload) {
         String userId = (String) payload.get("userId");
         if (userId == null || userId.isBlank()) {
             throw new BadRequestException("userId is required");

@@ -59,6 +59,7 @@ public class DTOMapper {
         dto.setIssuing(user.getIssuing());
         dto.setBank(user.getBank());
         dto.setActivityReason(user.getActivityReason());
+        dto.setCompanyImported(user.getCompanyImported());
         return dto;
     }
 }

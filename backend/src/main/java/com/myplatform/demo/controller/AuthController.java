@@ -1,8 +1,11 @@
 package com.myplatform.demo.controller;
 
+import com.myplatform.demo.dto.CompanyRecordDTO;
+import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ConflictException;
 import com.myplatform.demo.exception.UnauthorizedException;
 import com.myplatform.demo.model.Activity;
+import com.myplatform.demo.model.CountryKycData;
 import com.myplatform.demo.model.StoreCustomer;
 import com.myplatform.demo.model.PaymentMethodCustomer;
 import com.myplatform.demo.model.User;
@@ -12,6 +15,7 @@ import com.myplatform.demo.service.AccountHolderService;
 import com.myplatform.demo.service.BalanceAccountService;
 import com.myplatform.demo.service.LegalEntityService;
 import com.myplatform.demo.service.StoreManagementService;
+import com.myplatform.demo.util.CompanyRecord;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -73,6 +77,8 @@ public class AuthController {
             return ResponseEntity.badRequest().body("{\"error\": \"Unsupported country code: " + user.getCountryCode() + "\"}");
         }
         user.setCurrencyCode(resolvedCurrency);
+        user.setCompanyImported(Boolean.TRUE.equals(user.getCompanyImported())
+                && CompanyRecord.isAvailableFor(user.getUserType()));
 
         String legalEntityId = legalEntityService.createLegalEntity(user);
 
@@ -120,6 +126,15 @@ public class AuthController {
     @GetMapping("/country-currency")
     public ResponseEntity<?> getCountryCurrencyMapping() {
         return ResponseEntity.ok(COUNTRY_CURRENCY_MAP);
+    }
+
+    /** The company record the sign-up page imports for a company of the country. */
+    @GetMapping("/company-record")
+    public ResponseEntity<CompanyRecordDTO> getCompanyRecord(@RequestParam String country) {
+        if (!COUNTRY_CURRENCY_MAP.containsKey(country)) {
+            throw new BadRequestException("Unsupported country code: " + country);
+        }
+        return ResponseEntity.ok(CompanyRecord.preview(CountryKycData.fromCode(country)));
     }
 
     @PostMapping("/login")

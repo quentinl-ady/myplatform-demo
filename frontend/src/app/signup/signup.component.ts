@@ -14,7 +14,9 @@ import {
 } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { MaterialModule } from '../material.module';
+import { CompanyRecord } from '../models';
 import { AuthService } from '../services';
 import { INDUSTRY_CODES } from '../industry-codes';
 import { InlineAlertComponent, httpErrorMessage, httpStatus } from '../shared';
@@ -77,6 +79,12 @@ export class SignupComponent {
     newActivity = { industryCode: '' };
     businessActivityError: string | null = null;
 
+    // company record imported from the user's system
+    companyRecord: CompanyRecord | null = null;
+    importingCompany = false;
+    companyImportError: string | null = null;
+    private companyImportRequest: Subscription | null = null;
+
     @Output() signupSuccess = new EventEmitter<unknown>();
 
     constructor(
@@ -105,6 +113,9 @@ export class SignupComponent {
         this.form.get('countryCode')!.valueChanges.subscribe((country) => {
             const currency = this.countryCurrencyMap[country] || 'EUR';
             this.form.get('currencyCode')!.setValue(currency);
+            if (this.companyRecord || this.importingCompany) {
+                this.importCompany();
+            }
         });
 
         this.updateRestrictions();
@@ -113,6 +124,7 @@ export class SignupComponent {
 
     updateUserTypeControls(type: string) {
         if (type === 'individual') {
+            this.clearCompanyImport();
             this.form.removeControl('legalEntityName');
             this.form.addControl('firstName', this.fb.control('', Validators.required));
             this.form.addControl('lastName', this.fb.control('', Validators.required));
@@ -207,6 +219,50 @@ export class SignupComponent {
         return this.form.get('activityReason')!.value === 'embeddedPayment';
     }
 
+    isOrganization(): boolean {
+        return this.form.get('userType')!.value === 'organization';
+    }
+
+    /** Individuals have no company record to import. */
+    canImportCompany(): boolean {
+        return this.form.get('userType')!.value !== 'individual';
+    }
+
+    importCompany() {
+        const country = this.form.get('countryCode')!.value;
+        this.companyImportRequest?.unsubscribe();
+        this.companyRecord = null;
+        this.companyImportError = null;
+        this.importingCompany = true;
+        this.cdr.markForCheck();
+        this.companyImportRequest = this.authService.getCompanyRecord(country).subscribe({
+            next: (company) => {
+                this.importingCompany = false;
+                this.companyRecord = company;
+                this.cdr.markForCheck();
+            },
+            error: (err) => {
+                this.importingCompany = false;
+                this.companyImportError = httpErrorMessage(err, 'Unable to import the company from your system. Try again.');
+                this.cdr.markForCheck();
+            },
+        });
+    }
+
+    clearCompanyImport() {
+        this.companyImportRequest?.unsubscribe();
+        this.companyImportRequest = null;
+        this.companyRecord = null;
+        this.importingCompany = false;
+        this.companyImportError = null;
+        this.cdr.markForCheck();
+    }
+
+    dismissCompanyImportError() {
+        this.companyImportError = null;
+        this.cdr.markForCheck();
+    }
+
     filterIndustries() {
         const term = this.industrySearch.toLowerCase();
         this.filteredIndustries = INDUSTRY_CODES.filter(
@@ -281,13 +337,13 @@ export class SignupComponent {
     }
 
     canSubmit(): boolean {
-        if (this.form.invalid || this.loading) return false;
+        if (this.form.invalid || this.loading || this.importingCompany) return false;
         if (this.isEmbeddedPayment() && this.businessActivities.length === 0) return false;
         return true;
     }
 
     onSubmit() {
-        if (this.loading) return;
+        if (this.loading || this.importingCompany) return;
         if (!this.form.valid) {
             this.form.markAllAsTouched();
             this.cdr.markForCheck();
@@ -311,6 +367,10 @@ export class SignupComponent {
 
         if (this.isEmbeddedPayment()) {
             payload.businessActivities = this.businessActivities;
+        }
+
+        if (this.companyRecord?.country === payload.countryCode && payload.userType !== 'individual') {
+            payload.companyImported = true;
         }
 
         this.authService.signup(payload).subscribe({

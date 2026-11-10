@@ -49,6 +49,15 @@ public class CardTransferDTO {
     // Transaction rules result
     private TransactionRulesResultDTO transactionRulesResult;
 
+    // How the payment is booked
+    /** The expense account the merchant category code suggests, e.g. 6240. */
+    private String suggestedCategory;
+    /** How the user classified the payment, null when they didn't. */
+    private CardExpenseDTO expense;
+    /** The bill the single-use card of the payment pays, null for another card. */
+    private Long billId;
+    private String billNumber;
+
     @Getter
     @Setter
     public static class ValidationFact {

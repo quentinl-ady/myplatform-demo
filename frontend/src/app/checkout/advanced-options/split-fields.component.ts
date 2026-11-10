@@ -77,8 +77,8 @@ export class SplitFieldsComponent {
 
   get feeHelp(): string {
     return this.feeAllocation === 'SUB_MERCHANT'
-      ? "Interchange, scheme and Adyen fees are deducted from the sub-merchant's balance account."
-      : "Interchange, scheme and Adyen fees are booked to the platform's liable balance account.";
+      ? "Payment fees are deducted from the sub-merchant's balance."
+      : 'Payment fees are charged to the platform.';
   }
 
   /** Null while a field is invalid, so the preview is hidden. */

@@ -16,21 +16,28 @@ import com.myplatform.demo.model.PendingTransfer;
 import com.myplatform.demo.model.RecipientCountry;
 import com.myplatform.demo.model.TransferRequest;
 import com.myplatform.demo.repository.PendingTransferRepository;
+import com.myplatform.demo.util.TransferStatuses;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class TransferService {
 
     private static final Logger log = LoggerFactory.getLogger(TransferService.class);
+    /** Adyen's error code when a transfer to cancel no longer waits for its approval. */
+    private static final String NOT_PENDING_ERROR_CODE = "30_081";
 
     private final ManageScaDevicesApi manageScaDevicesApi;
     private final String balancePlatformApiKey;
@@ -250,11 +257,19 @@ public class TransferService {
     }
 
     /**
+     * @param transferIds     the transfers this request cancelled
+     * @param noLongerPending the transfers that no longer waited for their approval, e.g. because it expired: they
+     *                        leave the batch as Adyen reports them
+     */
+    public record CancelResult(String status, List<String> transferIds, List<Map<String, Object>> noLongerPending) {
+    }
+
+    /**
      * Cancels batch transfers that are still waiting for approval, so "Clear" in the UI doesn't
      * leave them pending on Adyen. Only transfers recorded for this account holder are sent.
      */
-    public Map<String, Object> cancelTransfers(String accountHolderId, List<String> transferIds) {
-        java.util.Set<String> ownTransferIds = new java.util.HashSet<>();
+    public CancelResult cancelTransfers(String accountHolderId, List<String> transferIds) {
+        Set<String> ownTransferIds = new HashSet<>();
         for (PendingTransfer pt : pendingTransferRepository.findByAccountHolderId(accountHolderId)) {
             ownTransferIds.add(pt.getTransferId());
         }
@@ -263,14 +278,38 @@ public class TransferService {
             throw new com.myplatform.demo.exception.BadRequestException("These transfers are not pending for this account");
         }
 
+        List<String> cancelled = idsToCancel;
+        List<Map<String, Object>> noLongerPending = List.of();
+        try {
+            requestCancel(idsToCancel);
+        } catch (HttpClientErrorException e) {
+            if (!notPending(e)) {
+                throw e;
+            }
+            // Adyen refuses the whole list when one of its transfers no longer waits for its approval.
+            noLongerPending = getTransferDetails(idsToCancel).stream().filter(detail -> !awaitsApproval(detail)).toList();
+            if (noLongerPending.isEmpty()) {
+                throw e;
+            }
+            Set<String> closedIds = new HashSet<>(ids(noLongerPending));
+            pendingTransferRepository.deleteAllById(closedIds);
+            cancelled = idsToCancel.stream().filter(id -> !closedIds.contains(id)).toList();
+            if (!cancelled.isEmpty()) {
+                requestCancel(cancelled);
+            }
+        }
+        if (!cancelled.isEmpty()) {
+            pendingTransferRepository.deleteAllById(cancelled);
+        }
+        return new CancelResult("cancelled", cancelled, noLongerPending);
+    }
+
+    private void requestCancel(List<String> transferIds) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add("X-API-Key", balancePlatformApiKey);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("transferIds", idsToCancel);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(Map.of("transferIds", transferIds), headers);
 
         String url = "https://balanceplatform-api-test.adyen.com/btl/v4/transfers/cancel";
 
@@ -278,10 +317,10 @@ public class TransferService {
         for (int attempt = 1; ; attempt++) {
             try {
                 restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
-                break;
-            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                return;
+            } catch (HttpClientErrorException e) {
                 String responseBody = e.getResponseBodyAsString();
-                if (attempt < maxRetries && responseBody != null && responseBody.contains("Transfer not found")) {
+                if (attempt < maxRetries && responseBody.contains("Transfer not found")) {
                     log.info("Transfer not found on cancel attempt {}/{}, retrying in 2s...", attempt, maxRetries);
                     try { Thread.sleep(2000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 } else {
@@ -289,39 +328,58 @@ public class TransferService {
                 }
             }
         }
-
-        pendingTransferRepository.deleteAllById(idsToCancel);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "cancelled");
-        result.put("transferIds", idsToCancel);
-        return result;
     }
 
+    /**
+     * The transfers of the account holder that wait for their approval. Those that no longer do, e.g. because their
+     * approval expired, are listed apart under noLongerPending, then forgotten.
+     */
     public Map<String, Object> getPendingTransfers(String accountHolderId) {
         List<PendingTransfer> stored = pendingTransferRepository.findByAccountHolderId(accountHolderId);
-        List<Map<String, Object>> results = new java.util.ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
+        List<Map<String, Object>> noLongerPending = new ArrayList<>();
         int notFoundCount = 0;
 
         for (PendingTransfer pt : stored) {
             try {
                 Map<String, Object> detail = fetchTransferDetail(pt.getTransferId());
-                if (detail != null) {
-                    results.add(detail);
+                if (detail == null) {
+                    continue;
                 }
-            } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+                if (awaitsApproval(detail)) {
+                    results.add(detail);
+                } else {
+                    noLongerPending.add(detail);
+                }
+            } catch (HttpClientErrorException.NotFound e) {
                 notFoundCount++;
                 log.warn("Transfer {} not yet propagated (404)", pt.getTransferId());
             } catch (Exception e) {
                 log.warn("Failed to fetch transfer detail for {}: {}", pt.getTransferId(), e.getMessage());
             }
         }
+        if (!noLongerPending.isEmpty()) {
+            pendingTransferRepository.deleteAllById(ids(noLongerPending));
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("transfers", results);
+        response.put("noLongerPending", noLongerPending);
         response.put("notFoundCount", notFoundCount);
-        response.put("totalCount", stored.size());
+        response.put("totalCount", stored.size() - noLongerPending.size());
         return response;
+    }
+
+    private static boolean awaitsApproval(Map<String, Object> detail) {
+        return TransferStatuses.awaitsApproval((String) detail.get("status"), (String) detail.get("reason"));
+    }
+
+    private static boolean notPending(HttpClientErrorException e) {
+        return e.getResponseBodyAsString().contains("\"" + NOT_PENDING_ERROR_CODE + "\"");
+    }
+
+    private static List<String> ids(List<Map<String, Object>> details) {
+        return details.stream().map(detail -> (String) detail.get("id")).toList();
     }
 
     /** The details of the given transfers; those not propagated yet or failing are left out. */

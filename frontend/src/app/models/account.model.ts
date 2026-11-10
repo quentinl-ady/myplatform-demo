@@ -16,6 +16,8 @@ export interface User {
   issuing: boolean;
   bankAccountId: string;
   bankAccountNumber: string;
+  /** True when the company details of the legal entity were imported at sign-up. */
+  companyImported?: boolean | null;
 }
 
 export interface BalanceAccount {

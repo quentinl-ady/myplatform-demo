@@ -623,7 +623,7 @@ public class CheckoutPaymentService {
             throw new ConflictException("This payment is already cancelled.");
         }
         if (totals.autoCaptureDue()) {
-            throw new ConflictException("Adyen has already captured this payment automatically.");
+            throw new ConflictException("This payment was already captured automatically.");
         }
         if (totals.remaining() <= 0) {
             throw new ConflictException("Nothing is left to " + ("captured".equals(action) ? "capture" : "cancel") + " on this payment.");

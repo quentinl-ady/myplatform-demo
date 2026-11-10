@@ -1,0 +1,367 @@
+<div class="invoices-wrapper">
+
+  <div class="invoices-header">
+    <div>
+      <h1>Subscriptions</h1>
+      <p class="invoices-subtitle">Bill a plan monthly or yearly. After the first payment, each cycle is charged automatically.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-icon-button type="button" (click)="load()" [disabled]="loading()"
+              matTooltip="Refresh" aria-label="Refresh subscriptions">
+        <mat-icon [class.spinning]="loading() || refreshing()" aria-hidden="true">refresh</mat-icon>
+      </button>
+      <button mat-icon-button type="button" [matMenuTriggerFor]="pageMenu"
+              matTooltip="More actions" aria-label="More actions">
+        <mat-icon aria-hidden="true">more_vert</mat-icon>
+      </button>
+      <mat-menu #pageMenu="matMenu" xPosition="before">
+        <a mat-menu-item [routerLink]="['/', userId, 'invoices']">
+          <mat-icon aria-hidden="true">request_quote</mat-icon>
+          <span>Open invoices</span>
+        </a>
+        <button mat-menu-item type="button" (click)="loadDemoData()" [disabled]="loadingDemo()">
+          <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+          <span>Load demo data</span>
+        </button>
+      </mat-menu>
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="newSubscription()" [disabled]="!settings()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        New subscription
+      </button>
+    </div>
+  </div>
+
+  <div class="demo-progress" *ngIf="loadingDemo()" role="status">
+    <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+    <span>Loading the demo data…</span>
+  </div>
+  <app-inline-alert *ngIf="demoError() as error" title="Unable to load the demo data" actionLabel="Try again"
+                    (action)="loadDemoData()" [dismissible]="true" (dismiss)="demoError.set(null)">{{ error }}</app-inline-alert>
+  <app-inline-alert *ngIf="demoWarnings().length" kind="warning" title="Part of the demo data couldn't be created"
+                    [dismissible]="true" (dismiss)="demoWarnings.set([])">
+    <ul class="alert-list">
+      <li *ngFor="let warning of demoWarnings()">{{ warning }}</li>
+    </ul>
+  </app-inline-alert>
+  <app-inline-alert *ngIf="!loading() && settings()?.issue as issue" kind="info" [live]="false"
+                    title="Subscriptions can't start yet">{{ issue }}</app-inline-alert>
+
+  <dl class="kpis" *ngIf="!loading() && !loadError() && subscriptions().length">
+    <div class="kpi">
+      <dt>Monthly recurring revenue</dt>
+      <dd class="kpi-value">{{ kpis().mrr | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ mrrHint(kpis()) }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().active ? 'success' : null">
+      <dt>Active</dt>
+      <dd class="kpi-value">{{ kpis().active }}</dd>
+      <dd class="kpi-hint">{{ activeHint(kpis()) }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().pastDue ? 'danger' : null">
+      <dt>Past due</dt>
+      <dd class="kpi-value">{{ kpis().pastDueAmount | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ pastDueHint(kpis()) }}</dd>
+    </div>
+  </dl>
+
+  <mat-card class="invoices-card" [attr.aria-busy]="loading()">
+
+    <div *ngIf="loading()" class="loading-spinner" role="status">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span class="cdk-visually-hidden">Loading subscriptions</span>
+    </div>
+
+    <app-inline-alert *ngIf="!loading() && loadError() as error" class="load-error" title="Unable to load subscriptions"
+                      actionLabel="Try again" (action)="load()">{{ error }}</app-inline-alert>
+
+    <ng-container *ngIf="!loading() && !loadError()">
+      <ng-container *ngIf="subscriptions().length; else noSubscriptions">
+        <div class="list-toolbar">
+          <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
+                                   class="filter-toggle" aria-label="Show subscriptions">
+            <mat-button-toggle value="all">All</mat-button-toggle>
+            <mat-button-toggle value="active">Active</mat-button-toggle>
+            <mat-button-toggle value="pastDue">Past due<span *ngIf="counts().pastDue"> ({{ counts().pastDue }})</span></mat-button-toggle>
+            <mat-button-toggle value="awaiting">Awaiting payment<span *ngIf="counts().awaiting"> ({{ counts().awaiting }})</span></mat-button-toggle>
+            <mat-button-toggle value="cancelled">Cancelled</mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+
+        <div class="empty-state compact" *ngIf="!visibleSubscriptions().length">
+          <mat-icon class="empty-icon" aria-hidden="true">task_alt</mat-icon>
+          <p>{{ emptyFilterText() }}</p>
+          <button mat-stroked-button type="button" (click)="setFilter('all')">Show all subscriptions</button>
+        </div>
+
+        <ul class="invoice-list" *ngIf="visibleSubscriptions().length" aria-label="Subscriptions">
+          <li *ngFor="let sub of visibleSubscriptions(); trackBy: trackById" class="invoice-item" [id]="'subscription-' + sub.id"
+              [class.expanded]="expandedId() === sub.id">
+            <div class="invoice-row">
+              <div class="invoice-main" role="button" tabindex="0"
+                   [attr.aria-expanded]="expandedId() === sub.id"
+                   [attr.aria-controls]="'subscription-detail-' + sub.id"
+                   (click)="toggle(sub, $event)"
+                   (keydown.enter)="toggle(sub, $event)"
+                   (keydown.space)="toggle(sub, $event)">
+                <div class="invoice-icon" [attr.data-tone]="subscriptionStatus(sub).tone" aria-hidden="true">
+                  <mat-icon>{{ subscriptionStatus(sub).icon }}</mat-icon>
+                </div>
+                <div class="invoice-content">
+                  <div class="invoice-title">
+                    <span class="invoice-customer">{{ sub.customer.displayName }}</span>
+                    <span class="invoice-amount">{{ sub.total | money:sub.currency }}<span class="per"> / {{ periodNoun(sub.frequency) }}</span></span>
+                  </div>
+                  <div class="invoice-meta">
+                    <span class="plan-name">{{ sub.plan }}</span>
+                    <span class="state-chip" [attr.data-tone]="subscriptionStatus(sub).tone">{{ subscriptionStatus(sub).label }}</span>
+                    <span *ngIf="nextStepText(sub) as next" [class.overdue-text]="sub.status === 'PAST_DUE'">{{ next }}</span>
+                  </div>
+                </div>
+                <mat-icon class="invoice-chevron" aria-hidden="true">{{ expandedId() === sub.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </div>
+            </div>
+
+            <app-inline-alert *ngIf="rowNotice()?.id === sub.id" class="row-error" [kind]="rowNotice()!.kind"
+                              [title]="rowNotice()!.title" [dismissible]="true"
+                              (dismiss)="rowNotice.set(null)">{{ rowNotice()!.message }}</app-inline-alert>
+
+            <div class="invoice-detail" *ngIf="expandedId() === sub.id" [id]="'subscription-detail-' + sub.id">
+              <div class="detail-columns">
+                <dl class="detail-grid">
+                  <div class="detail-item wide">
+                    <dt>Customer</dt>
+                    <dd class="customer-block">
+                      <span class="strong">{{ sub.customer.displayName }}</span>
+                      <span>{{ sub.customer.email }}</span>
+                    </dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Plan</dt>
+                    <dd>{{ sub.plan }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Billing</dt>
+                    <dd>{{ sub.frequency === 'YEARLY' ? 'Yearly' : 'Monthly' }}, from {{ date(sub.startDate) }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Price</dt>
+                    <dd>{{ sub.price | money:sub.currency }} per {{ periodNoun(sub.frequency) }}, excluding {{ taxLabel() }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Charged per {{ periodNoun(sub.frequency) }}</dt>
+                    <dd>{{ sub.total | money:sub.currency }}, with {{ taxLabel() }} at {{ formatRate(sub.vatRate) }}</dd>
+                  </div>
+                  <div class="detail-item wide">
+                    <dt>Payment method</dt>
+                    <dd *ngIf="sub.paymentMethod as method; else noMethod">
+                      <span class="strong">{{ method.label }}</span><span *ngIf="method.expiry">, expires {{ method.expiry }}</span><span *ngIf="method.holder">, {{ method.holder }}</span>
+                    </dd>
+                    <ng-template #noMethod><dd>Saved when the customer pays the first invoice</dd></ng-template>
+                  </div>
+                  <div class="detail-item" *ngIf="sub.status !== 'CANCELLED'">
+                    <dt>Next cycle</dt>
+                    <dd>Cycle {{ sub.cyclesBilled + 1 }}, from {{ date(sub.nextBillingDate) }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="sub.autoRescue || settings()?.autoRescueAvailable">
+                    <dt>Auto Rescue</dt>
+                    <dd>{{ sub.autoRescue ? 'Retries a refused card charge for up to ' + plural(sub.rescueDays ?? 30, 'day') : 'Off' }}</dd>
+                  </div>
+                  <div class="detail-item">
+                    <dt>Created</dt>
+                    <dd>{{ dateTime(sub.createdAt) }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="sub.activatedAt">
+                    <dt>Active since</dt>
+                    <dd>{{ dateTime(sub.activatedAt) }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="sub.pastDueSince">
+                    <dt>Past due since</dt>
+                    <dd class="danger-text">{{ dateTime(sub.pastDueSince) }}</dd>
+                  </div>
+                  <div class="detail-item" *ngIf="sub.cancelledAt">
+                    <dt>Cancelled</dt>
+                    <dd>{{ dateTime(sub.cancelledAt) }}</dd>
+                  </div>
+                </dl>
+
+                <!-- Awaiting the first payment -->
+                <section class="pay-panel" *ngIf="sub.status === 'AWAITING_PAYMENT_METHOD'"
+                         [attr.aria-labelledby]="'subscription-first-' + sub.id">
+                  <h3 class="pay-title" [id]="'subscription-first-' + sub.id">First payment</h3>
+                  <ng-container *ngIf="firstInvoice(sub) as first">
+                    <mat-icon class="pay-icon" aria-hidden="true">{{ first.status === 'PAID' ? 'task_alt' : 'link' }}</mat-icon>
+                    <p class="pay-text">{{ first.total | money:sub.currency }}</p>
+                    <div class="pay-status">
+                      <span class="mono">{{ first.number }}</span>
+                      <span class="state-chip" [attr.data-tone]="cycleStatus(first).tone">{{ cycleStatus(first).label }}</span>
+                    </div>
+                    <div class="pay-actions" *ngIf="first.paymentLinkUrl as url">
+                      <a mat-flat-button class="action-btn primary" [href]="url" target="_blank" rel="noopener">
+                        <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                        Open as customer<span class="cdk-visually-hidden"> (opens in a new tab)</span>
+                      </a>
+                      <button mat-stroked-button type="button" class="action-btn" *ngIf="canCopy" (click)="copyLink(first)">
+                        <mat-icon aria-hidden="true">{{ copiedId() === first.id ? 'check' : 'content_copy' }}</mat-icon>
+                        {{ copiedId() === first.id ? 'Link copied' : 'Copy link' }}
+                      </button>
+                    </div>
+                    <div class="pay-actions" *ngIf="first.sendable">
+                      <button mat-flat-button type="button" class="action-btn primary" (click)="sendInvoice(sub, first)"
+                              [disabled]="!!pending() || !!settings()?.issue">
+                        <mat-spinner *ngIf="isSending(first)" diameter="16" aria-hidden="true"></mat-spinner>
+                        <mat-icon *ngIf="!isSending(first)" aria-hidden="true">send</mat-icon>
+                        {{ isSending(first) ? 'Sending…' : 'Send payment link' }}
+                      </button>
+                    </div>
+                  </ng-container>
+                  <p class="pay-caption" *ngIf="firstPaymentHint(sub) as hint">{{ hint }}</p>
+                </section>
+
+                <!-- Charged each cycle -->
+                <section class="pay-panel" *ngIf="sub.status === 'ACTIVE' || sub.status === 'PAST_DUE'"
+                         [attr.aria-labelledby]="'subscription-charge-' + sub.id">
+                  <h3 class="pay-title" [id]="'subscription-charge-' + sub.id">{{ chargeTitle(sub) }}</h3>
+                  <mat-icon class="pay-icon" aria-hidden="true">{{ sub.paymentMethod?.card === false ? 'account_balance' : 'credit_card' }}</mat-icon>
+                  <ng-container *ngIf="openInvoice(sub) as open; else nextCharge">
+                    <p class="pay-text">{{ open.total | money:sub.currency }}</p>
+                    <div class="pay-status">
+                      <span class="mono">{{ open.number }}</span>
+                      <span class="state-chip" [attr.data-tone]="cycleStatus(open).tone">{{ cycleStatus(open).label }}</span>
+                    </div>
+                  </ng-container>
+                  <ng-template #nextCharge>
+                    <p class="pay-text">{{ sub.total | money:sub.currency }}</p>
+                    <div class="pay-status"><span>Cycle {{ sub.cyclesBilled + 1 }}, from {{ date(sub.nextBillingDate) }}</span></div>
+                  </ng-template>
+                  <p class="pay-caption" *ngIf="sub.paymentMethod as method">To {{ method.label }}</p>
+                  <div class="pay-actions">
+                    <button mat-flat-button type="button" class="action-btn primary" (click)="runCycle(sub)"
+                            [disabled]="!!pending() || !!sub.runCycleBlocked">
+                      <mat-spinner *ngIf="isPending(sub, 'run')" diameter="16" aria-hidden="true"></mat-spinner>
+                      <mat-icon *ngIf="!isPending(sub, 'run')" aria-hidden="true">bolt</mat-icon>
+                      {{ isPending(sub, 'run') ? 'Charging…' : (sub.retryInvoiceNumber ? 'Charge again now' : 'Run billing cycle now') }}
+                    </button>
+                    <button mat-stroked-button type="button" class="action-btn" *ngIf="testOutcomes(sub).length"
+                            [matMenuTriggerFor]="outcomeMenu" [matMenuTriggerData]="{ sub: sub }"
+                            [disabled]="!!pending() || !!sub.runCycleBlocked">
+                      <mat-icon aria-hidden="true">science</mat-icon>
+                      {{ sub.autoRescue ? 'Test Auto Rescue' : 'Test a refused charge' }}
+                    </button>
+                    <button mat-stroked-button type="button" class="action-btn" *ngIf="sub.rescueStoppable"
+                            (click)="stopRescue(sub)" [disabled]="!!pending()">
+                      <mat-spinner *ngIf="isPending(sub, 'stop')" diameter="16" aria-hidden="true"></mat-spinner>
+                      <mat-icon *ngIf="!isPending(sub, 'stop')" aria-hidden="true">stop_circle</mat-icon>
+                      {{ isPending(sub, 'stop') ? 'Stopping…' : 'Stop Auto Rescue…' }}
+                    </button>
+                  </div>
+                  <p class="pay-caption">{{ chargeHint(sub) }}</p>
+                </section>
+
+                <div class="pay-panel muted" *ngIf="sub.status === 'CANCELLED'">
+                  <mat-icon aria-hidden="true">block</mat-icon>
+                  <p>Cancelled{{ sub.cancelledAt ? ' on ' + date(sub.cancelledAt) : '' }}: no more cycles are billed.</p>
+                </div>
+              </div>
+
+              <section class="detail-section" *ngIf="sub.invoices.length" [attr.aria-labelledby]="'subscription-cycles-' + sub.id">
+                <h3 class="detail-heading" [id]="'subscription-cycles-' + sub.id">Billing cycles</h3>
+                <div class="table-scroll">
+                  <table class="lines-table cycles-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Cycle</th>
+                        <th scope="col">Period</th>
+                        <th scope="col">Invoice</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="num">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let inv of sub.invoices; trackBy: trackInvoice">
+                        <td>{{ inv.cycle }}</td>
+                        <td class="nowrap">{{ periodText(inv) }}</td>
+                        <td>
+                          <a class="invoice-link mono" [routerLink]="['/', userId, 'invoices']" [queryParams]="{ invoice: inv.id }">{{ inv.number }}</a>
+                        </td>
+                        <td>
+                          <div class="cycle-status">
+                            <span class="state-chip" [attr.data-tone]="cycleStatus(inv).tone">{{ cycleStatus(inv).label }}</span>
+                            <span class="cycle-note" *ngIf="unpaid(inv) && inv.chargeRefusalReason">{{ inv.chargeRefusalReason }}</span>
+                            <span class="cycle-note" *ngIf="inv.status === 'PAID' && inv.paidAt">{{ date(inv.paidAt) }}</span>
+                          </div>
+                          <!-- The first invoice has its own panel while it's unpaid. -->
+                          <div class="cycle-actions" *ngIf="inv.cycle > 1 && (inv.paymentLinkUrl || inv.sendable)">
+                            <a class="link-btn" *ngIf="inv.paymentLinkUrl as url" [href]="url" target="_blank" rel="noopener">
+                              Payment link<span class="cdk-visually-hidden"> of {{ inv.number }} (opens in a new tab)</span>
+                            </a>
+                            <button type="button" class="link-btn" *ngIf="inv.sendable" (click)="sendInvoice(sub, inv)"
+                                    [disabled]="!!pending() || !!settings()?.issue">
+                              {{ isSending(inv) ? 'Sending…' : 'Send payment link' }}
+                            </button>
+                          </div>
+                        </td>
+                        <td class="num">{{ inv.total | money:sub.currency }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="detail-section" *ngIf="sub.events.length" [attr.aria-labelledby]="'subscription-history-' + sub.id">
+                <h3 class="detail-heading" [id]="'subscription-history-' + sub.id">History</h3>
+                <ol class="timeline">
+                  <li class="timeline-item" *ngFor="let event of sub.events; trackBy: trackEvent"
+                      [attr.data-tone]="eventView(event).tone">
+                    <mat-icon class="timeline-icon" aria-hidden="true">{{ eventView(event).icon }}</mat-icon>
+                    <div class="timeline-content">
+                      <div class="timeline-title">
+                        <span>{{ eventView(event).label }}</span>
+                        <time [attr.datetime]="event.occurredAt" [attr.title]="dateTime(event.occurredAt)">{{ timeAgo(event.occurredAt) }}</time>
+                      </div>
+                      <div class="timeline-detail" *ngIf="event.detail">{{ event.detail }}</div>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+
+              <div class="detail-actions" *ngIf="sub.cancellable">
+                <button mat-stroked-button type="button" class="action-btn danger" (click)="cancel(sub)" [disabled]="!!pending()">
+                  <mat-spinner *ngIf="isPending(sub, 'cancel')" diameter="16" aria-hidden="true"></mat-spinner>
+                  <mat-icon *ngIf="!isPending(sub, 'cancel')" aria-hidden="true">block</mat-icon>
+                  {{ isPending(sub, 'cancel') ? 'Cancelling…' : 'Cancel subscription…' }}
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+
+        <mat-menu #outcomeMenu="matMenu" xPosition="before" aria-label="Test outcomes of the charge">
+          <ng-template matMenuContent let-sub="sub">
+            <button mat-menu-item type="button" class="outcome-item" *ngFor="let outcome of testOutcomes(sub)"
+                    (click)="runCycle(sub, outcome)">
+              <span class="outcome-label">{{ outcome.label }}</span>
+              <span class="outcome-hint">{{ outcome.hint }}</span>
+            </button>
+          </ng-template>
+        </mat-menu>
+      </ng-container>
+
+      <ng-template #noSubscriptions>
+        <div class="empty-state">
+          <mat-icon class="empty-icon" aria-hidden="true">autorenew</mat-icon>
+          <p>No subscriptions yet</p>
+          <span class="empty-hint">Start a subscription, or load the demo data.</span>
+          <div class="empty-actions">
+            <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadDemoData()" [disabled]="loadingDemo()">
+              <mat-spinner *ngIf="loadingDemo()" diameter="18" aria-hidden="true"></mat-spinner>
+              <mat-icon *ngIf="!loadingDemo()" aria-hidden="true">auto_awesome</mat-icon>
+              {{ loadingDemo() ? 'Loading demo data…' : 'Load demo data' }}
+            </button>
+            <button mat-stroked-button type="button" class="fintech-btn" (click)="newSubscription()" [disabled]="!settings()">New subscription</button>
+          </div>
+        </div>
+      </ng-template>
+    </ng-container>
+  </mat-card>
+
+</div>

@@ -20,7 +20,7 @@ export class ReportComponent extends PlatformExperiencePage {
   readonly pageDescription = 'Download and review financial reports.';
   readonly itemLabel = 'reports';
   readonly containerId = 'report-overview-container';
-  protected readonly errorFallback = 'Unable to open a reporting session with Adyen. Try again.';
+  protected readonly errorFallback = 'The session couldn\'t be opened. Try again.';
 
   protected requestSession(userId: string) {
     return this.sessionService.getReportInformation(userId);

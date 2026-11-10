@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {AuthPayload} from '../models';
+import {AuthPayload, CompanyRecord} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class AuthService {
@@ -15,5 +15,9 @@ export class AuthService {
 
   signup(payload: AuthPayload): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/api/auth/signup`, payload, {responseType: 'json'});
+  }
+
+  getCompanyRecord(country: string): Observable<CompanyRecord> {
+    return this.http.get<CompanyRecord>(`${this.baseUrl}/api/auth/company-record`, {params: {country}});
   }
 }

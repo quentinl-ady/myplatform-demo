@@ -152,14 +152,14 @@ export class CapturesComponent implements OnInit {
     ref.afterClosed().subscribe(updated => {
       if (!updated) return;
       this.replace(updated);
-      this.notify.success('Capture sent to Adyen. The status changes when Adyen confirms the capture.');
+      this.notify.success('Capture requested. The status updates once it is confirmed.');
     });
   }
 
   async cancel(payment: CheckoutPayment): Promise<void> {
     const confirmed = await this.confirmService.confirm({
       title: 'Cancel this payment?',
-      message: "Adyen releases the authorisation, so the shopper isn't charged. The payment can't be captured afterwards.",
+      message: "The shopper isn't charged, and the payment can't be captured afterwards.",
       details: [
         { label: 'Reference', value: payment.merchantReference },
         { label: 'Amount', value: formatMoney(payment.amount, payment.currency) },
@@ -177,7 +177,7 @@ export class CapturesComponent implements OnInit {
       next: updated => {
         this.cancellingId.set(null);
         this.replace(updated);
-        this.notify.success('Cancellation sent to Adyen. The status changes when Adyen confirms the cancellation.');
+        this.notify.success('Cancellation requested. The status updates once it is confirmed.');
       },
       error: err => {
         this.cancellingId.set(null);
@@ -230,7 +230,7 @@ export class CapturesComponent implements OnInit {
 
   sourceLabel(payment: CheckoutPayment): string {
     const source = payment.source === 'issuing-checkout' ? 'Test issued cards' : 'Checkout';
-    return `${source} · ${payment.channel === 'SAVED_CARD' ? 'Saved card' : 'Drop-in'}`;
+    return `${source} · ${payment.channel === 'SAVED_CARD' ? 'Saved card' : 'Payment form'}`;
   }
 
   splitLabel(type: string | null | undefined): string {
@@ -244,14 +244,13 @@ export class CapturesComponent implements OnInit {
   }
 
   operationStatus(operation: CheckoutPaymentOperation): string {
-    const webhook = operation.type === 'CANCEL' ? 'cancellation' : 'capture';
     switch (operation.status) {
       case 'SUCCEEDED':
-        return 'Confirmed by Adyen';
+        return 'Confirmed';
       case 'FAILED':
         return operation.reason ? `Failed: ${operation.reason}` : 'Failed';
       default:
-        return `Sent to Adyen, waiting for the ${webhook} webhook`;
+        return 'Waiting for confirmation';
     }
   }
 

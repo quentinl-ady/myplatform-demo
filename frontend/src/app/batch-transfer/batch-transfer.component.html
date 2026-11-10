@@ -2,7 +2,7 @@
 
   <div class="page-header">
     <h1>Batch transfers</h1>
-    <p>Prepare several transfers, then approve them all at once with a single authentication.</p>
+    <p>Prepare transfers, then approve them all at once.</p>
   </div>
 
   <!-- ==================== LOADING / NOT SET UP / ERROR ==================== -->
@@ -18,7 +18,7 @@
       </div>
       <div class="warning-text">
         <h2>No trusted device registered</h2>
-        <p>Register this device before you make batch transfers. You will use it to approve them with strong customer authentication (SCA).</p>
+        <p>Register this device to approve your transfers.</p>
       </div>
     </div>
     <app-device-registration [userId]="userId" (deviceRegistered)="onDeviceRegistered()"></app-device-registration>
@@ -79,7 +79,7 @@
           </ng-container>
           <ng-template #batchAmountHint>
             <ng-container *ngIf="!amountErrorMessage() && batchExceedsBalance(true); else batchDefaultHint">
-              With this transfer, the batch total is above your available balance of {{ accountInfo.amount | money:accountInfo.currency }}.
+              With this transfer, the batch exceeds your balance of {{ accountInfo.amount | money:accountInfo.currency }}.
             </ng-container>
             <ng-template #batchDefaultHint>{{ amountErrorMessage() || ('In ' + userCurrency + '. Available: ' + (accountInfo.amount | money:accountInfo.currency)) }}</ng-template>
           </ng-template>
@@ -91,7 +91,7 @@
             <label for="batch-name">Beneficiary name</label>
             <input id="batch-name" type="text" class="fintech-input" formControlName="counterpartyName"
                    placeholder="e.g. John Doe or Acme Corp" autocomplete="off" aria-describedby="batch-name-hint batch-name-check" />
-            <span class="hint-text" id="batch-name-hint">The name of the account holder, as known by their bank.</span>
+            <span class="hint-text" id="batch-name-hint">As known by their bank.</span>
             <p class="name-match" id="batch-name-check" role="status"><ng-container *ngIf="nameMatches"><mat-icon aria-hidden="true">check_circle</mat-icon>Name matches</ng-container></p>
           </div>
 
@@ -114,7 +114,7 @@
           <div class="form-group">
             <label for="batch-reference">Internal reference (optional)</label>
             <input id="batch-reference" type="text" class="fintech-input" formControlName="reference" placeholder="e.g. INV-2026-001" />
-            <span class="hint-text">Only visible to you. Demo: enter "noNameMatch" or "partialNameMatch" to test the name check results.</span>
+            <span class="hint-text">Only visible to you. Enter "noNameMatch" or "partialNameMatch" to test the name check.</span>
           </div>
 
           <div class="form-group">
@@ -173,7 +173,7 @@
       </div>
 
       <p class="empty-hint" *ngIf="!isLoadingPending && !pendingError && pendingTransfers.length === 0">
-        No transfers yet. Add transfers with the form above, then approve them all at once.
+        No transfers yet.
       </p>
 
       <ng-container *ngIf="pendingTransfers.length > 0">
@@ -208,7 +208,7 @@
         </div>
 
         <app-inline-alert *ngIf="batchExceedsBalance()" class="list-alert" kind="warning">
-          The batch total is above your available balance of {{ accountInfo.amount | money:accountInfo.currency }}. Some transfers may fail.
+          The batch exceeds your balance of {{ accountInfo.amount | money:accountInfo.currency }}. Some transfers may fail.
         </app-inline-alert>
 
         <app-inline-alert *ngIf="approvalError && !showScaModal" class="list-alert" [title]="approvalError.title" actionLabel="Try again"
@@ -238,9 +238,9 @@
       </div>
       <div class="modal-body">
         <p>You are about to approve <strong>{{ pendingTransfers.length === 1 ? '1 transfer' : pendingTransfers.length + ' transfers' }}</strong> for a total of <strong>{{ getBatchTotal() }}</strong>.</p>
-        <p *ngIf="!batchRemoteStart">Approve with the passkey of your trusted device to send them all at once.</p>
+        <p *ngIf="!batchRemoteStart">Approve with the passkey of your trusted device.</p>
         <app-remote-session-panel *ngIf="batchRemoteStart" [userId]="userId" [start]="batchRemoteStart"
-                                  instructions="Scan this QR code with your phone, then approve the transfers there to send them all at once."
+                                  instructions="Scan this QR code with your phone, then approve the transfers there."
                                   (completed)="onBatchApprovedOnPhone()"></app-remote-session-panel>
         <div class="sca-banner" *ngIf="scaStatus" role="status">
           <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
@@ -274,7 +274,6 @@
         <p>The name on the account is slightly different from the one you entered.</p>
         <p>You entered: <br><strong>{{ transferForm.value.counterpartyName }}</strong></p>
         <p>Name on the account: <br><strong>{{ suggestedName }}</strong></p>
-        <p class="modal-note">Use the name on the account, edit the details, or cancel.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn primary" (click)="acceptSuggestedName()" cdkFocusInitial>Use the name on the account</button>
@@ -295,8 +294,8 @@
         </h3>
       </div>
       <div class="modal-body">
-        <p>The name on the destination account <strong>does not match</strong> the beneficiary name you entered.</p>
-        <p class="modal-note">Sending money to the wrong account can result in loss of funds. Only continue if you are sure the details are correct.</p>
+        <p>The name on the account <strong>doesn't match</strong> the name you entered.</p>
+        <p class="modal-note">Money sent to the wrong account may be lost. Only continue if you're sure.</p>
       </div>
       <div class="actions stacked">
         <button mat-flat-button type="button" class="fintech-btn danger" (click)="proceedWithRisk()">Add to batch anyway</button>

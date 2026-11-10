@@ -52,6 +52,21 @@ interface ApprovalRecap {
   date: string;
 }
 
+/** Why transfers left the batch without being cancelled from it. */
+function leftBatchMessage(transfers: BatchTransferResponse[], currency: string): string {
+  const expired = transfers.every(t => t.reason === 'approvalExpired');
+  if (transfers.length > 1) {
+    return expired
+      ? `${transfers.length} transfers expired before approval and were cancelled.`
+      : `${transfers.length} transfers no longer wait for approval.`;
+  }
+  const [transfer] = transfers;
+  const what = `${formatMoney(transfer.amount, transfer.currency || currency)} to ${transfer.counterpartyName || 'its beneficiary'}`;
+  return expired
+    ? `The transfer of ${what} expired before approval and was cancelled.`
+    : `The transfer of ${what} no longer waits for approval.`;
+}
+
 @Component({
   selector: 'app-batch-transfer',
   standalone: true,
@@ -256,7 +271,12 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     this.transferService.getPendingBatchTransfers(this.userId).subscribe({
       next: (res: PendingBatchTransfersResponse | BatchTransferResponse[]) => {
         const transfers = Array.isArray(res) ? res : (res?.transfers ?? []);
+        const left = Array.isArray(res) ? [] : (res?.noLongerPending ?? []);
         this.pendingNotFoundCount = Array.isArray(res) ? 0 : (res?.notFoundCount || 0);
+        if (left.length) {
+          this.dropFromBatch(left.map(t => t.id));
+          this.notify.info(leftBatchMessage(left, this.userCurrency));
+        }
         // Transfers added in this session may not be listed yet, so the response is merged rather than replacing the list.
         const existingIds = new Set(this.pendingTransfers.map(t => t.id));
         transfers
@@ -490,7 +510,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
   async removeFromBatch(transfer: BatchTransferResponse) {
     const confirmed = await this.confirmService.confirm({
       title: 'Cancel this transfer?',
-      message: 'The transfer is cancelled on Adyen and removed from the batch. This cannot be undone.',
+      message: 'The transfer is removed from the batch. This cannot be undone.',
       details: [
         { label: 'Beneficiary', value: transfer.counterpartyName || '—' },
         { label: 'Amount', value: formatMoney(transfer.amount, transfer.currency || this.userCurrency) }
@@ -507,7 +527,7 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
     if (!transfers.length) return;
     const confirmed = await this.confirmService.confirm({
       title: transfers.length === 1 ? 'Cancel 1 transfer?' : `Cancel all ${transfers.length} transfers?`,
-      message: 'The transfers are cancelled on Adyen and removed from the batch. This cannot be undone.',
+      message: 'The transfers are removed from the batch. This cannot be undone.',
       details: [
         { label: 'Transfers', value: String(transfers.length) },
         { label: 'Total', value: this.getBatchTotal(transfers) }
@@ -545,11 +565,12 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
     this.transferService.cancelBatchTransfers(this.userId, ids).subscribe({
       next: (res) => {
-        const cancelled = new Set(res?.transferIds?.length ? res.transferIds : ids);
-        cancelled.forEach(id => this.hiddenIds.add(id));
+        const cancelled = res?.transferIds ?? [];
+        const left = res?.noLongerPending ?? [];
+        const removed = new Set([...cancelled, ...left.map(t => t.id)]);
         ids.forEach(id => this.cancellingIds.delete(id));
-        this.pendingTransfers = this.pendingTransfers.filter(t => !cancelled.has(t.id));
-        const notCancelled = ids.filter(id => !cancelled.has(id)).length;
+        this.dropFromBatch(removed);
+        const notCancelled = ids.filter(id => !removed.has(id)).length;
         if (notCancelled > 0) {
           this.pendingActionError = {
             title: notCancelled === 1 ? "1 transfer couldn't be cancelled" : `${notCancelled} transfers couldn't be cancelled`,
@@ -557,8 +578,11 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
             retry: () => this.loadPendingTransfers(),
             actionLabel: 'Refresh'
           };
-        } else {
-          this.notify.success(cancelled.size === 1 ? 'Transfer cancelled' : `${cancelled.size} transfers cancelled`);
+        } else if (cancelled.length) {
+          const done = cancelled.length === 1 ? 'Transfer cancelled' : `${cancelled.length} transfers cancelled`;
+          this.notify.success(left.length ? `${done}. ${leftBatchMessage(left, this.userCurrency)}` : done);
+        } else if (left.length) {
+          this.notify.info(leftBatchMessage(left, this.userCurrency));
         }
         this.loadPendingTransfers();
       },
@@ -576,6 +600,12 @@ export class BatchTransferComponent implements OnInit, OnDestroy {
 
   get isCancelling(): boolean {
     return this.cancellingIds.size > 0;
+  }
+
+  private dropFromBatch(ids: Iterable<string>) {
+    const dropped = new Set(ids);
+    dropped.forEach(id => this.hiddenIds.add(id));
+    this.pendingTransfers = this.pendingTransfers.filter(t => !dropped.has(t.id));
   }
 
   // ─────────── Approval ───────────

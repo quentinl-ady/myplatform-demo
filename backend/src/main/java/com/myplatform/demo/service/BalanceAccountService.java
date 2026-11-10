@@ -12,10 +12,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class BalanceAccountService {
+
+    private static final int LIST_PAGE_SIZE = 100;
+    private static final int MAX_LISTED_PAGES = 5;
 
     private final AccountHoldersApi accountHoldersApi;
     private final BalanceAccountsApi balanceAccountsApi;
@@ -54,6 +58,22 @@ public class BalanceAccountService {
                     }
                 })
                 .toList();
+    }
+
+    /** The balance accounts of the account holder, without their balances. */
+    public List<BalanceAccountBase> listBalanceAccounts(String accountHolderId) throws IOException, ApiException {
+        List<BalanceAccountBase> accounts = new ArrayList<>();
+        for (int page = 0; page < MAX_LISTED_PAGES; page++) {
+            PaginatedBalanceAccountsResponse response = accountHoldersApi.getAllBalanceAccountsOfAccountHolder(
+                    accountHolderId, page * LIST_PAGE_SIZE, LIST_PAGE_SIZE, null);
+            if (response.getBalanceAccounts() != null) {
+                accounts.addAll(response.getBalanceAccounts());
+            }
+            if (!Boolean.TRUE.equals(response.getHasNext())) {
+                break;
+            }
+        }
+        return accounts;
     }
 
     public BalanceAccountInfoCustomer getOneBalanceAccount(String balanceAccountId) throws IOException, ApiException {

@@ -158,8 +158,8 @@ export class ContinueComponent implements OnInit, OnDestroy {
 
   get confirmText(): string {
     switch (this.pendingStep()) {
-      case 'register': return 'Your phone needs a tap to create the passkey. Tap Continue, then confirm with Face ID, your fingerprint or your screen lock.';
-      case 'associate': return 'One more confirmation links this phone to your bank account. Tap Continue, then confirm with your passkey.';
+      case 'register': return 'Tap Continue to create the passkey, then confirm with Face ID, your fingerprint or your screen lock.';
+      case 'associate': return 'Tap Continue to link this phone to your bank account, then confirm with your passkey.';
       default: return 'Tap Continue, then confirm with Face ID, your fingerprint or your screen lock.';
     }
   }

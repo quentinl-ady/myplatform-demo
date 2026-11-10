@@ -3,6 +3,7 @@ package com.myplatform.demo.controller;
 import com.myplatform.demo.model.WebhookEvent;
 import com.myplatform.demo.service.AccountStatementService;
 import com.myplatform.demo.service.CheckoutPaymentService;
+import com.myplatform.demo.service.InvoicingWebhookHandler;
 import com.myplatform.demo.service.WebhookService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,12 +18,15 @@ public class WebhookController {
     private final WebhookService webhookService;
     private final CheckoutPaymentService checkoutPaymentService;
     private final AccountStatementService accountStatementService;
+    private final InvoicingWebhookHandler invoicingWebhookHandler;
 
     public WebhookController(WebhookService webhookService, CheckoutPaymentService checkoutPaymentService,
-                             AccountStatementService accountStatementService) {
+                             AccountStatementService accountStatementService,
+                             InvoicingWebhookHandler invoicingWebhookHandler) {
         this.webhookService = webhookService;
         this.checkoutPaymentService = checkoutPaymentService;
         this.accountStatementService = accountStatementService;
+        this.invoicingWebhookHandler = invoicingWebhookHandler;
     }
 
     @PostMapping("/adyen")
@@ -30,6 +34,7 @@ public class WebhookController {
         webhookService.processWebhook(rawJson, "adyen");
         checkoutPaymentService.applyWebhook(rawJson);
         accountStatementService.applyWebhook(rawJson);
+        invoicingWebhookHandler.apply(rawJson);
         return ResponseEntity.ok("[accepted]");
     }
 
@@ -38,6 +43,7 @@ public class WebhookController {
         WebhookEvent event = webhookService.processWebhook(rawJson, "manual");
         checkoutPaymentService.applyWebhook(rawJson);
         accountStatementService.applyWebhook(rawJson);
+        invoicingWebhookHandler.apply(rawJson);
         return ResponseEntity.ok(event);
     }
 

@@ -1,0 +1,164 @@
+/* Shared by the bill, supplier and payment dialogs. */
+.bank-section {
+  margin: 0;
+  padding: 16px 0 0;
+  border: none;
+  border-top: 1px solid var(--fintech-border);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.bank-section legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+}
+.bank-section legend .optional {
+  font-weight: 400;
+  color: var(--fintech-text-secondary);
+}
+.bank-section .helper-text { margin-top: -4px; }
+.bank-section .text-btn { align-self: flex-start; }
+.dialog-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fintech-text-secondary);
+}
+.check-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8125rem;
+  color: var(--fintech-text-secondary);
+}
+.check-progress mat-spinner,
+.text-btn mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+
+/* Verification of Payee */
+.payee-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.payee-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 12px;
+}
+.payee-item.excluded { background: var(--fintech-surface-subtle); }
+.payee-item.excluded .payee-amount {
+  text-decoration: line-through;
+  color: var(--fintech-text-secondary);
+}
+.payee-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.payee-who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.payee-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  overflow-wrap: anywhere;
+}
+.payee-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 0.75rem;
+  color: var(--fintech-text-secondary);
+}
+.payee-amount {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fintech-text);
+}
+.payee-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.payee-description {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--fintech-text-secondary);
+}
+.payee-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.payee-risk { font-size: 0.8125rem; }
+.payee-item .helper-text { margin: 0; }
+
+/*
+ * Transfer speed: the routes Adyen has to the banks of the suppliers. Not a .field: its rule for labels would lay out
+ * the speed options, which are labels, as plain blocks.
+ */
+.pay-speeds {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pay-speeds .field-label { margin-bottom: 0; }
+.pay-speeds .helper-text { margin: 0; }
+
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--fintech-surface-muted);
+  color: var(--fintech-text-secondary);
+}
+.state-chip mat-icon {
+  font-size: 0.875rem;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.state-chip[data-tone="success"] { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.state-chip[data-tone="warning"] { background: var(--fintech-warning-bg); color: var(--fintech-warning); }
+.state-chip[data-tone="danger"] { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
+.state-chip[data-tone="info"] { background: var(--fintech-info-bg); color: var(--fintech-info); }
+
+.mono { font-family: var(--fintech-font-mono); }
+.alert-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.pay-summary {
+  margin-right: auto;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .state-chip { border: 1px solid CanvasText; }
+}

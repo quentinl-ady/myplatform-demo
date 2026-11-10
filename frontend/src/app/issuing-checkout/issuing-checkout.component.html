@@ -2,7 +2,7 @@
 
   <div class="header-section">
     <h1>Test issued cards</h1>
-    <p>Test payments with Adyen-issued cards. Only Visa and Mastercard are accepted.</p>
+    <p>Pay with the cards you issued. Visa and Mastercard only.</p>
     <div class="issuing-badge" *ngIf="issuingUserInfo()">
       <mat-icon aria-hidden="true">credit_card</mat-icon>
       <span>Issuing test merchant: <strong>{{ issuingUserId }}</strong></span>
@@ -100,7 +100,7 @@
       <mat-card class="dropin-card" [class.active]="dropinActive() || paymentOutcome()">
         <div class="empty-dropin" *ngIf="!dropinActive() && !paymentOutcome() && !submitting()">
           <mat-icon aria-hidden="true">credit_card</mat-icon>
-          <p>Enter the payment details, then select <strong>Continue to payment</strong> to load the payment form.<br><strong>Only Visa and Mastercard are accepted.</strong></p>
+          <p>The payment form appears here.</p>
         </div>
 
         <div class="empty-dropin" *ngIf="submitting() && !dropinActive()" role="status">
@@ -130,7 +130,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Save a card (zero-amount authorisation)</h2>
-        <p class="section-desc">Store an Adyen-issued card for future payments with a zero-amount authorisation. The card is saved for unscheduled card-on-file payments.</p>
+        <p class="section-desc">Save an issued card for later payments.</p>
 
         <form [formGroup]="tokenizeForm" (ngSubmit)="onTokenizeSubmit()" class="fintech-form" novalidate>
 
@@ -178,7 +178,7 @@
       <mat-card class="dropin-card" [class.active]="tokenizeDropinActive() || tokenizeOutcome()">
         <div class="empty-dropin" *ngIf="!tokenizeDropinActive() && !tokenizeOutcome() && !submittingTokenize()">
           <mat-icon aria-hidden="true">credit_card</mat-icon>
-          <p>Enter the details, then select <strong>Continue to card details</strong> to load the card form.<br><strong>Only Visa and Mastercard are accepted.</strong></p>
+          <p>The card form appears here.</p>
         </div>
 
         <div class="empty-dropin" *ngIf="submittingTokenize() && !tokenizeDropinActive()" role="status">
@@ -208,7 +208,7 @@
 
       <mat-card class="config-card">
         <h2 class="mat-h3 card-title">Saved cards</h2>
-        <p class="section-desc">Select a saved issued card and charge it from the server as an unscheduled card-on-file payment, without the cardholder.</p>
+        <p class="section-desc">Charge a saved card without the cardholder.</p>
 
         <form [formGroup]="tokenPaymentForm" *ngIf="isEmbeddedPayment" novalidate>
           <div class="form-group">

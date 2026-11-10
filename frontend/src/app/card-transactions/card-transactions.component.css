@@ -275,7 +275,117 @@ app-inline-alert { margin-bottom: 24px; }
   color: var(--fintech-warning);
 }
 
+/* How the payment is booked */
+.merchant-booking {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--fintech-text-secondary);
+  overflow-wrap: anywhere;
+}
+.merchant-booking mat-icon { font-size: 0.875rem; }
+.receipt-badge {
+  display: inline-block;
+  width: fit-content;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--fintech-warning-bg);
+  color: var(--fintech-warning);
+}
+
+.fintech-btn.danger { background-color: var(--fintech-danger) !important; color: var(--fintech-on-danger) !important; }
+.fintech-btn mat-spinner {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+  --mdc-circular-progress-active-indicator-color: currentColor;
+}
+
+.booking-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: var(--fintech-surface-subtle);
+  color: var(--fintech-text);
+}
+.booking-status mat-icon { font-size: 1.125rem; margin-top: 1px; }
+.booking-status[data-tone="success"] { background: var(--fintech-success-bg); }
+.booking-status[data-tone="success"] mat-icon { color: var(--fintech-success); }
+.booking-status[data-tone="warning"] { background: var(--fintech-warning-bg); }
+.booking-status[data-tone="warning"] mat-icon { color: var(--fintech-warning); }
+
+.expense-loading { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; color: var(--fintech-text-secondary); }
+.expense-fields { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; gap: 14px 16px; }
+.expense-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.expense-field.note { grid-column: 1 / -1; }
+.expense-field .fintech-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  font: inherit;
+  /* Below 16px, iOS Safari zooms in on focus. */
+  font-size: max(1rem, 16px);
+  color: var(--fintech-text);
+  background: var(--fintech-surface);
+  border: 1px solid var(--fintech-border-strong);
+  border-radius: 12px;
+}
+.expense-field .fintech-input:focus { border-color: var(--fintech-primary); }
+.expense-field .fintech-input:disabled { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+.field-hint, .optional { font-size: 0.75rem; font-weight: 400; color: var(--fintech-text-secondary); }
+
+.expense-amounts { margin: 16px 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+.expense-amounts > div { display: flex; justify-content: space-between; gap: 12px; }
+.expense-amounts dt { color: var(--fintech-text-secondary); }
+.expense-amounts dd { margin: 0; color: var(--fintech-text); font-variant-numeric: tabular-nums; }
+.expense-amounts .total { padding-top: 6px; border-top: 1px solid var(--fintech-border); font-weight: 600; }
+.expense-amounts .total dt { color: var(--fintech-text); }
+
+.expense-form app-inline-alert { display: block; margin: 0 0 12px; }
+.expense-actions, .receipt-actions, .confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.confirm-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: stretch;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--fintech-danger-border);
+  background: var(--fintech-danger-bg-subtle);
+  font-size: 0.875rem;
+  color: var(--fintech-text);
+}
+
+.receipt-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 12px;
+}
+.receipt-box.missing { border-color: var(--fintech-warning-border); background: var(--fintech-warning-bg); }
+.receipt-title { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); }
+.receipt-empty { margin: 0; font-size: 0.875rem; color: var(--fintech-text-secondary); }
+.receipt-box.missing .receipt-empty { color: var(--fintech-warning); font-weight: 500; }
+.receipt-file { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.receipt-file mat-icon { font-size: 1.5rem; color: var(--fintech-text-secondary); }
+.receipt-info { display: flex; flex-direction: column; min-width: 0; }
+.receipt-name { font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); overflow-wrap: anywhere; }
+.receipt-meta { font-size: 0.75rem; color: var(--fintech-text-secondary); }
+.receipt-box app-inline-alert { display: block; align-self: stretch; margin: 0; }
+
 @media (max-width: 600px) {
+  .expense-fields { grid-template-columns: 1fr; }
   .modal-header { padding: 20px 20px 12px; }
   .modal-body { padding: 16px 20px 20px; }
   .detail-grid { grid-template-columns: 1fr; }

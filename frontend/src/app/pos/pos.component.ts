@@ -243,7 +243,7 @@ export class PosComponent implements OnInit {
     const amount = this.formatAmount(result.request.amount, result.request.currency);
     const confirmed = await this.confirm.confirm({
       title: `Charge ${amount} again?`,
-      message: 'If the first payment went through, the customer is charged twice. Check the terminal screen or the transactions list first.',
+      message: 'If the first payment went through, the customer pays twice. Check the terminal first.',
       details: [
         { label: 'Amount', value: amount },
         { label: 'First reference', value: result.request.reference },
@@ -307,8 +307,8 @@ export class PosComponent implements OnInit {
             kind: 'error',
             title: timedOut ? 'No answer from the terminal' : 'Unable to reach the terminal',
             message: timedOut
-              ? 'The terminal did not answer in time, so the payment may have gone through. Check the terminal screen or the transactions list before charging again.'
-              : httpErrorMessage(err, 'The payment may not have reached the terminal. Check that the terminal is online and check its screen before charging again.'),
+              ? 'The payment may have gone through. Check the terminal before charging again.'
+              : httpErrorMessage(err, 'The payment may not have reached the terminal. Check that it is online before charging again.'),
             request: payload,
             response: null,
             reason: ''
@@ -350,7 +350,7 @@ export class PosComponent implements OnInit {
           ...base,
           kind: 'error',
           title: 'Payment status unknown',
-          message: 'The terminal returned an unexpected response, so the payment may have gone through. Check the terminal screen or the transactions list before charging again.'
+          message: 'The payment may have gone through. Check the terminal before charging again.'
         };
     }
   }

@@ -139,12 +139,17 @@ export interface BatchApproveResponse {
 
 export interface BatchCancelResponse {
   status: string;
+  /** The transfers this request cancelled. */
   transferIds: string[];
+  /** Transfers that no longer waited for their approval, e.g. because it expired: they leave the batch as they are. */
+  noLongerPending?: BatchTransferResponse[];
 }
 
 export interface PendingBatchTransfersResponse {
   transfers?: BatchTransferResponse[];
   notFoundCount?: number;
+  /** Transfers that no longer wait for their approval, e.g. because it expired: they leave the batch. */
+  noLongerPending?: BatchTransferResponse[];
 }
 
 export interface IsCrossBorderRequest {

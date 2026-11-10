@@ -1,0 +1,502 @@
+<div class="invoices-wrapper">
+
+  <div class="invoices-header">
+    <div>
+      <h1>Bills</h1>
+      <p class="invoices-subtitle">Record your supplier bills and pay them by transfer or with a single-use card.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-icon-button type="button" (click)="load()" [disabled]="loading()"
+              matTooltip="Refresh" aria-label="Refresh bills">
+        <mat-icon [class.spinning]="loading() || refreshing()" aria-hidden="true">refresh</mat-icon>
+      </button>
+      <button mat-icon-button type="button" [matMenuTriggerFor]="pageMenu"
+              matTooltip="More actions" aria-label="More actions">
+        <mat-icon aria-hidden="true">more_vert</mat-icon>
+      </button>
+      <mat-menu #pageMenu="matMenu" xPosition="before">
+        <button mat-menu-item type="button" (click)="addSupplier()" [disabled]="!settings()">
+          <mat-icon aria-hidden="true">add_business</mat-icon>
+          <span>New supplier</span>
+        </button>
+        <button mat-menu-item type="button" (click)="loadDemoData()" [disabled]="loadingDemo()">
+          <mat-icon aria-hidden="true">auto_awesome</mat-icon>
+          <span>Load demo data</span>
+        </button>
+      </mat-menu>
+      <button mat-flat-button type="button" class="fintech-btn primary" (click)="newBill()" [disabled]="!settings()">
+        <mat-icon aria-hidden="true">add</mat-icon>
+        New bill
+      </button>
+    </div>
+  </div>
+
+  <div class="demo-progress" *ngIf="loadingDemo()" role="status">
+    <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+    <span>Loading the demo data…</span>
+  </div>
+  <app-inline-alert *ngIf="demoError() as error" title="Unable to load the demo data" actionLabel="Try again"
+                    (action)="loadDemoData()" [dismissible]="true" (dismiss)="demoError.set(null)">{{ error }}</app-inline-alert>
+  <app-inline-alert *ngIf="demoWarnings().length" kind="warning" title="Part of the demo data couldn't be created"
+                    [dismissible]="true" (dismiss)="demoWarnings.set([])">
+    <ul class="alert-list">
+      <li *ngFor="let warning of demoWarnings()">{{ warning }}</li>
+    </ul>
+  </app-inline-alert>
+  <app-inline-alert *ngIf="paymentResult() as result" [kind]="result.failed ? 'warning' : 'success'"
+                    [title]="paymentResultTitle(result)" actionLabel="Approve on Batch transfers" (action)="approveTransfers()"
+                    [dismissible]="true" (dismiss)="paymentResult.set(null)">
+    <ul class="alert-list" *ngIf="failedItems(result).length">
+      <li *ngFor="let item of failedItems(result)">{{ item.number }}: {{ item.error }}</li>
+    </ul>
+  </app-inline-alert>
+  <ng-container *ngIf="!loading() && settings() as s">
+    <app-inline-alert *ngIf="s.transfersIssue as issue" kind="info" [live]="false"
+                      title="Bills can't be paid by transfer">{{ issue }}</app-inline-alert>
+    <app-inline-alert *ngIf="s.cardsIssue as issue" kind="info" [live]="false"
+                      title="Bills can't be paid with a card">{{ issue }}</app-inline-alert>
+  </ng-container>
+
+  <dl class="kpis" *ngIf="!loading() && !loadError() && bills().length">
+    <div class="kpi">
+      <dt>To pay</dt>
+      <dd class="kpi-value">{{ kpis().toPay | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().toPayCount ? plural(kpis().toPayCount, 'bill') + ' to pay' : 'Nothing to pay' }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().overdueCount ? 'danger' : null">
+      <dt>Overdue</dt>
+      <dd class="kpi-value">{{ kpis().overdue | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().overdueCount ? plural(kpis().overdueCount, 'bill') + ' past due' : 'Nothing overdue' }}</dd>
+    </div>
+    <div class="kpi">
+      <dt>Under way</dt>
+      <dd class="kpi-value">{{ kpis().inProgress | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().inProgressCount ? plural(kpis().inProgressCount, 'payment') + ' under way' : 'No payments under way' }}</dd>
+    </div>
+    <div class="kpi" [attr.data-tone]="kpis().paidCount ? 'success' : null">
+      <dt>Paid</dt>
+      <dd class="kpi-value">{{ kpis().paid | money:currency() }}</dd>
+      <dd class="kpi-hint">{{ kpis().paidCount ? plural(kpis().paidCount, 'bill') + ' paid' : 'No bills paid yet' }}</dd>
+    </div>
+  </dl>
+
+  <mat-card class="invoices-card" [attr.aria-busy]="loading()">
+
+    <div *ngIf="loading()" class="loading-spinner" role="status">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span class="cdk-visually-hidden">Loading bills</span>
+    </div>
+
+    <app-inline-alert *ngIf="!loading() && loadError() as error" class="load-error" title="Unable to load bills"
+                      actionLabel="Try again" (action)="load()">{{ error }}</app-inline-alert>
+
+    <mat-tab-group *ngIf="!loading() && !loadError()" class="invoice-tabs" mat-stretch-tabs="false" animationDuration="0ms"
+                   [selectedIndex]="tab()" (selectedIndexChange)="tab.set($event)">
+
+      <!-- Bills -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Bills <span class="tab-count" *ngIf="bills().length">{{ bills().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="bills().length; else noBills">
+          <div class="list-toolbar">
+            <mat-button-toggle-group [value]="filter()" (change)="setFilter($event.value)" appearance="standard"
+                                     class="filter-toggle" aria-label="Show bills">
+              <mat-button-toggle value="all">All</mat-button-toggle>
+              <mat-button-toggle value="open">To pay<span *ngIf="counts().open"> ({{ counts().open }})</span></mat-button-toggle>
+              <mat-button-toggle value="inProgress">Under way<span *ngIf="counts().inProgress"> ({{ counts().inProgress }})</span></mat-button-toggle>
+              <mat-button-toggle value="paid">Paid</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          <div class="selection-bar" *ngIf="transfersAvailable() && selectableBills().length">
+            <mat-checkbox [checked]="allSelected()" [indeterminate]="someSelected()" (change)="toggleAll($event.checked)">
+              Select all
+            </mat-checkbox>
+            <span class="selection-text" *ngIf="selectedBills().length" aria-live="polite">
+              {{ plural(selectedBills().length, 'bill') }} selected · {{ selectedTotal() | money:currency() }}
+            </span>
+            <button mat-flat-button type="button" class="action-btn primary selection-pay" (click)="paySelected()"
+                    [disabled]="!selectedBills().length || !!pending()">
+              <mat-icon aria-hidden="true">account_balance</mat-icon>
+              {{ selectedBills().length ? 'Pay ' + plural(selectedBills().length, 'bill') + ' by transfer' : 'Pay by transfer' }}
+            </button>
+          </div>
+
+          <div class="empty-state compact" *ngIf="!visibleBills().length">
+            <mat-icon class="empty-icon" aria-hidden="true">task_alt</mat-icon>
+            <p>{{ emptyFilterText() }}</p>
+            <button mat-stroked-button type="button" (click)="setFilter('all')">Show all bills</button>
+          </div>
+
+          <ul class="invoice-list" *ngIf="visibleBills().length" aria-label="Bills">
+            <li *ngFor="let bill of visibleBills(); trackBy: trackById" class="invoice-item" [id]="'bill-' + bill.id"
+                [class.expanded]="expandedId() === bill.id">
+              <div class="invoice-row">
+                <div class="bill-select" *ngIf="transfersAvailable()">
+                  <mat-checkbox *ngIf="bill.payableByTransfer" [checked]="isSelected(bill)" (change)="toggleSelected(bill, $event)"
+                                [aria-label]="'Select ' + bill.number + ' to pay by transfer'"></mat-checkbox>
+                </div>
+                <div class="invoice-main" role="button" tabindex="0"
+                     [attr.aria-expanded]="expandedId() === bill.id"
+                     [attr.aria-controls]="'bill-detail-' + bill.id"
+                     (click)="toggle(bill, $event)"
+                     (keydown.enter)="toggle(bill, $event)"
+                     (keydown.space)="toggle(bill, $event)">
+                  <div class="invoice-icon" [attr.data-tone]="displayStatus(bill).tone" aria-hidden="true">
+                    <mat-icon>{{ displayStatus(bill).icon }}</mat-icon>
+                  </div>
+                  <div class="invoice-content">
+                    <div class="invoice-title">
+                      <span class="invoice-customer">{{ bill.supplier.name }}</span>
+                      <span class="invoice-amount">{{ bill.total | money:bill.currency }}</span>
+                    </div>
+                    <div class="invoice-meta">
+                      <span class="invoice-number">{{ bill.number }}</span>
+                      <span class="state-chip" [attr.data-tone]="displayStatus(bill).tone">{{ displayStatus(bill).label }}</span>
+                      <span [class.overdue-text]="bill.status === 'OVERDUE'">{{ billDueText(bill) }}</span>
+                      <span class="bill-summary" *ngIf="bill.description">{{ bill.description }}</span>
+                    </div>
+                  </div>
+                  <mat-icon class="invoice-chevron" aria-hidden="true">{{ expandedId() === bill.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </div>
+
+                <div class="invoice-actions" *ngIf="bill.status === 'PENDING_APPROVAL'">
+                  <a mat-flat-button class="action-btn primary" [routerLink]="['/', userId, 'batch-transfer']"
+                     [attr.aria-label]="'Approve the transfer of ' + bill.number + ' on Batch transfers'">Approve</a>
+                </div>
+              </div>
+
+              <app-inline-alert *ngIf="rowError()?.id === bill.id" class="row-error" [title]="rowError()!.title"
+                                [dismissible]="true" (dismiss)="rowError.set(null)">{{ rowError()!.message }}</app-inline-alert>
+
+              <div class="invoice-detail" *ngIf="expandedId() === bill.id" [id]="'bill-detail-' + bill.id">
+                <div class="detail-columns">
+                  <dl class="detail-grid">
+                    <div class="detail-item wide">
+                      <dt>Supplier</dt>
+                      <dd class="customer-block">
+                        <span class="strong">{{ bill.supplier.name }}</span>
+                        <span *ngIf="bill.supplier.email">{{ bill.supplier.email }}</span>
+                        <span *ngIf="bill.supplier.country">{{ countryName(bill.supplier.country) }}</span>
+                        <span class="mono" *ngIf="bill.supplier.bankAccount">{{ bill.supplier.bankAccount }}</span>
+                      </dd>
+                    </div>
+                    <div class="detail-item" *ngIf="bill.supplierReference">
+                      <dt>Supplier's invoice</dt>
+                      <dd class="mono">{{ bill.supplierReference }}</dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Category</dt>
+                      <dd>{{ bill.category }} · {{ bill.categoryName }}</dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Issue date</dt>
+                      <dd>{{ date(bill.issueDate) }}</dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Due date</dt>
+                      <dd>{{ date(bill.dueDate) }}</dd>
+                    </div>
+                    <div class="detail-item">
+                      <dt>Payment</dt>
+                      <dd>{{ paymentMethodLabel(bill) }}<ng-container *ngIf="bill.transferStatus"> · {{ humanize(bill.transferStatus) }}</ng-container></dd>
+                    </div>
+                    <div class="detail-item" *ngIf="bill.paidAt">
+                      <dt>Paid</dt>
+                      <dd>{{ dateTime(bill.paidAt) }}</dd>
+                    </div>
+                    <div class="detail-item wide" *ngIf="bill.payeeCheck as check">
+                      <dt>Verification of Payee</dt>
+                      <dd class="payee-line">
+                        <span class="state-chip" [attr.data-tone]="payeeCheckView(check.result).tone">{{ payeeCheckView(check.result).label }}</span>
+                        <span *ngIf="check.name">The bank has “{{ check.name }}”</span>
+                        <time class="muted-text" *ngIf="check.checkedAt" [attr.datetime]="check.checkedAt"
+                              [attr.title]="dateTime(check.checkedAt)">{{ timeAgo(check.checkedAt) }}</time>
+                      </dd>
+                    </div>
+                    <div class="detail-item wide" *ngIf="bill.status === 'FAILED' && bill.failureReason">
+                      <dt>Why the payment failed</dt>
+                      <dd class="danger-text">{{ bill.failureReason }}</dd>
+                    </div>
+                  </dl>
+
+                  <!-- To pay -->
+                  <section class="pay-panel" *ngIf="isOpen(bill)" [attr.aria-labelledby]="'bill-pay-' + bill.id">
+                    <h3 class="pay-title" [id]="'bill-pay-' + bill.id">{{ bill.status === 'FAILED' ? 'Pay again' : 'Pay this bill' }}</h3>
+                    <div class="pay-actions">
+                      <button mat-flat-button type="button" class="action-btn primary" *ngIf="bill.payableByTransfer"
+                              (click)="payByTransfer(bill)" [disabled]="!!pending()">
+                        <mat-icon aria-hidden="true">account_balance</mat-icon>
+                        Pay by transfer
+                      </button>
+                      <ng-container *ngIf="bill.payableByCard">
+                        <button mat-stroked-button type="button" class="action-btn" *ngIf="cardBrands().length <= 1"
+                                (click)="payByCard(bill, cardBrands()[0])" [disabled]="!!pending()">
+                          <mat-spinner *ngIf="isPending(bill, 'card')" diameter="16" aria-hidden="true"></mat-spinner>
+                          <mat-icon *ngIf="!isPending(bill, 'card')" aria-hidden="true">credit_card</mat-icon>
+                          {{ isPending(bill, 'card') ? 'Issuing the card…' : 'Pay with a single-use card' }}
+                        </button>
+                        <button mat-stroked-button type="button" class="action-btn" *ngIf="cardBrands().length > 1"
+                                [matMenuTriggerFor]="brandMenu" [matMenuTriggerData]="{ bill: bill }" [disabled]="!!pending()">
+                          <mat-spinner *ngIf="isPending(bill, 'card')" diameter="16" aria-hidden="true"></mat-spinner>
+                          <mat-icon *ngIf="!isPending(bill, 'card')" aria-hidden="true">credit_card</mat-icon>
+                          {{ isPending(bill, 'card') ? 'Issuing the card…' : 'Pay with a single-use card' }}
+                        </button>
+                      </ng-container>
+                    </div>
+                    <p class="pay-caption" *ngIf="payHint(bill) as hint">{{ hint }}</p>
+                  </section>
+
+                  <!-- Single-use card -->
+                  <section class="pay-panel" *ngIf="!isOpen(bill) && bill.paymentMethod === 'CARD' && bill.card as card"
+                           [attr.aria-labelledby]="'bill-card-' + bill.id">
+                    <h3 class="pay-title" [id]="'bill-card-' + bill.id">Single-use card</h3>
+                    <div class="virtual-card" [class.closed]="card.status === 'closed'">
+                      <span class="virtual-card-brand">{{ cardBrandName(card.brand) }}</span>
+                      <span class="virtual-card-number" *ngIf="revealedFor(bill) as details; else maskedNumber">{{ details.pan | formatCardNumber }}</span>
+                      <ng-template #maskedNumber>
+                        <span class="virtual-card-number">•••• •••• •••• {{ card.lastFour || '••••' }}</span>
+                      </ng-template>
+                      <span class="virtual-card-meta" *ngIf="revealedFor(bill) as details">
+                        <span>Expires {{ expiryOf(details) }}</span>
+                        <span>CVC {{ details.cvc }}</span>
+                      </span>
+                    </div>
+                    <div class="pay-status">
+                      <span class="state-chip" [attr.data-tone]="card.status === 'active' ? 'info' : null">{{ humanize(card.status) || 'Unknown' }}</span>
+                      <span>One payment of up to {{ bill.total | money:bill.currency }}</span>
+                    </div>
+                    <div class="pay-actions" *ngIf="card.status !== 'closed'">
+                      <button mat-stroked-button type="button" class="action-btn" (click)="toggleCardDetails(bill)"
+                              [disabled]="revealingId() !== null">
+                        <mat-spinner *ngIf="revealingId() === bill.id" diameter="16" aria-hidden="true"></mat-spinner>
+                        <mat-icon *ngIf="revealingId() !== bill.id" aria-hidden="true">{{ revealedFor(bill) ? 'visibility_off' : 'visibility' }}</mat-icon>
+                        {{ revealingId() === bill.id ? 'Revealing…' : (revealedFor(bill) ? 'Hide card details' : 'Show card details') }}
+                      </button>
+                      <button mat-stroked-button type="button" class="action-btn" *ngIf="canCopy && revealedFor(bill)"
+                              (click)="copyCardNumber(bill)">
+                        <mat-icon aria-hidden="true">{{ copiedId() === bill.id ? 'check' : 'content_copy' }}</mat-icon>
+                        {{ copiedId() === bill.id ? 'Number copied' : 'Copy number' }}
+                      </button>
+                      <a mat-flat-button class="action-btn primary" *ngIf="bill.cardCancellable"
+                         [routerLink]="['/', userId, 'issuing-checkout']" [queryParams]="checkoutParams(bill)">
+                        <mat-icon aria-hidden="true">storefront</mat-icon>
+                        Charge it as the supplier
+                      </a>
+                      <a mat-stroked-button class="action-btn" *ngIf="bill.status === 'PROCESSING' && cardCharged(bill)"
+                         [routerLink]="['/', userId, 'captures']">
+                        <mat-icon aria-hidden="true">task_alt</mat-icon>
+                        Capture the payment
+                      </a>
+                    </div>
+                    <p class="pay-caption" *ngIf="bill.cardCancellable">Give these card details to the supplier.</p>
+                  </section>
+
+                  <!-- Transfer -->
+                  <section class="pay-panel" *ngIf="!isOpen(bill) && bill.paymentMethod === 'TRANSFER'"
+                           [attr.aria-labelledby]="'bill-transfer-' + bill.id">
+                    <h3 class="pay-title" [id]="'bill-transfer-' + bill.id">Bank transfer</h3>
+                    <mat-icon class="pay-icon" aria-hidden="true">account_balance</mat-icon>
+                    <p class="pay-text">{{ bill.total | money:bill.currency }} to {{ bill.supplier.name }}</p>
+                    <p class="pay-caption mono" *ngIf="bill.supplier.bankAccount">{{ bill.supplier.bankAccount }}</p>
+                    <div class="pay-status">
+                      <span class="state-chip" [attr.data-tone]="displayStatus(bill).tone">{{ displayStatus(bill).label }}</span>
+                    </div>
+                    <p class="pay-caption" *ngIf="bill.transferId">Transfer <span class="mono">{{ bill.transferId }}</span></p>
+                    <div class="pay-actions" *ngIf="bill.status === 'PENDING_APPROVAL'">
+                      <a mat-flat-button class="action-btn primary" [routerLink]="['/', userId, 'batch-transfer']">
+                        <mat-icon aria-hidden="true">verified_user</mat-icon>
+                        Approve on Batch transfers
+                      </a>
+                    </div>
+                  </section>
+                </div>
+
+                <div class="table-scroll">
+                  <table class="lines-table">
+                    <caption class="cdk-visually-hidden">Amounts of {{ bill.number }}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Description</th>
+                        <th scope="col">Account</th>
+                        <th scope="col" class="num">Net</th>
+                        <th scope="col" class="num">{{ taxLabel() }} {{ formatRate(bill.vatRate) }}</th>
+                        <th scope="col" class="num">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="description">{{ bill.description || bill.categoryName }}</td>
+                        <td class="mono">{{ bill.category }}</td>
+                        <td class="num">{{ bill.subtotal | money:bill.currency }}</td>
+                        <td class="num">{{ bill.taxTotal | money:bill.currency }}</td>
+                        <td class="num strong">{{ bill.total | money:bill.currency }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <section class="detail-section" *ngIf="bill.events.length" [attr.aria-labelledby]="'bill-history-' + bill.id">
+                  <h3 class="detail-heading" [id]="'bill-history-' + bill.id">History</h3>
+                  <ol class="timeline">
+                    <li class="timeline-item" *ngFor="let event of bill.events; trackBy: trackEvent"
+                        [attr.data-tone]="eventView(event).tone">
+                      <mat-icon class="timeline-icon" aria-hidden="true">{{ eventView(event).icon }}</mat-icon>
+                      <div class="timeline-content">
+                        <div class="timeline-title">
+                          <span>{{ eventView(event).label }}</span>
+                          <time [attr.datetime]="event.occurredAt" [attr.title]="dateTime(event.occurredAt)">{{ timeAgo(event.occurredAt) }}</time>
+                        </div>
+                        <div class="timeline-detail" *ngIf="eventDetail(event) as detail">{{ detail }}</div>
+                        <div class="timeline-ref mono" *ngIf="event.transferId">Transfer {{ event.transferId }}</div>
+                      </div>
+                    </li>
+                  </ol>
+                </section>
+
+                <div class="detail-actions" *ngIf="bill.editable || bill.deletable || bill.status === 'PENDING_APPROVAL' || bill.cardCancellable">
+                  <button mat-stroked-button type="button" class="action-btn" *ngIf="bill.editable" (click)="edit(bill)"
+                          [disabled]="!!pending()">
+                    <mat-icon aria-hidden="true">edit</mat-icon>
+                    Edit bill
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn danger" *ngIf="bill.status === 'PENDING_APPROVAL'"
+                          (click)="cancelTransfer(bill)" [disabled]="!!pending()">
+                    <mat-spinner *ngIf="isPending(bill, 'cancelTransfer')" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="!isPending(bill, 'cancelTransfer')" aria-hidden="true">block</mat-icon>
+                    {{ isPending(bill, 'cancelTransfer') ? 'Cancelling…' : 'Cancel transfer…' }}
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn danger" *ngIf="bill.cardCancellable"
+                          (click)="cancelCard(bill)" [disabled]="!!pending()">
+                    <mat-spinner *ngIf="isPending(bill, 'cancelCard')" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="!isPending(bill, 'cancelCard')" aria-hidden="true">credit_card_off</mat-icon>
+                    {{ isPending(bill, 'cancelCard') ? 'Closing…' : 'Close card…' }}
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn danger" *ngIf="bill.deletable"
+                          (click)="deleteBill(bill)" [disabled]="!!pending()">
+                    <mat-spinner *ngIf="isPending(bill, 'delete')" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="!isPending(bill, 'delete')" aria-hidden="true">delete_outline</mat-icon>
+                    {{ isPending(bill, 'delete') ? 'Deleting…' : 'Delete bill…' }}
+                  </button>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <mat-menu #brandMenu="matMenu" xPosition="before">
+            <ng-template matMenuContent let-bill="bill">
+              <button mat-menu-item type="button" *ngFor="let brand of cardBrands()" (click)="payByCard(bill, brand)">
+                <mat-icon aria-hidden="true">credit_card</mat-icon>
+                <span>{{ cardBrandName(brand) }} card</span>
+              </button>
+            </ng-template>
+          </mat-menu>
+        </ng-container>
+
+        <ng-template #noBills>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">receipt_long</mat-icon>
+            <p>No bills yet</p>
+            <span class="empty-hint">Record a bill, or load demo suppliers and bills.</span>
+            <div class="empty-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="loadDemoData()" [disabled]="loadingDemo()">
+                <mat-spinner *ngIf="loadingDemo()" diameter="18" aria-hidden="true"></mat-spinner>
+                <mat-icon *ngIf="!loadingDemo()" aria-hidden="true">auto_awesome</mat-icon>
+                {{ loadingDemo() ? 'Loading demo data…' : 'Load demo data' }}
+              </button>
+              <button mat-stroked-button type="button" class="fintech-btn" (click)="newBill()" [disabled]="!settings()">New bill</button>
+            </div>
+          </div>
+        </ng-template>
+      </mat-tab>
+
+      <!-- Suppliers -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          Suppliers <span class="tab-count" *ngIf="suppliers().length">{{ suppliers().length }}</span>
+        </ng-template>
+
+        <ng-container *ngIf="suppliers().length; else noSuppliers">
+          <div class="list-toolbar">
+            <p class="toolbar-text">Suppliers with bank details are paid by transfer, the others with a single-use card.</p>
+            <button mat-stroked-button type="button" class="action-btn" (click)="addSupplier()" [disabled]="!settings()">
+              <mat-icon aria-hidden="true">add_business</mat-icon>
+              New supplier
+            </button>
+          </div>
+
+          <ul class="customer-list" aria-label="Suppliers">
+            <li class="customer-item" *ngFor="let s of suppliers(); trackBy: trackSupplier">
+              <div class="customer-row">
+                <div class="customer-avatar" aria-hidden="true">{{ initialsOf(s.name) }}</div>
+                <div class="customer-content">
+                  <div class="customer-title">
+                    <span class="customer-name">{{ s.name }}</span>
+                    <span class="customer-due" *ngIf="s.outstanding > 0">{{ s.outstanding | money:s.currency }} to pay</span>
+                  </div>
+                  <div class="customer-meta">
+                    <span *ngIf="s.email">{{ s.email }}</span>
+                    <span>{{ countryName(s.country) }}</span>
+                    <span *ngIf="s.vatNumber">{{ taxLabel() }} number {{ s.vatNumber }}</span>
+                  </div>
+                  <div class="customer-meta">
+                    <span>{{ s.billCount ? plural(s.billCount, 'bill') : 'No bills yet' }}</span>
+                    <span class="mono" *ngIf="s.bankAccount">{{ s.bankAccount }}</span>
+                    <span *ngIf="!s.bankAccount">No bank details: paid by card</span>
+                    <span *ngIf="s.defaultCategory">{{ categoryLabel(s.defaultCategory) }}</span>
+                    <span class="test-tag" *ngIf="s.vopScenario">Verification of Payee test: {{ vopScenarioLabel(s.vopScenario) }}</span>
+                  </div>
+                </div>
+                <div class="customer-actions">
+                  <button mat-stroked-button type="button" class="action-btn" (click)="newBill(s)" [disabled]="!settings()"
+                          [attr.aria-label]="'New bill from ' + s.name">
+                    New bill
+                  </button>
+                  <button mat-icon-button type="button" [matMenuTriggerFor]="supplierMenu" [matMenuTriggerData]="{ supplier: s }"
+                          [disabled]="deletingSupplierId() === s.id" [attr.aria-label]="'Actions for ' + s.name">
+                    <mat-spinner *ngIf="deletingSupplierId() === s.id" diameter="18" aria-label="Deleting the supplier"></mat-spinner>
+                    <mat-icon *ngIf="deletingSupplierId() !== s.id" aria-hidden="true">more_vert</mat-icon>
+                  </button>
+                </div>
+              </div>
+              <app-inline-alert *ngIf="supplierError()?.id === s.id" class="row-error" title="Unable to delete the supplier"
+                                [dismissible]="true" (dismiss)="supplierError.set(null)">{{ supplierError()!.message }}</app-inline-alert>
+            </li>
+          </ul>
+
+          <mat-menu #supplierMenu="matMenu" xPosition="before">
+            <ng-template matMenuContent let-supplier="supplier">
+              <button mat-menu-item type="button" (click)="editSupplier(supplier)">
+                <mat-icon aria-hidden="true">edit</mat-icon>
+                <span>Edit supplier</span>
+              </button>
+              <!-- The bills of a supplier keep it. -->
+              <button mat-menu-item type="button" class="danger-item" *ngIf="!supplier.billCount" (click)="deleteSupplier(supplier)">
+                <mat-icon aria-hidden="true">delete_outline</mat-icon>
+                <span>Delete supplier…</span>
+              </button>
+            </ng-template>
+          </mat-menu>
+        </ng-container>
+
+        <ng-template #noSuppliers>
+          <div class="empty-state">
+            <mat-icon class="empty-icon" aria-hidden="true">storefront</mat-icon>
+            <p>No suppliers yet</p>
+            <span class="empty-hint">Add a supplier, or load demo suppliers and bills.</span>
+            <div class="empty-actions">
+              <button mat-flat-button type="button" class="fintech-btn primary" (click)="addSupplier()" [disabled]="!settings()">
+                <mat-icon aria-hidden="true">add_business</mat-icon>
+                New supplier
+              </button>
+              <button mat-stroked-button type="button" class="fintech-btn" (click)="loadDemoData()" [disabled]="loadingDemo()">Load demo data</button>
+            </div>
+          </div>
+        </ng-template>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+
+</div>

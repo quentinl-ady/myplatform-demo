@@ -33,4 +33,14 @@ public class AccountStatementController {
         headers.setContentDisposition(ContentDisposition.attachment().filename(pdf.fileName()).build());
         return new ResponseEntity<>(pdf.content(), headers, HttpStatus.OK);
     }
+
+    /** The CAMT.053 file as Adyen generated it, for accounting software. */
+    @GetMapping("/{userId}/download-xml")
+    public ResponseEntity<byte[]> downloadXml(@PathVariable String userId, @RequestParam String fileName) {
+        AccountStatementService.StatementXml xml = accountStatementService.downloadXml(userId, fileName);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_XML);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(xml.fileName()).build());
+        return new ResponseEntity<>(xml.content(), headers, HttpStatus.OK);
+    }
 }

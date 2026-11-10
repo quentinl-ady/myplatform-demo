@@ -9,6 +9,7 @@ import com.myplatform.demo.model.Card;
 import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.CardRepository;
 import com.myplatform.demo.repository.UserRepository;
+import com.myplatform.demo.service.CardExpenseService;
 import com.myplatform.demo.service.CardRangeCatalog;
 import com.myplatform.demo.service.CardTransferService;
 import com.myplatform.demo.service.IssuingService;
@@ -34,17 +35,20 @@ public class IssuingController {
     private final CardTransferService cardTransferService;
     private final UserRepository userRepository;
     private final CardRepository cardRepository;
+    private final CardExpenseService cardExpenseService;
 
     public IssuingController(IssuingService issuingService,
                              CardRangeCatalog cardRangeCatalog,
                              CardTransferService cardTransferService,
                              UserRepository userRepository,
-                             CardRepository cardRepository) {
+                             CardRepository cardRepository,
+                             CardExpenseService cardExpenseService) {
         this.issuingService = issuingService;
         this.cardRangeCatalog = cardRangeCatalog;
         this.cardTransferService = cardTransferService;
         this.userRepository = userRepository;
         this.cardRepository = cardRepository;
+        this.cardExpenseService = cardExpenseService;
     }
 
     @PostMapping("/cards")
@@ -211,7 +215,9 @@ public class IssuingController {
         if (user.getAccountHolderId() == null) {
             throw new BadRequestException("User has no account holder");
         }
-        return ResponseEntity.ok(cardTransferService.getCardTransfers(user.getAccountHolderId(), paymentInstrumentId));
+        List<CardTransferDTO> transfers = cardTransferService.getCardTransfers(user.getAccountHolderId(), paymentInstrumentId);
+        cardExpenseService.attach(userId, transfers);
+        return ResponseEntity.ok(transfers);
     }
 
     @GetMapping("/relayed-auth/{userId}")

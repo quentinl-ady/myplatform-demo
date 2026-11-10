@@ -1,6 +1,7 @@
 package com.myplatform.demo.service;
 
 import com.adyen.model.checkout.CreateCheckoutSessionRequest;
+import com.adyen.model.checkout.PaymentLinkRequest;
 import com.adyen.model.checkout.PaymentRequest;
 import com.adyen.model.checkout.Split;
 import com.myplatform.demo.model.CheckoutPayment;
@@ -68,6 +69,17 @@ public record ResolvedPaymentOptions(
             }
             case DELAYED -> request.setCaptureDelayHours(captureDelayHours);
             case MANUAL -> request.setAdditionalData(manualCaptureData());
+        }
+    }
+
+    public void applyTo(PaymentLinkRequest request) {
+        if (splits != null) {
+            request.setSplits(splits);
+        }
+        switch (captureMode) {
+            case IMMEDIATE -> request.setCaptureDelayHours(0);
+            case DELAYED -> request.setCaptureDelayHours(captureDelayHours);
+            case MANUAL -> request.setManualCapture(true);
         }
     }
 

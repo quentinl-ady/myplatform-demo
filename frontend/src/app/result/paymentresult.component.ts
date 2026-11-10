@@ -28,12 +28,12 @@ const VIEWS: Record<ResultStatus, ResultView> = {
   pending: {
     icon: 'schedule',
     title: 'Payment pending',
-    message: 'The payment was received and is waiting for confirmation. The final result is sent as a notification.'
+    message: 'The payment was received and waits for confirmation.'
   },
   failed: {
     icon: 'cancel',
     title: 'Payment refused',
-    message: 'The payment was not completed. No money was taken. You can try again with another payment method.'
+    message: 'No money was taken. Try again with another payment method.'
   },
   error: {
     icon: 'error',

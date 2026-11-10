@@ -1,12 +1,11 @@
 import { Component, OnDestroy, OnInit, inject, ChangeDetectorRef } from '@angular/core';
-import * as forge from 'node-forge';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angular/forms';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { A11yModule } from '@angular/cdk/a11y';
-import { firstValueFrom, forkJoin } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { MaterialModule } from '../material.module';
 
 import {
@@ -18,14 +17,13 @@ import { IssuingService } from '../services';
 import { ConfirmService, InlineAlertComponent, NotifyService, formatMoney, httpErrorMessage, toMinorUnits } from '../shared';
 import { FormatCardNumberPipe } from './format-card-number.pipe';
 import { MCC_CODES } from '../industry-codes';
+import { REVEAL_DURATION_MS, RevealedCard, revealCard, revealedCardText } from './card-reveal';
 
 type Mcc = { code: string; label: string; risky?: boolean };
 type CardAction = 'suspend' | 'activate' | 'close';
 type PageError = { title: string; message: string; retry?: () => void };
 
 const STATUS_LABELS: Record<string, string> = { active: 'Active', suspended: 'Suspended', closed: 'Closed' };
-
-const REVEAL_DURATION_MS = 30000;
 
 @Component({
   selector: 'app-card-list',
@@ -82,7 +80,7 @@ export class CardListComponent implements OnInit, OnDestroy {
   addRuleError: string | null = null;
 
   revealedCardId?: string;
-  revealedData?: { pan: string; cvc: string; expiryMonth: string; expiryYear: string };
+  revealedData?: RevealedCard;
   private revealTimer?: ReturnType<typeof setTimeout>;
   private rulesPanelOpener: HTMLElement | null = null;
 
@@ -243,40 +241,8 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
 
     try {
-      const { publicKey: publicKeyRaw } = await firstValueFrom(this.issuingService.getPublicKey('panReveal'));
-
-      let publicKeyPem = publicKeyRaw;
-      if (!publicKeyPem.includes('-----BEGIN')) {
-        publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKeyPem}\n-----END PUBLIC KEY-----`;
-      }
-
-      // Adyen PAN reveal: a random AES-256 key, encrypted with Adyen's RSA key (PKCS1 v1.5), hex encoded.
-      const aesKeyBytes = forge.random.getBytesSync(32);
-      const rsaPublicKey = forge.pki.publicKeyFromPem(publicKeyPem);
-      const encryptedAesKey = rsaPublicKey.encrypt(aesKeyBytes, 'RSAES-PKCS1-V1_5');
-      const encryptedKeyHex = forge.util.bytesToHex(encryptedAesKey);
-
-      const { encryptedData: encryptedDataHex } = await firstValueFrom(
-        this.issuingService.revealCardData(card.paymentInstrumentId, encryptedKeyHex)
-      );
-
-      // The response is AES-256-CBC encrypted with a zero IV.
-      const decipher = forge.cipher.createDecipher('AES-CBC', aesKeyBytes);
-      decipher.start({ iv: forge.util.createBuffer('\0'.repeat(16)) });
-      decipher.update(forge.util.createBuffer(forge.util.hexToBytes(encryptedDataHex)));
-      if (!decipher.finish()) {
-        throw new Error('AES decryption failed');
-      }
-
-      const parsedData = JSON.parse(decipher.output.toString());
-
+      this.revealedData = await revealCard(this.issuingService, card.paymentInstrumentId);
       this.revealedCardId = card.paymentInstrumentId;
-      this.revealedData = {
-        pan: parsedData.pan,
-        cvc: parsedData.cvc,
-        expiryMonth: parsedData.expiration?.month,
-        expiryYear: parsedData.expiration?.year
-      };
       this.isRevealing = false;
       this.cdr.detectChanges();
 
@@ -301,10 +267,8 @@ export class CardListComponent implements OnInit, OnDestroy {
 
   async copyCardNumber(card: CardResponse) {
     if (!this.revealedData?.pan) return;
-    const expiry = `${this.revealedData.expiryMonth}/${this.revealedData.expiryYear?.toString().slice(-2)}`;
-    const text = `${this.revealedData.pan}\t${expiry}\t${this.revealedData.cvc}\t${card.cardholderName}`;
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(revealedCardText(this.revealedData, card.cardholderName));
       this.notify.success('Card details copied');
     } catch {
       this.showCardError(card, 'Unable to copy the card details', 'The clipboard is not available. Copy the details from the card manually.');

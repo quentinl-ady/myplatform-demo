@@ -9,9 +9,9 @@ import { MAX_CAPTURE_DELAY_HOURS, describeCaptureMode, describeSplit, toSplitSet
 import { SplitFieldsComponent } from './split-fields.component';
 
 const CAPTURE_HELP: Record<CaptureMode, string> = {
-  IMMEDIATE: 'The payment is captured as soon as it is authorised.',
-  DELAYED: 'Adyen captures the payment automatically after the delay. Until then, you can capture or cancel it from the Captures page.',
-  MANUAL: 'The payment is only authorised. Capture all or part of it, or cancel it, from the Captures page. Card authorisations usually expire after about 7 days.',
+  IMMEDIATE: 'Captured as soon as it is authorised.',
+  DELAYED: 'Captured automatically after the delay. Until then, capture or cancel it from the Captures page.',
+  MANUAL: 'Only authorised: capture or cancel it from the Captures page. Card authorisations expire after about 7 days.',
 };
 
 /** Collapsible capture and split settings of a checkout form (group created with createAdvancedOptionsForm). */

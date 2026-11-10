@@ -60,6 +60,63 @@
         <mat-hint>Set from the country.</mat-hint>
       </mat-form-field>
     </div>
+
+    <!-- COMPANY IMPORT (organizations and sole proprietorships) -->
+    <div *ngIf="canImportCompany()" class="company-import" role="group" aria-labelledby="signup-company-label">
+      <span class="field-label" id="signup-company-label">Company record in your system</span>
+      <p class="hint">
+        Import the registered address, registration number, VAT number and phone.
+        Onboarding page then only asks for the rest.
+      </p>
+
+      <button *ngIf="!companyRecord" type="button" mat-stroked-button class="company-import-btn"
+              (click)="importCompany()" [disabled]="importingCompany">
+        <mat-spinner *ngIf="importingCompany" diameter="18" aria-hidden="true"></mat-spinner>
+        <mat-icon *ngIf="!importingCompany" aria-hidden="true">cloud_download</mat-icon>
+        {{ importingCompany ? 'Importing…' : 'Import company' }}
+      </button>
+
+      <div *ngIf="companyRecord as company" class="company-preview">
+        <p class="company-preview-title" role="status">
+          <mat-icon aria-hidden="true">check_circle</mat-icon>
+          <span>Imported from your system</span>
+        </p>
+        <dl class="company-fields">
+          <div class="company-wide">
+            <dt>Registered address</dt>
+            <dd><span *ngFor="let line of company.address" class="company-line">{{ line }}</span></dd>
+          </div>
+          <div *ngIf="isOrganization()">
+            <dt>Legal form</dt>
+            <dd>{{ company.legalForm }}</dd>
+          </div>
+          <div>
+            <dt>Registration number</dt>
+            <dd class="mono">{{ company.registrationNumber }}</dd>
+          </div>
+          <div>
+            <dt>VAT number</dt>
+            <dd [class.mono]="company.vatNumber">{{ company.vatNumber || 'Not applicable' }}</dd>
+          </div>
+          <div>
+            <dt>Phone</dt>
+            <dd class="mono">{{ company.phone }}</dd>
+          </div>
+        </dl>
+        <button type="button" mat-button class="company-remove" (click)="clearCompanyImport()">
+          <mat-icon aria-hidden="true">close</mat-icon>
+          Don't use these details
+        </button>
+      </div>
+
+      <app-inline-alert
+        *ngIf="companyImportError"
+        title="Unable to import the company"
+        actionLabel="Try again"
+        (action)="importCompany()"
+        [dismissible]="true"
+        (dismiss)="dismissCompanyImportError()">{{ companyImportError }}</app-inline-alert>
+    </div>
   </fieldset>
 
   <!-- ACTIVITY & PRODUCTS -->
