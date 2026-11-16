@@ -11,6 +11,7 @@ import java.util.List;
  * @param vatRates          the rates of the country, the standard one first
  * @param nextNumber        the number the next invoice gets
  * @param paymentLinksIssue why invoices can't be sent yet, null when they can
+ * @param terminalsAvailable the user has a store, whose terminals can collect and refund the payments of invoices
  */
 public record InvoiceSettingsDTO(String currency,
                                  String country,
@@ -20,5 +21,6 @@ public record InvoiceSettingsDTO(String currency,
                                  int paymentTermsDays,
                                  String nextNumber,
                                  boolean paymentLinksReady,
-                                 String paymentLinksIssue) {
+                                 String paymentLinksIssue,
+                                 boolean terminalsAvailable) {
 }

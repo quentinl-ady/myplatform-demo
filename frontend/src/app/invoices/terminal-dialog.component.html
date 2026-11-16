@@ -1,0 +1,111 @@
+<h2 mat-dialog-title class="dialog-title" id="terminal-dialog-title" tabindex="-1">{{ title }}</h2>
+<mat-dialog-content class="terminal-content">
+  <!-- Only state changes are announced; the elapsed seconds stay outside this region. -->
+  <p class="cdk-visually-hidden" aria-live="polite" aria-atomic="true">{{ liveMessage() }}</p>
+
+  <dl class="recap">
+    <div class="recap-row">
+      <dt>Invoice</dt>
+      <dd>{{ invoice().number }}</dd>
+    </div>
+    <div class="recap-row">
+      <dt>Customer</dt>
+      <dd>{{ invoice().customer.displayName }}</dd>
+    </div>
+    <div class="recap-row">
+      <dt>{{ refund ? 'Refund' : 'Amount' }}</dt>
+      <dd class="recap-amount">{{ recapAmount() }}</dd>
+    </div>
+    <div class="recap-row" *ngIf="step() !== 'choose' && terminalId() as id">
+      <dt>Terminal</dt>
+      <dd class="mono">{{ id }}</dd>
+    </div>
+  </dl>
+
+  <ng-container *ngIf="step() === 'choose'">
+    <p class="refund-warning" *ngIf="refund">
+      <mat-icon aria-hidden="true">warning</mat-icon>
+      <span>{{ invoice().customer.displayName }} gets {{ amountText() }} back on the card they paid with. This can't be undone.</span>
+    </p>
+
+    <div class="loading-row" *ngIf="loadingTerminals()" role="status">
+      <mat-spinner diameter="18" aria-hidden="true"></mat-spinner>
+      <span>Loading the terminals of your stores…</span>
+    </div>
+
+    <app-inline-alert *ngIf="!loadingTerminals() && terminalsError() as message" title="Unable to load the terminals"
+                      actionLabel="Try again" (action)="loadTerminals()">{{ message }}</app-inline-alert>
+
+    <div class="no-terminal" *ngIf="!loadingTerminals() && !terminalsError() && terminalsLoaded() && !terminals().length">
+      <mat-icon aria-hidden="true">point_of_sale</mat-icon>
+      <p>No terminal is ready in your stores. Assign a terminal to a store, then try again.</p>
+      <button type="button" class="text-btn" (click)="loadTerminals()">Try again</button>
+    </div>
+
+    <div class="terminal-picker" *ngIf="!loadingTerminals() && terminals().length">
+      <span class="field-label">Terminal</span>
+      <fieldset class="store-group" *ngFor="let group of groups(); trackBy: trackGroup">
+        <legend>{{ group.label }}</legend>
+        <label class="terminal-option" *ngFor="let terminal of group.terminals; trackBy: trackTerminal"
+               [class.selected]="selectedId() === terminal.id">
+          <input type="radio" name="invoice-terminal" [value]="terminal.id" [checked]="selectedId() === terminal.id"
+                 (change)="select(terminal.id)" />
+          <span class="terminal-model">{{ terminal.model || 'Terminal' }}</span>
+          <span class="terminal-id mono">{{ terminal.id }}</span>
+          <mat-icon class="terminal-check" *ngIf="selectedId() === terminal.id" aria-hidden="true">check_circle</mat-icon>
+        </label>
+      </fieldset>
+    </div>
+  </ng-container>
+
+  <div class="waiting" *ngIf="step() === 'waiting'">
+    <mat-spinner diameter="48" aria-hidden="true"></mat-spinner>
+    <h3 class="step-title" id="terminal-step-title" tabindex="-1">{{ waitingTitle() }}</h3>
+    <p class="step-text">{{ waitingText() }}</p>
+    <p class="elapsed">{{ elapsedSeconds() }} s elapsed</p>
+    <p class="slow-hint" *ngIf="isSlow()">
+      <mat-icon aria-hidden="true">schedule</mat-icon>
+      <span>{{ slowText() }}</span>
+    </p>
+    <app-inline-alert *ngIf="cancelError() as message" title="Unable to cancel on the terminal"
+                      [dismissible]="true" (dismiss)="cancelError.set(null)">{{ message }}</app-inline-alert>
+  </div>
+
+  <div class="result" *ngIf="step() === 'result' && result() as view" [attr.data-kind]="view.kind">
+    <mat-icon class="result-icon" aria-hidden="true">{{ view.icon }}</mat-icon>
+    <h3 class="step-title" id="terminal-step-title" tabindex="-1">{{ view.title }}</h3>
+    <p class="step-text">{{ view.message }}</p>
+    <app-inline-alert *ngIf="view.warning" kind="warning" [live]="false">{{ view.warning }}</app-inline-alert>
+    <dl class="result-details" *ngIf="view.card || view.pspReference">
+      <div *ngIf="view.card">
+        <dt>Card</dt>
+        <dd>{{ view.card }}</dd>
+      </div>
+      <div *ngIf="view.pspReference">
+        <dt>PSP reference</dt>
+        <dd class="mono">{{ view.pspReference }}</dd>
+      </div>
+    </dl>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end" class="dialog-actions" [ngSwitch]="step()">
+  <ng-container *ngSwitchCase="'choose'">
+    <button type="button" class="dialog-btn secondary" (click)="close()">Cancel</button>
+    <button type="button" class="dialog-btn" [class.danger]="refund" (click)="start()"
+            [disabled]="!selectedId() || loadingTerminals()">
+      <mat-icon aria-hidden="true">{{ refund ? 'undo' : 'point_of_sale' }}</mat-icon>
+      <span>{{ refund ? 'Refund' : 'Collect' }} {{ amountText() }}</span>
+    </button>
+  </ng-container>
+  <ng-container *ngSwitchCase="'waiting'">
+    <button *ngIf="!refund" type="button" class="dialog-btn secondary" (click)="cancelPayment()" [disabled]="!canCancel()">
+      <mat-spinner *ngIf="cancelling()" diameter="16" aria-hidden="true"></mat-spinner>
+      <span>{{ cancelling() ? 'Cancelling…' : 'Cancel payment' }}</span>
+    </button>
+  </ng-container>
+  <ng-container *ngSwitchCase="'result'">
+    <button *ngIf="result()?.retry" type="button" class="dialog-btn secondary" (click)="tryAgain()">Try again</button>
+    <button type="button" class="dialog-btn" (click)="close()">Done</button>
+  </ng-container>
+</mat-dialog-actions>

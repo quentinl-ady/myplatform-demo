@@ -387,6 +387,19 @@ public class StoreManagementService {
         return result;
     }
 
+    /** The terminal of the company with this ID, matched exactly: the search also returns the IDs that contain it. */
+    public Optional<Terminal> findTerminal(String terminalId) throws IOException, ApiException {
+        ListTerminalsResponse response = terminalsTerminalLevelApi.listTerminals(terminalId, null, null, null, null, null,
+                null, 100, null);
+        List<Terminal> terminals = response.getData();
+        if (terminals == null) {
+            return Optional.empty();
+        }
+        return terminals.stream()
+                .filter(terminal -> terminalId.equalsIgnoreCase(terminal.getId()))
+                .findFirst();
+    }
+
     public List<TerminalResponse> listTerminals(String storeId) throws IOException, ApiException {
         ListTerminalsResponse listTerminalsResponses = terminalsTerminalLevelApi.listTerminals(null, null, null, null, storeId, null, null, null, null);
         List<Terminal> terminalList = listTerminalsResponses.getData();

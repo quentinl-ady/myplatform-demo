@@ -40,9 +40,11 @@ import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.repository.WebhookEventRepository;
 import com.myplatform.demo.util.AdyenNotifications;
 import com.myplatform.demo.util.InvoiceMath;
+import com.myplatform.demo.util.InvoiceTerminalRules;
 import com.myplatform.demo.util.PaymentLinks;
 import com.myplatform.demo.util.PaymentMethodNames;
 import com.myplatform.demo.util.PaymentResultRedirects;
+import com.myplatform.demo.util.TerminalOutcome;
 import com.myplatform.demo.util.VatRates;
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
@@ -79,6 +81,7 @@ import java.util.stream.Stream;
  * An invoice is paid when the AUTHORISATION webhook of its link arrives. Without webhooks, opening the
  * invoices reads the webhooks other backends stored, then asks Adyen for the status of the link.
  * The invoices of a subscription are also charged to the payment method its first invoice stored.
+ * A terminal can collect the payment of an invoice, and refund it: see {@link InvoiceTerminalService}.
  */
 @Service
 public class InvoiceService {
@@ -97,6 +100,13 @@ public class InvoiceService {
     private static final int MAX_CHECKS_PER_LIST = 5;
     /** How often a charge Adyen hasn't settled is looked up in the webhooks other backends stored. */
     private static final Duration CHARGE_CHECK_INTERVAL = Duration.ofSeconds(30);
+    /** How often a refund Adyen hasn't confirmed is looked up in the webhooks other backends stored. */
+    private static final Duration REFUND_CHECK_INTERVAL = Duration.ofSeconds(30);
+    /**
+     * A terminal answers within 3 minutes. An operation older than this was left behind by a request that ended
+     * without saying so: the invoice is free again.
+     */
+    private static final Duration TERMINAL_OPERATION_TIMEOUT = Duration.ofMinutes(5);
     private static final int MAX_LINES = 50;
     private static final long MAX_QUANTITY = 1_000_000;
     private static final long MAX_UNIT_PRICE = 100_000_000_000L;
@@ -134,6 +144,14 @@ public class InvoiceService {
     private final Object[] invoiceLocks = Stream.generate(Object::new).limit(64).toArray();
     /** When each unsettled charge was last looked up in the stored webhooks. */
     private final Map<Long, Instant> chargeCheckedAt = new ConcurrentHashMap<>();
+    /** When each unconfirmed refund was last looked up in the stored webhooks. */
+    private final Map<Long, Instant> refundCheckedAt = new ConcurrentHashMap<>();
+    /**
+     * The payments and refunds terminals are handling, by invoice. The lock of the invoice isn't held while the
+     * terminal waits for the card: this keeps a second payment or refund, the sending and the voiding of the invoice
+     * out meanwhile. Held in memory: another backend sharing the database doesn't see them.
+     */
+    private final Map<Long, TerminalOperation> terminalOperations = new ConcurrentHashMap<>();
 
     /** An invoice as a PDF, and the name to save it under. */
     public record InvoicePdf(byte[] content, String fileName) {
@@ -153,6 +171,20 @@ public class InvoiceService {
 
     /** The invoice once charged, and how Adyen answered. */
     record ChargeResult(Invoice invoice, Invoice.ChargeStatus status, String pspReference, String refusalReason) {
+    }
+
+    /**
+     * A payment or a refund of an invoice that a terminal is handling.
+     *
+     * @param serviceId identifies the request to the terminal: cancelling a payment references it
+     * @param amount    in minor units: the total for a payment, what isn't refunded yet for a refund
+     * @param original  for a refund, the payment it refunds
+     */
+    public record TerminalOperation(Long invoiceId, String userId, String number, Kind kind, String terminalId,
+                                    String serviceId, long amount, String currency,
+                                    InvoiceTerminalRules.OriginalTransaction original, Instant startedAt) {
+
+        public enum Kind { PAYMENT, REFUND }
     }
 
     public InvoiceService(@Qualifier("pspClient") Client pspClient,
@@ -192,9 +224,12 @@ public class InvoiceService {
         List<BigDecimal> rates = VatRates.forCountry(user.getCountryCode());
         int year = today().getYear();
         String issue = paymentLinksIssue(user);
+        boolean terminalsAvailable = storeCustomerRepository.findByUserIdOrderByIdAsc(userId).stream()
+                .anyMatch(store -> store.getStoreId() != null && !store.getStoreId().isBlank());
         return new InvoiceSettingsDTO(currency(user), user.getCountryCode(), VatRates.taxLabel(user.getCountryCode()),
                 rates, rates.get(0),
-                PAYMENT_TERMS_DAYS, formatNumber(year, nextSequenceNumber(userId, year)), issue == null, issue);
+                PAYMENT_TERMS_DAYS, formatNumber(year, nextSequenceNumber(userId, year)), issue == null, issue,
+                terminalsAvailable);
     }
 
     /** The invoices of the user, the latest number first. */
@@ -217,8 +252,8 @@ public class InvoiceService {
     }
 
     /**
-     * Settles what no webhook settled yet: the open payment links of these invoices, and their charges. Returns true
-     * when an invoice changed.
+     * Settles what no webhook settled yet: the open payment links of these invoices, their charges and their refunds.
+     * Returns true when an invoice changed.
      *
      * @param detail the invoices are shown in detail: their links are checked more often
      */
@@ -227,7 +262,8 @@ public class InvoiceService {
         boolean links = checkOpenLinks(invoices, detail ? DETAIL_CHECK_INTERVAL : LIST_CHECK_INTERVAL,
                 MAX_CHECKS_PER_LIST, now);
         boolean charges = checkCharges(invoices, now);
-        return links || charges;
+        boolean refunds = checkRefunds(invoices, now);
+        return links || charges || refunds;
     }
 
     public InvoicePdf pdf(String userId, Long invoiceId) {
@@ -317,6 +353,7 @@ public class InvoiceService {
 
     private InvoiceDTO send(User user, Invoice invoice) throws IOException, ApiException {
         Instant now = Instant.now();
+        rejectWhileAtTerminal(invoice, now);
         String charging = chargeInProgress(invoice);
         if (charging != null) {
             throw new ConflictException(charging);
@@ -381,6 +418,7 @@ public class InvoiceService {
 
     private Invoice voidInvoice(Invoice invoice) throws IOException, ApiException {
         Instant now = Instant.now();
+        rejectWhileAtTerminal(invoice, now);
         switch (invoice.getStatus()) {
             case PAID -> throw new ConflictException("A paid invoice can't be voided. Refund the payment instead.");
             case VOID -> {
@@ -433,11 +471,15 @@ public class InvoiceService {
     // ---------- Webhooks ----------
 
     /**
-     * Applies a payment notification to the invoice it pays, and the end of an Auto Rescue to the invoice whose
-     * charge it retried. Returns the invoice the notification is about, if any.
+     * Applies a payment notification to the invoice it pays, the end of an Auto Rescue to the invoice whose charge it
+     * retried, and a refund to the invoice whose payment it refunds. Returns the invoice the notification is about, if
+     * any.
      */
     public Optional<Invoice> applyNotification(JsonNode item) {
         String eventCode = AdyenNotifications.text(item, "eventCode");
+        if (InvoiceTerminalRules.isRefundEvent(eventCode)) {
+            return applyRefundNotification(item);
+        }
         boolean authorisation = AUTHORISATION.equals(eventCode);
         if (!authorisation && !AUTORESCUE.equals(eventCode) && !CANCEL_AUTORESCUE.equals(eventCode)) {
             return Optional.empty();
@@ -520,7 +562,8 @@ public class InvoiceService {
         }
         String pspReference = AdyenNotifications.text(item, "pspReference");
         if (pspReference != null) {
-            invoice = invoiceRepository.findFirstByPspReference(pspReference);
+            invoice = invoiceRepository.findFirstByPspReference(pspReference)
+                    .or(() -> invoiceRepository.findFirstByRefundPspReference(pspReference));
             if (invoice.isPresent()) {
                 return invoice;
             }
@@ -663,19 +706,24 @@ public class InvoiceService {
                 if (!linkCheckDue(invoice, interval, now)) {
                     continue; // settled, or just checked, by another request
                 }
-                applyStoredWebhooks(invoice);
-                if (invoice.getStatus() == Invoice.Status.SENT) {
-                    try {
-                        applyLinkStatus(invoice, paymentLinksApi.getPaymentLink(invoice.getPaymentLinkId()), now);
-                    } catch (Exception e) {
-                        log.warn("Couldn't check the payment link of invoice {}: {}", invoice.getNumber(), e.getMessage());
-                    }
-                }
-                invoice.setPaymentLinkCheckedAt(now);
+                checkLink(invoice, now);
                 invoiceRepository.save(invoice);
             }
         }
         return !due.isEmpty();
+    }
+
+    /** Settles the payment link of a sent invoice with the stored webhooks, else by asking Adyen. Call under its lock. */
+    private void checkLink(Invoice invoice, Instant now) {
+        applyStoredWebhooks(invoice);
+        if (invoice.getStatus() == Invoice.Status.SENT) {
+            try {
+                applyLinkStatus(invoice, paymentLinksApi.getPaymentLink(invoice.getPaymentLinkId()), now);
+            } catch (Exception e) {
+                log.warn("Couldn't check the payment link of invoice {}: {}", invoice.getNumber(), e.getMessage());
+            }
+        }
+        invoice.setPaymentLinkCheckedAt(now);
     }
 
     private static boolean linkCheckDue(Invoice invoice, Duration interval, Instant now) {
@@ -763,6 +811,7 @@ public class InvoiceService {
                 default -> {
                 }
             }
+            rejectWhileAtTerminal(invoice, Instant.now());
             String charging = chargeInProgress(invoice);
             if (charging != null) {
                 throw new ConflictException(charging);
@@ -980,6 +1029,225 @@ public class InvoiceService {
             log.warn("Couldn't read the stored webhooks of the charges of invoice {}: {}", invoice.getNumber(), e.getMessage());
         }
         return changed;
+    }
+
+    // ---------- Terminals ----------
+
+    /**
+     * Starts collecting the payment of the invoice at a terminal. Throws when it can't be paid there, or a terminal is
+     * already handling it. Its payment link is checked first: the customer may have just paid with it.
+     */
+    public TerminalOperation startTerminalPayment(String userId, Long invoiceId, String terminalId) {
+        Invoice found = owned(userId, invoiceId);
+        synchronized (lockOf(invoiceId)) {
+            Invoice invoice = current(found);
+            Instant now = Instant.now();
+            rejectWhileAtTerminal(invoice, now);
+            if (invoice.getStatus() == Invoice.Status.SENT && !linkExpired(invoice, now)) {
+                checkLink(invoice, now);
+                invoice = invoiceRepository.save(invoice);
+            }
+            String issue = InvoiceTerminalRules.notPayable(invoice);
+            if (issue != null) {
+                throw new ConflictException(issue);
+            }
+            return register(new TerminalOperation(invoice.getId(), userId, invoice.getNumber(),
+                    TerminalOperation.Kind.PAYMENT, terminalId, PosService.newServiceId(), invoice.getTotal(),
+                    invoice.getCurrency(), null, now));
+        }
+    }
+
+    /**
+     * Starts refunding the payment of the invoice at a terminal: what its refunds haven't given back yet. Throws when
+     * it can't be refunded, or a terminal is already handling it.
+     */
+    public TerminalOperation startTerminalRefund(String userId, Long invoiceId, String terminalId) {
+        Invoice found = owned(userId, invoiceId);
+        synchronized (lockOf(invoiceId)) {
+            Invoice invoice = current(found);
+            Instant now = Instant.now();
+            rejectWhileAtTerminal(invoice, now);
+            String issue = InvoiceTerminalRules.notRefundable(invoice);
+            if (issue != null) {
+                throw new ConflictException(issue);
+            }
+            return register(new TerminalOperation(invoice.getId(), userId, invoice.getNumber(),
+                    TerminalOperation.Kind.REFUND, terminalId, PosService.newServiceId(),
+                    InvoiceTerminalRules.refundableAmount(invoice), invoice.getCurrency(),
+                    InvoiceTerminalRules.original(invoice, now), now));
+        }
+    }
+
+    /** The payment of the invoice a terminal is collecting, if any. */
+    public Optional<TerminalOperation> terminalPayment(String userId, Long invoiceId) {
+        owned(userId, invoiceId);
+        return Optional.ofNullable(terminalOperation(invoiceId, Instant.now()))
+                .filter(operation -> operation.kind() == TerminalOperation.Kind.PAYMENT);
+    }
+
+    /**
+     * Applies the answer of the terminal to the invoice, and frees the invoice for the next operation. A payment
+     * approved at the terminal also stops the payment link from taking a second payment.
+     */
+    public InvoiceDTO finishTerminalOperation(TerminalOperation operation, TerminalOutcome outcome) {
+        Invoice invoice;
+        try {
+            synchronized (lockOf(operation.invoiceId())) {
+                invoice = currentById(operation.invoiceId());
+                boolean payment = operation.kind() == TerminalOperation.Kind.PAYMENT;
+                boolean changed = payment
+                        ? InvoiceTerminalRules.applyPayment(invoice, outcome, operation.terminalId(), Instant.now())
+                        : InvoiceTerminalRules.applyRefund(invoice, outcome, operation.terminalId(), operation.startedAt());
+                if (payment && outcome.result() == TerminalOutcome.Result.APPROVED) {
+                    changed |= expireLink(invoice);
+                }
+                if (changed) {
+                    invoice = invoiceRepository.save(invoice);
+                }
+                log.info("{} of invoice {} at terminal {}: {}", payment ? "Payment" : "Refund", invoice.getNumber(),
+                        operation.terminalId(), outcome.result());
+            }
+        } finally {
+            terminalOperations.remove(operation.invoiceId(), operation);
+        }
+        return toDto(invoice, today());
+    }
+
+    private TerminalOperation register(TerminalOperation operation) {
+        terminalOperations.put(operation.invoiceId(), operation);
+        return operation;
+    }
+
+    /** Throws while a terminal handles a payment or a refund of the invoice. Call under its lock. */
+    private void rejectWhileAtTerminal(Invoice invoice, Instant now) {
+        TerminalOperation operation = terminalOperation(invoice.getId(), now);
+        if (operation != null) {
+            throw new ConflictException("Terminal " + operation.terminalId()
+                    + (operation.kind() == TerminalOperation.Kind.PAYMENT ? " is collecting the payment of "
+                    : " is refunding the payment of ") + invoice.getNumber() + ". Try again once it's done.");
+        }
+    }
+
+    /** The operation a terminal is handling for the invoice, null when there is none. */
+    private TerminalOperation terminalOperation(Long invoiceId, Instant now) {
+        TerminalOperation operation = invoiceId != null ? terminalOperations.get(invoiceId) : null;
+        if (operation != null && operation.startedAt().plus(TERMINAL_OPERATION_TIMEOUT).isBefore(now)) {
+            terminalOperations.remove(invoiceId, operation);
+            log.warn("The {} of invoice {} at terminal {} never ended: the invoice is free again", operation.kind(),
+                    operation.number(), operation.terminalId());
+            return null;
+        }
+        return operation;
+    }
+
+    /** Stops the active payment link of an invoice paid otherwise from taking a second payment. */
+    private boolean expireLink(Invoice invoice) {
+        if (invoice.getPaymentLinkId() == null
+                || !PaymentLinkResponse.StatusEnum.ACTIVE.getValue().equals(invoice.getPaymentLinkStatus())) {
+            return false;
+        }
+        try {
+            PaymentLinkResponse expired = paymentLinksApi.updatePaymentLink(invoice.getPaymentLinkId(),
+                    new UpdatePaymentLinkRequest().status(UpdatePaymentLinkRequest.StatusEnum.EXPIRED));
+            invoice.setPaymentLinkStatus(expired.getStatus() != null ? expired.getStatus().getValue() : LINK_EXPIRED);
+            return true;
+        } catch (Exception e) {
+            log.warn("Couldn't expire the payment link of invoice {}: {}", invoice.getNumber(), e.getMessage());
+            return false;
+        }
+    }
+
+    /** Applies a refund webhook to the invoice whose payment it refunds. */
+    private Optional<Invoice> applyRefundNotification(JsonNode item) {
+        String eventCode = AdyenNotifications.text(item, "eventCode");
+        return findForRefund(item).map(found -> {
+            synchronized (lockOf(found.getId())) {
+                Invoice invoice = current(found);
+                if (InvoiceTerminalRules.applyRefundNotification(invoice,
+                        InvoiceTerminalRules.RefundNotification.of(item, Instant.now()))) {
+                    invoice = invoiceRepository.save(invoice);
+                    log.info("Invoice {} updated from the {} webhook {}", invoice.getNumber(), eventCode,
+                            AdyenNotifications.text(item, "pspReference"));
+                }
+                return invoice;
+            }
+        });
+    }
+
+    /** The invoice whose payment a refund webhook is about: by the refund, else by the payment, never by its number. */
+    private Optional<Invoice> findForRefund(JsonNode item) {
+        String pspReference = AdyenNotifications.text(item, "pspReference");
+        String originalReference = AdyenNotifications.text(item, "originalReference");
+        Optional<Invoice> invoice = pspReference != null
+                ? invoiceRepository.findFirstByRefundPspReference(pspReference)
+                : Optional.empty();
+        if (invoice.isEmpty() && originalReference != null) {
+            invoice = invoiceRepository.findFirstByPspReference(originalReference)
+                    .or(() -> invoiceRepository.findFirstByRefundPspReference(originalReference));
+        }
+        return invoice;
+    }
+
+    /**
+     * Settles the refunds Adyen hasn't confirmed with the webhooks another backend sharing the database stored. Each
+     * refund is looked up once per interval at most. Returns true when an invoice changed.
+     */
+    private boolean checkRefunds(List<Invoice> invoices, Instant now) {
+        boolean changed = false;
+        for (Invoice found : invoices) {
+            if (!refundUnsettled(found)) {
+                continue;
+            }
+            Instant checkedAt = refundCheckedAt.get(found.getId());
+            if (checkedAt != null && checkedAt.plus(REFUND_CHECK_INTERVAL).isAfter(now)) {
+                continue;
+            }
+            refundCheckedAt.put(found.getId(), now);
+            synchronized (lockOf(found.getId())) {
+                Invoice invoice = current(found);
+                if (refundUnsettled(invoice) && applyStoredRefundWebhooks(invoice, now)) {
+                    invoiceRepository.save(invoice);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    private static boolean refundUnsettled(Invoice invoice) {
+        return invoice.getRefundStatus() == Invoice.RefundStatus.REQUESTED && invoice.getPspReference() != null;
+    }
+
+    /** Returns true when the invoice changed. */
+    private boolean applyStoredRefundWebhooks(Invoice invoice, Instant now) {
+        boolean changed = false;
+        try {
+            // By id: the order they were received in.
+            Map<Long, WebhookEvent> events = new TreeMap<>();
+            for (String eventCode : InvoiceTerminalRules.REFUND_EVENTS) {
+                webhookEventRepository.findByEventTypeAndRawJsonContainingOrderByReceivedAtAsc(eventCode,
+                        invoice.getPspReference()).forEach(event -> events.put(event.getId(), event));
+            }
+            for (WebhookEvent event : events.values()) {
+                for (JsonNode item : AdyenNotifications.items(objectMapper, event.getRawJson())) {
+                    if (InvoiceTerminalRules.isRefundEvent(AdyenNotifications.text(item, "eventCode"))
+                            && refunds(invoice, item)) {
+                        changed |= InvoiceTerminalRules.applyRefundNotification(invoice,
+                                InvoiceTerminalRules.RefundNotification.of(item, now));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Couldn't read the stored refund webhooks of invoice {}: {}", invoice.getNumber(), e.getMessage());
+        }
+        return changed;
+    }
+
+    /** Whether a refund webhook refunds the payment of the invoice. */
+    private static boolean refunds(Invoice invoice, JsonNode item) {
+        String refund = invoice.getRefundPspReference();
+        return invoice.getPspReference().equals(AdyenNotifications.text(item, "originalReference"))
+                || (refund != null && refund.equals(AdyenNotifications.text(item, "pspReference")));
     }
 
     // ---------- Payment links ----------
@@ -1221,6 +1489,11 @@ public class InvoiceService {
                 Objects.requireNonNullElse(invoice.getChargeAttempts(), 0), invoice.getChargedAt());
         boolean open = status == Invoice.Status.DRAFT || status == Invoice.Status.SENT;
         boolean subscription = invoice.getSubscriptionId() != null;
+        boolean atTerminal = terminalOperation(invoice.getId(), now) != null;
+        InvoiceDTO.Refund refund = invoice.getRefundStatus() == null ? null
+                : new InvoiceDTO.Refund(invoice.getRefundStatus().name(), invoice.getRefundRequestedAt(),
+                invoice.getRefundedAt(), invoice.getRefundFailureReason(), invoice.getRefundTerminalId(),
+                invoice.getRefundPspReference());
         return new InvoiceDTO(
                 invoice.getId(),
                 invoice.getNumber(),
@@ -1251,9 +1524,14 @@ public class InvoiceService {
                 charge,
                 events,
                 status == Invoice.Status.DRAFT && !subscription,
-                chargeInProgress(invoice) == null
+                !atTerminal && chargeInProgress(invoice) == null
                         && (status == Invoice.Status.DRAFT || (status == Invoice.Status.SENT && linkExpired(invoice, now))),
-                open && !subscription);
+                open && !subscription && !atTerminal,
+                invoice.getTerminalId(),
+                !atTerminal && InvoiceTerminalRules.notPayable(invoice) == null,
+                !atTerminal && InvoiceTerminalRules.notRefundable(invoice) == null,
+                InvoiceTerminalRules.refundedAmount(invoice),
+                refund);
     }
 
     /** The seller as Adyen verified it, else the name the user signed up with. */

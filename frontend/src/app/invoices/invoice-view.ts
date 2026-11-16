@@ -1,5 +1,5 @@
 import { Invoice, InvoiceCharge, InvoiceEvent, InvoiceEventType, InvoiceStatus } from '../models';
-import { formatDate, parseServerDate } from '../shared';
+import { formatDate, formatMoney, parseServerDate } from '../shared';
 import { PHONE_COUNTRIES } from '../shared/phone';
 
 export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -56,7 +56,41 @@ export function displayStatus(invoice: Invoice): StatusView {
       return { label: 'Charge refused', icon: 'error_outline', tone: 'danger' };
     }
   }
-  return statusOf(invoice);
+  return (invoice.status === 'PAID' ? refundView(invoice) : null) ?? statusOf(invoice);
+}
+
+/** The refunds of the payment, null while nothing was refunded or requested. */
+export function refundView(invoice: Invoice): StatusView | null {
+  switch (invoice.refund?.status) {
+    case 'REQUESTED':
+      return { label: 'Refund pending', icon: 'hourglass_top', tone: 'warning' };
+    case 'FAILED':
+      return { label: 'Refund failed', icon: 'error_outline', tone: 'danger' };
+  }
+  const refunded = invoice.refundedAmount ?? 0;
+  if (refunded <= 0) return null;
+  return refunded >= invoice.total
+    ? { label: 'Refunded', icon: 'undo', tone: 'neutral' }
+    : { label: 'Partially refunded', icon: 'undo', tone: 'info' };
+}
+
+/** "€40.00 of €120.00 refunded", "€120.00 requested, awaiting confirmation". */
+export function refundText(invoice: Invoice): string {
+  const refunded = invoice.refundedAmount ?? 0;
+  switch (invoice.refund?.status) {
+    case 'REQUESTED':
+      return `${formatMoney(Math.max(0, invoice.total - refunded), invoice.currency)} requested, awaiting confirmation`;
+    case 'FAILED':
+      if (refunded <= 0) return 'Nothing was refunded';
+  }
+  return refunded >= invoice.total
+    ? `${formatMoney(refunded, invoice.currency)} refunded`
+    : `${formatMoney(refunded, invoice.currency)} of ${formatMoney(invoice.total, invoice.currency)} refunded`;
+}
+
+/** A refund requested at a terminal that isn't confirmed yet. */
+export function refundPending(invoice: Invoice): boolean {
+  return invoice.status === 'PAID' && invoice.refund?.status === 'REQUESTED';
 }
 
 /** The last charge of a subscription invoice, e.g. "Refused: Not enough balance". */

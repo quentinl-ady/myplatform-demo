@@ -26,6 +26,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     Optional<Invoice> findFirstByRescueReference(String rescueReference);
 
+    Optional<Invoice> findFirstByRefundPspReference(String refundPspReference);
+
     List<Invoice> findBySubscriptionIdOrderBySubscriptionCycleAsc(Long subscriptionId);
 
     List<Invoice> findByUserIdAndSubscriptionIdIsNotNull(String userId);

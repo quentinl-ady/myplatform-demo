@@ -2,7 +2,7 @@ import {inject, Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
 import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
-import {Invoice, InvoiceRequest, InvoiceSettings} from '../models';
+import {Invoice, InvoiceRequest, InvoiceSettings, InvoiceTerminal, TerminalResult} from '../models';
 
 @Injectable({providedIn: 'root'})
 export class InvoiceService {
@@ -37,6 +37,26 @@ export class InvoiceService {
 
   voidInvoice(userId: string, invoiceId: number): Observable<Invoice> {
     return this.http.post<Invoice>(`${this.baseUrl}/${userId}/${invoiceId}/void`, {});
+  }
+
+  /** The terminals boarded in the stores of the account. */
+  getTerminals(userId: string): Observable<InvoiceTerminal[]> {
+    return this.http.get<InvoiceTerminal[]>(`${this.baseUrl}/${userId}/terminals`);
+  }
+
+  /** Collects the payment at the terminal: answers once the terminal does, within 3 minutes. */
+  payAtTerminal(userId: string, invoiceId: number, terminalId: string): Observable<TerminalResult> {
+    return this.http.post<TerminalResult>(`${this.baseUrl}/${userId}/${invoiceId}/terminal-payment`, {terminalId});
+  }
+
+  /** Asks the terminal to stop waiting for the card: the pending payment then ends as cancelled. */
+  cancelTerminalPayment(userId: string, invoiceId: number): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/${userId}/${invoiceId}/terminal-payment/cancel`, {});
+  }
+
+  /** Refunds at the terminal what the payment hasn't given back yet. The refund is confirmed later. */
+  refundAtTerminal(userId: string, invoiceId: number, terminalId: string): Observable<TerminalResult> {
+    return this.http.post<TerminalResult>(`${this.baseUrl}/${userId}/${invoiceId}/terminal-refund`, {terminalId});
   }
 
   downloadPdf(userId: string, invoiceId: number): Observable<Blob> {

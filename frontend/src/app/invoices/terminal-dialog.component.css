@@ -1,0 +1,262 @@
+.dialog-title:focus { outline: none; }
+.terminal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.recap {
+  margin: 0;
+  padding: 8px 16px;
+  background: var(--fintech-bg);
+  border-radius: 12px;
+}
+.recap-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  font-size: 0.875rem;
+}
+.recap-row + .recap-row { border-top: 1px solid var(--fintech-border); }
+.recap-row dt { color: var(--fintech-text-secondary); }
+.recap-row dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--fintech-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.recap-amount { font-variant-numeric: tabular-nums; }
+.mono {
+  font-family: var(--fintech-font-mono);
+  font-size: 0.8125rem;
+}
+
+.refund-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--fintech-danger-border);
+  border-radius: 12px;
+  background: var(--fintech-danger-bg-subtle);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--fintech-text);
+}
+.refund-warning mat-icon {
+  flex: none;
+  color: var(--fintech-danger);
+}
+
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  color: var(--fintech-text-secondary);
+}
+.loading-row mat-spinner,
+.dialog-btn mat-spinner { --mdc-circular-progress-active-indicator-color: currentColor; }
+
+.no-terminal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--fintech-border-strong);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--fintech-text-secondary);
+}
+.no-terminal p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.terminal-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fintech-text-secondary);
+}
+.store-group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.store-group legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+}
+.terminal-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 44px 12px 14px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 10px;
+  background: var(--fintech-surface);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.terminal-option:hover { border-color: var(--fintech-text-secondary); }
+.terminal-option.selected {
+  border-color: var(--fintech-primary);
+  box-shadow: inset 0 0 0 1px var(--fintech-primary);
+}
+/* The native radio is hidden: its keyboard focus is drawn on the option. */
+.terminal-option:has(input:focus-visible) {
+  outline: 2px solid var(--fintech-primary);
+  outline-offset: 2px;
+}
+.terminal-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.terminal-model {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fintech-text);
+}
+.terminal-id { color: var(--fintech-text-secondary); }
+.terminal-check {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--fintech-primary);
+}
+
+.waiting,
+.result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  text-align: center;
+}
+.step-title {
+  margin: 8px 0 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--fintech-text);
+}
+.step-title:focus { outline: none; }
+.step-text {
+  margin: 0;
+  max-width: 420px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--fintech-text-secondary);
+}
+.elapsed {
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--fintech-text);
+}
+.slow-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  max-width: 360px;
+  font-size: 0.8125rem;
+  text-align: left;
+  color: var(--fintech-warning);
+}
+.slow-hint mat-icon {
+  flex: none;
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.waiting app-inline-alert,
+.result app-inline-alert { width: 100%; }
+
+.result-icon {
+  font-size: 3rem;
+  width: 3rem;
+  height: 3rem;
+  color: var(--fintech-text-secondary);
+}
+.result[data-kind="success"] .result-icon,
+.result[data-kind="success"] .step-title { color: var(--fintech-success); }
+.result[data-kind="failure"] .result-icon,
+.result[data-kind="failure"] .step-title { color: var(--fintech-danger); }
+.result[data-kind="error"] .result-icon,
+.result[data-kind="error"] .step-title,
+.result[data-kind="unknown"] .result-icon,
+.result[data-kind="unknown"] .step-title { color: var(--fintech-warning); }
+.result-details {
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 12px;
+  background: var(--fintech-bg);
+  font-size: 0.875rem;
+  text-align: left;
+}
+.result-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.result-details dt { color: var(--fintech-text-secondary); }
+.result-details dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  color: var(--fintech-text);
+}
+
+.dialog-btn mat-icon {
+  font-size: 1.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.dialog-btn.danger {
+  background: var(--fintech-danger);
+  color: var(--fintech-on-danger);
+}
+.dialog-btn.danger:disabled {
+  background: var(--fintech-surface-muted);
+  color: var(--fintech-text-secondary);
+}
+
+@media (pointer: coarse) {
+  .terminal-option { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .terminal-option { transition: none; }
+}
+@media (forced-colors: active) {
+  .terminal-option.selected { outline: 2px solid Highlight; }
+}

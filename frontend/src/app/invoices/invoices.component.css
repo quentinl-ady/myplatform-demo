@@ -379,6 +379,12 @@ mat-card.invoices-card {
 .strong { font-weight: 600; }
 .muted-text { color: var(--fintech-text-secondary); }
 .danger-text { color: var(--fintech-danger); }
+.refund-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
 .detail-link {
   color: var(--fintech-text);
   font-weight: 600;

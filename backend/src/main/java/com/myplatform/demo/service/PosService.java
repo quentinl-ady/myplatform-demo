@@ -6,23 +6,33 @@ import com.adyen.service.clouddevice.CloudDeviceApi;
 import com.adyen.model.clouddevice.CloudDeviceApiAsyncResponse;
 import com.adyen.model.clouddevice.CloudDeviceApiRequest;
 import com.adyen.model.clouddevice.CloudDeviceApiResponse;
+import com.adyen.service.exception.ApiException;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.model.PosPaymentResponse;
+import com.myplatform.demo.util.InvoiceTerminalRules;
+import com.myplatform.demo.util.TerminalOutcome;
+import com.myplatform.demo.util.TerminalResponses;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.ZoneOffset;
+import java.util.Currency;
 import java.util.regex.Pattern;
 
 @Service
 @Getter
 public class PosService {
 
+    private static final Logger log = LoggerFactory.getLogger(PosService.class);
     private static final Pattern SERVICE_ID_PATTERN = Pattern.compile("^[A-Za-z0-9]{1,10}$");
     private static final String SERVICE_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -32,20 +42,113 @@ public class PosService {
     private final String merchantAccount;
     private final NetworkTimeService networkTimeService;
 
-    public PosService(@Qualifier("pspClient") Client pspClient,
+    public PosService(@Qualifier("terminalClient") Client terminalClient,
                       @Value("${adyen.saleId:POS_SYSTEM_MYPLATFORM}") String saleId,
                       @Value("${adyen.merchantAccount}") String merchantAccount,
                       NetworkTimeService networkTimeService) {
         this.saleId = saleId;
         this.merchantAccount = merchantAccount;
-        this.cloudDeviceApi = new CloudDeviceApi(pspClient);
+        this.cloudDeviceApi = new CloudDeviceApi(terminalClient);
         this.networkTimeService = networkTimeService;
+    }
+
+    /**
+     * Asks the terminal to take a payment, and waits for its answer. A request that failed, or whose answer was lost,
+     * is an outcome too.
+     *
+     * @param serviceId identifies the payment, to cancel it with {@link #abortPayment}
+     * @param reference the merchant reference of the payment: its webhooks carry it
+     * @param amount    in minor units
+     */
+    public TerminalOutcome pay(String terminalId, String serviceId, String reference, long amount, String currency) {
+        PaymentRequest paymentRequest = new PaymentRequest()
+                .saleData(new SaleData().saleTransactionID(new TransactionIDType()
+                        .transactionID(reference)
+                        .timeStamp(networkTimeService.nowUtc())))
+                .paymentTransaction(new PaymentTransaction().amountsReq(new AmountsReq()
+                        .currency(currency)
+                        .requestedAmount(majorUnits(amount, currency))));
+        SaleToPOIRequest request = new SaleToPOIRequest()
+                .messageHeader(header(MessageCategory.PAYMENT, serviceId))
+                .paymentRequest(paymentRequest);
+        try {
+            return TerminalResponses.payment(sync(terminalId, request));
+        } catch (ApiException e) {
+            log.warn("Payment {} at terminal {} rejected: {} {}", reference, terminalId, e.getStatusCode(), e.getMessage());
+            return TerminalResponses.failure(e);
+        } catch (IOException e) {
+            log.warn("Payment {} at terminal {}: no answer ({})", reference, terminalId, e.toString());
+            return TerminalResponses.lost(e);
+        }
+    }
+
+    /**
+     * Asks the terminal to refund a payment, and waits for its answer: Adyen confirms the refund later, with a webhook.
+     *
+     * @param reference the merchant reference of the refund
+     * @param amount    in minor units: less than the payment for a partial refund
+     */
+    public TerminalOutcome reverse(String terminalId, String serviceId, String reference,
+                                   InvoiceTerminalRules.OriginalTransaction original, long amount, String currency) {
+        SaleData saleData = new SaleData().saleTransactionID(new TransactionIDType()
+                .transactionID(reference)
+                .timeStamp(networkTimeService.nowUtc()));
+        if (!original.atTerminal()) {
+            // The terminal knows the currency of its own payments only.
+            saleData.saleToAcquirerData("currency=" + currency);
+        }
+        ReversalRequest reversalRequest = new ReversalRequest()
+                .saleData(saleData)
+                .originalPOITransaction(new OriginalPOITransaction().poITransactionID(new TransactionIDType()
+                        .transactionID(original.transactionId())
+                        .timeStamp(original.at().atOffset(ZoneOffset.UTC))))
+                .reversedAmount(majorUnits(amount, currency))
+                .reversalReason(ReversalReason.MERCHANT_CANCEL);
+        SaleToPOIRequest request = new SaleToPOIRequest()
+                .messageHeader(header(MessageCategory.REVERSAL, serviceId))
+                .reversalRequest(reversalRequest);
+        try {
+            return TerminalResponses.reversal(sync(terminalId, request));
+        } catch (ApiException e) {
+            log.warn("Refund {} at terminal {} rejected: {} {}", reference, terminalId, e.getStatusCode(), e.getMessage());
+            return TerminalResponses.failure(e);
+        } catch (IOException e) {
+            log.warn("Refund {} at terminal {}: no answer ({})", reference, terminalId, e.toString());
+            return TerminalResponses.lost(e);
+        }
+    }
+
+    private CloudDeviceApiResponse sync(String terminalId, SaleToPOIRequest request) throws ApiException, IOException {
+        CloudDeviceApiRequest apiRequest = new CloudDeviceApiRequest();
+        apiRequest.setSaleToPOIRequest(request);
+        return this.cloudDeviceApi.sync(this.merchantAccount, terminalId, apiRequest);
+    }
+
+    private MessageHeader header(MessageCategory category, String serviceId) {
+        return new MessageHeader()
+                .protocolVersion("3.0")
+                .messageType(MessageType.REQUEST)
+                .messageClass(MessageClass.SERVICE)
+                .messageCategory(category)
+                .saleID(this.saleId)
+                .serviceID(validServiceId(serviceId));
+    }
+
+    /** The amount the Terminal API expects: in major units, with the decimals of the currency. */
+    static BigDecimal majorUnits(long minorUnits, String currency) {
+        int digits;
+        try {
+            digits = Math.max(Currency.getInstance(currency).getDefaultFractionDigits(), 0);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            digits = 2;
+        }
+        return BigDecimal.valueOf(minorUnits, digits);
     }
 
     public CloudDeviceApiResponse initiateSyncPayment(String reference, Long minorUnitAmount, String currency, String terminalId, String requestedServiceId) throws Exception {
 
         String serviceId = requestedServiceId == null || requestedServiceId.isBlank()
-                ? randomServiceId()
+                ? newServiceId()
                 : validServiceId(requestedServiceId);
 
         BigDecimal majorUnitAmount = BigDecimal.valueOf(minorUnitAmount).movePointLeft(2);
@@ -93,7 +196,7 @@ public class PosService {
      *
      * @return null when the request was delivered, otherwise a message explaining why it was rejected
      */
-    public String abortPayment(String terminalId, String paymentServiceId) throws Exception {
+    public String abortPayment(String terminalId, String paymentServiceId) throws IOException, ApiException {
         if (terminalId == null || terminalId.isBlank()) {
             throw new BadRequestException("Enter the ID of the terminal that runs the payment.");
         }
@@ -102,9 +205,9 @@ public class PosService {
         }
         String targetServiceId = validServiceId(paymentServiceId);
 
-        String abortServiceId = randomServiceId();
+        String abortServiceId = newServiceId();
         while (abortServiceId.equals(targetServiceId)) {
-            abortServiceId = randomServiceId();
+            abortServiceId = newServiceId();
         }
 
         MessageHeader messageHeader = new MessageHeader()
@@ -167,7 +270,8 @@ public class PosService {
         return serviceId;
     }
 
-    private static String randomServiceId() {
+    /** A ServiceID identifies a request to a terminal: 10 random letters and digits. */
+    public static String newServiceId() {
         StringBuilder id = new StringBuilder(10);
         for (int i = 0; i < 10; i++) {
             id.append(SERVICE_ID_ALPHABET.charAt(RANDOM.nextInt(SERVICE_ID_ALPHABET.length())));
@@ -206,9 +310,14 @@ public class PosService {
                     response.setReference(paymentResponse.getSaleData().getSaleTransactionID().getTransactionID());
                 }
 
-                if (paymentResponse.getPaymentResult() != null && paymentResponse.getPaymentResult().getPaymentInstrumentData() != null) {
-                    response.setCardBrand(paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData().getPaymentBrand());
-                    response.setMaskedPan(paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData().getMaskedPan());
+                // A payment with a wallet or another instrument has no CardData.
+                CardData cardData = paymentResponse.getPaymentResult() != null
+                        && paymentResponse.getPaymentResult().getPaymentInstrumentData() != null
+                        ? paymentResponse.getPaymentResult().getPaymentInstrumentData().getCardData()
+                        : null;
+                if (cardData != null) {
+                    response.setCardBrand(cardData.getPaymentBrand());
+                    response.setMaskedPan(cardData.getMaskedPan());
                 }
             } else {
                 response.setStatus("FAILURE");

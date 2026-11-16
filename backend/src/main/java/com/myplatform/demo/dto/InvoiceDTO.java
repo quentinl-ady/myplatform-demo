@@ -21,6 +21,11 @@ import java.util.List;
  * @param sendable    a payment link can be created: the invoice is a draft, or its link expired, and no charge of it
  *                    is in progress
  * @param voidable    the invoice isn't paid or void yet, and doesn't bill a subscription
+ * @param terminalId  the terminal the invoice was paid at, null when it was paid otherwise
+ * @param terminalPayable the invoice can be paid at a terminal: it's sent, and no other payment of it is in progress
+ * @param refundable  the payment can be refunded at a terminal: what it hasn't refunded yet
+ * @param refundedAmount what the refunds Adyen confirmed gave back
+ * @param refund      the last refund, null until there is one
  */
 public record InvoiceDTO(Long id,
                          String number,
@@ -52,7 +57,12 @@ public record InvoiceDTO(Long id,
                          List<Event> events,
                          boolean editable,
                          boolean sendable,
-                         boolean voidable) {
+                         boolean voidable,
+                         String terminalId,
+                         boolean terminalPayable,
+                         boolean refundable,
+                         long refundedAmount,
+                         Refund refund) {
 
     public record CustomerRef(Long id, String displayName, String name, String company, String email,
                               String country, String vatNumber, String addressLine, String postalCode, String city) {
@@ -79,5 +89,13 @@ public record InvoiceDTO(Long id,
     }
 
     public record Event(String type, Instant occurredAt, String detail, String pspReference) {
+    }
+
+    /**
+     * @param status      REQUESTED (Adyen hasn't confirmed it yet), REFUNDED or FAILED
+     * @param terminalId  the terminal it was requested at, null when it was made otherwise
+     */
+    public record Refund(String status, Instant requestedAt, Instant refundedAt, String failureReason, String terminalId,
+                         String pspReference) {
     }
 }

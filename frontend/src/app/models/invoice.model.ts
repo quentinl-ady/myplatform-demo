@@ -78,6 +78,20 @@ export interface InvoiceCharge {
   chargedAt?: string | null;
 }
 
+/** REQUESTED until the refund is confirmed. */
+export type InvoiceRefundStatus = 'REQUESTED' | 'REFUNDED' | 'FAILED';
+
+/** The last refund of the payment of an invoice. */
+export interface InvoiceRefund {
+  status: InvoiceRefundStatus;
+  requestedAt?: string | null;
+  refundedAt?: string | null;
+  failureReason?: string | null;
+  /** The terminal it was requested at, null when it was made otherwise. */
+  terminalId?: string | null;
+  pspReference?: string | null;
+}
+
 /** A customer invoice, paid with an Adyen payment link. Amounts in minor units. */
 export interface Invoice {
   id: number;
@@ -120,6 +134,44 @@ export interface Invoice {
   /** A payment link can be created: the invoice is a draft, or its link expired. */
   sendable: boolean;
   voidable: boolean;
+  /** The terminal the invoice was paid at, null when it was paid otherwise. */
+  terminalId?: string | null;
+  /** Can be paid at a terminal: sent, and no other payment of it is in progress. */
+  terminalPayable: boolean;
+  /** The payment can be refunded at a terminal: what it hasn't given back yet. */
+  refundable: boolean;
+  /** What the confirmed refunds gave back. */
+  refundedAmount: number;
+  /** The last refund, null until there is one. */
+  refund?: InvoiceRefund | null;
+}
+
+/** A terminal boarded in a store of the account: it can collect and refund the payments of invoices. */
+export interface InvoiceTerminal {
+  id: string;
+  model?: string | null;
+  storeId: string;
+  storeReference?: string | null;
+  storeCity?: string | null;
+}
+
+/**
+ * How a terminal answered. A payment: APPROVED, DECLINED, CANCELLED, ERROR (nothing was charged) or UNKNOWN (the answer
+ * was lost: the card may have been charged). A refund: REQUESTED (confirmed later), DECLINED, ERROR or UNKNOWN.
+ */
+export type TerminalOutcome = 'APPROVED' | 'DECLINED' | 'CANCELLED' | 'ERROR' | 'UNKNOWN' | 'REQUESTED';
+
+export interface TerminalResult {
+  outcome: TerminalOutcome;
+  /** Why it didn't succeed, or what to do next. */
+  message?: string | null;
+  /** e.g. "visa" */
+  cardBrand?: string | null;
+  /** e.g. "411111******1111" */
+  maskedPan?: string | null;
+  pspReference?: string | null;
+  /** The invoice once the answer is applied. */
+  invoice: Invoice;
 }
 
 export interface InvoiceLineRequest {
@@ -155,6 +207,8 @@ export interface InvoiceSettings {
   paymentLinksReady: boolean;
   /** Why invoices can't be sent yet. */
   paymentLinksIssue?: string | null;
+  /** The account has a store, whose terminals can collect and refund the payments of invoices. */
+  terminalsAvailable: boolean;
 }
 
 /** A customer of the account, with what it owes. */

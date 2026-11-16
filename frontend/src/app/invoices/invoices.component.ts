@@ -18,13 +18,18 @@ import { qrCode } from '../shared/qr';
 import { CustomerDialogComponent, CustomerDialogData } from './customer-dialog.component';
 import { InvoiceDialogComponent, InvoiceDialogData, InvoiceDialogResult } from './invoice-dialog.component';
 import {
-  awaitingPayment, chargeText, countryName, displayStatus, dueText, eventView, formatRate, linkStatusLabel, linkTone, plural
+  awaitingPayment, chargeText, countryName, displayStatus, dueText, eventView, formatRate, linkStatusLabel, linkTone, plural,
+  refundPending, refundText, refundView
 } from './invoice-view';
+import { TerminalDialogComponent, TerminalDialogData, TerminalDialogMode, TerminalDialogResult } from './terminal-dialog.component';
 
 type Filter = 'all' | 'unpaid' | 'draft' | 'paid';
 type InvoiceAction = 'send' | 'void';
 
-/** While a payment link is open, the list refreshes on its own, so a payment shows without reloading the page. */
+/**
+ * While a payment link is open or a refund unconfirmed, the list refreshes on its own, so a payment or a refund shows
+ * without reloading the page.
+ */
 const POLL_INTERVAL_MS = 10_000;
 
 interface Kpis {
@@ -59,7 +64,7 @@ function kpisOf(invoices: Invoice[], currency: string | null): Kpis {
         kpis.overdueCount++;
       }
     } else if (invoice.status === 'PAID') {
-      kpis.collected += invoice.total;
+      kpis.collected += Math.max(0, invoice.total - (invoice.refundedAmount ?? 0));
       kpis.collectedCount++;
       const sent = parseServerDate(invoice.sentAt);
       const paid = parseServerDate(invoice.paidAt);
@@ -124,11 +129,15 @@ export class InvoicesComponent implements OnInit {
   readonly linkTone = linkTone;
   readonly plural = plural;
   readonly countryName = countryName;
+  readonly refundText = refundText;
+  readonly refundView = refundView;
 
   readonly currency = computed(() => this.settings()?.currency ?? this.invoices()[0]?.currency ?? null);
   readonly taxLabel = computed(() => this.settings()?.taxLabel ?? 'VAT');
   /** Why invoices can't be sent yet, e.g. no store to process their payments. */
   readonly sendBlocked = computed(() => this.settings()?.paymentLinksReady === false);
+  /** The account has a store: its terminals can collect and refund the payments of invoices. */
+  readonly terminalsAvailable = computed(() => this.settings()?.terminalsAvailable === true);
   readonly kpis = computed(() => kpisOf(this.invoices(), this.currency()));
   readonly counts = computed(() => {
     const invoices = this.invoices();
@@ -242,7 +251,7 @@ export class InvoicesComponent implements OnInit {
   }
 
   private refreshWhileWaiting(): void {
-    if (document.hidden || !this.invoices().some(awaitingPayment)) return;
+    if (document.hidden || !this.invoices().some(invoice => awaitingPayment(invoice) || refundPending(invoice))) return;
     this.refresh();
   }
 
@@ -291,7 +300,7 @@ export class InvoicesComponent implements OnInit {
   }
 
   private setInvoices(invoices: Invoice[]): void {
-    this.announcePayments(this.invoices(), invoices);
+    this.announceChanges(this.invoices(), invoices);
     this.invoices.set(invoices);
     const expanded = this.expandedId();
     if (expanded !== null && !invoices.some(invoice => invoice.id === expanded)) {
@@ -308,15 +317,33 @@ export class InvoicesComponent implements OnInit {
       : [invoice, ...current]);
   }
 
-  private announcePayments(previous: Invoice[], current: Invoice[]): void {
-    const before = new Map(previous.map(invoice => [invoice.id, invoice.status]));
-    const paid = current.filter(invoice =>
-      invoice.status === 'PAID' && before.has(invoice.id) && before.get(invoice.id) !== 'PAID');
+  /** The payments and the confirmations of refunds since the last refresh. One message: the latest would replace the others. */
+  private announceChanges(previous: Invoice[], current: Invoice[]): void {
+    const before = new Map(previous.map(invoice => [invoice.id, invoice]));
+    const paid = current.filter(invoice => {
+      const old = before.get(invoice.id);
+      return invoice.status === 'PAID' && !!old && old.status !== 'PAID';
+    });
     if (paid.length === 1) {
       const [invoice] = paid;
       this.notify.success(`${invoice.number} is paid: ${formatMoney(invoice.total, invoice.currency)} from ${invoice.customer.displayName}.`);
-    } else if (paid.length > 1) {
+      return;
+    }
+    if (paid.length > 1) {
       this.notify.success(`${paid.length} invoices are paid: ${paid.map(invoice => invoice.number).join(', ')}.`);
+      return;
+    }
+    const settled = current.filter(invoice => before.get(invoice.id)?.refund?.status === 'REQUESTED');
+    const failed = settled.find(invoice => invoice.refund?.status === 'FAILED');
+    const refunded = settled.filter(invoice => invoice.refund?.status === 'REFUNDED');
+    if (failed) {
+      const reason = failed.refund?.failureReason?.trim().replace(/\.$/, '');
+      this.notify.error(`The refund of ${failed.number} failed${reason ? `: ${reason}` : ''}.`);
+    } else if (refunded.length === 1) {
+      const [invoice] = refunded;
+      this.notify.success(`${invoice.number} is refunded: ${formatMoney(invoice.refundedAmount, invoice.currency)} back to ${invoice.customer.displayName}.`);
+    } else if (refunded.length > 1) {
+      this.notify.success(`${refunded.length} refunds are confirmed: ${refunded.map(invoice => invoice.number).join(', ')}.`);
     }
   }
 
@@ -451,6 +478,40 @@ export class InvoicesComponent implements OnInit {
           message: httpErrorMessage(err, 'Unable to void the invoice. Try again.'),
         });
         // The customer may have just paid it.
+        this.refresh();
+      }
+    });
+  }
+
+  collectAtTerminal(invoice: Invoice): void {
+    if (invoice.terminalPayable) this.openTerminalDialog(invoice, 'payment');
+  }
+
+  refundAtTerminal(invoice: Invoice): void {
+    if (invoice.refundable) this.openTerminalDialog(invoice, 'refund');
+  }
+
+  /** The dialog stays open while the terminal works, then hands back the invoice as the terminal left it. */
+  private openTerminalDialog(invoice: Invoice, mode: TerminalDialogMode): void {
+    if (this.pending() || !this.terminalsAvailable()) return;
+    const userId = this.userId;
+    this.rowError.set(null);
+    const ref = this.dialog.open<TerminalDialogComponent, TerminalDialogData, TerminalDialogResult>(TerminalDialogComponent, {
+      data: { userId, invoice, mode },
+      width: '520px',
+      maxWidth: 'calc(100vw - 32px)',
+      autoFocus: '#terminal-dialog-title',
+      restoreFocus: true,
+    });
+    ref.afterClosed().subscribe(result => {
+      // No result: the terminal wasn't asked.
+      if (!result || userId !== this.userId) return;
+      if (result.invoice) {
+        this.upsert(result.invoice);
+        this.refreshCustomers();
+      } else {
+        // The terminal may have taken the payment or the refund: a refresh that started before wouldn't show it.
+        this.cancelRefresh();
         this.refresh();
       }
     });

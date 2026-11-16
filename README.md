@@ -28,7 +28,7 @@ MyPlatform Demo simulates a **marketplace / SaaS platform** that onboards sub-me
 | **Payouts** | Sweep/payout config to external bank accounts · Regular & instant |
 | **Platform Experience** | Transactions overview · Reports · Payouts · Disputes · Pay By Link · Capital |
 | **Security** | SCA device registration & management via WebAuthn (`@adyen/bpscaweb`) |
-| **Invoicing & accounting** | Invoices paid by Pay by Link (PDF with QR code) · Subscriptions charged with stored tokens (ContAuth) and Auto Rescue · Supplier bills paid in one SCA-approved batch or by single-use virtual card · Card expenses with receipts · Matched accounting journal, payout breakdown, CSV and CAMT.053 exports · Onboarding prefilled with the imported company record · Demo data. See [Invoicing & accounting](#invoicing--accounting) |
+| **Invoicing & accounting** | Invoices paid by Pay by Link (PDF with QR code) · Subscriptions charged with stored tokens (ContAuth) · Supplier bills paid in one SCA-approved batch or by single-use virtual card · Card expenses with receipts · Matched accounting journal, payout breakdown, CSV and CAMT.053 exports · Onboarding prefilled with the imported company record · Demo data. See [Invoicing & accounting](#invoicing--accounting) |
 
 ---
 
@@ -56,6 +56,10 @@ Send the standard webhooks and the balance platform transfer webhooks (`balanceP
 |----------|---------|
 | `/api/customers/{userId}` | Customers |
 | `/api/invoices/{userId}` | Invoices: send, void, PDF |
+| `/api/invoices/{userId}/terminals` | Terminals ready in the stores of the user |
+| `POST /api/invoices/{userId}/{id}/terminal-payment` | Collect at a terminal (`{terminalId}`); `/cancel` stops the payment |
+| `POST /api/invoices/{userId}/{id}/terminal-refund` | Refund at a terminal (`{terminalId}`) |
+| `/api/terminals/{terminalId}` | [Terminal app](android-terminal/README.md), no login: store of the terminal, `/invoices`, `/invoices/{id}`, `POST /invoices/{id}/payment`, `POST /invoices/{id}/refund` |
 | `/api/subscriptions/{userId}` | Subscriptions: run a cycle, stop Auto Rescue, cancel |
 | `/api/suppliers/{userId}` | Suppliers |
 | `/api/bills/{userId}` | Bills: payee checks, transfer speeds, payment by transfer or by card |
@@ -194,8 +198,8 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 | **Management - Payment Methods** | `/merchants/{id}/paymentMethodSettings` | GET | `StoreManagementService` | Management API - Payment methods |
 | **Management - Split Config** | `/merchants/{id}/splitConfigurations` | GET | `StoreManagementService` | Management API - Split configurations |
 | **Management - Split Config** | `/merchants/{id}/splitConfigurations` | POST | `StoreManagementService` | Management API - Split configurations |
-| **Management - Terminals** | `/terminals` | GET | `StoreManagementService` | Management API - Terminals |
-| **Terminal (Cloud)** | Cloud sync payment | POST | `PosService` | Terminal API |
+| **Management - Terminals** | `/terminals` | GET | `StoreManagementService` (POS, terminals of the stores, store of a terminal) | Management API - Terminals |
+| **Terminal (Cloud)** | `/sync`: payment, reversal (refund), abort | POST | `PosService` (POS, invoices collected and refunded at a terminal) | Terminal API |
 | **Recurring** | `/disable` | POST | `PaymentCheckoutService` | Recurring API |
 | **Checkout - Payment Links** | `/v71/paymentLinks` | POST | `InvoiceService` (invoices, first payment of subscriptions) | Checkout API |
 | **Checkout - Payment Links** | `/v71/paymentLinks/{id}` | GET, PATCH | `InvoiceService` (status, expiry) | Checkout API |
@@ -212,8 +216,8 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 > | `Management API - Stores read and write` | Create stores |
 > | `Management API - Payment methods read and write` | Request & list payment methods per store |
 > | `Management API - Split configuration read and write` | Create & list split configurations |
-> | `Management API - Terminals read` | List terminals for POS |
-> | `Adyen Payments Terminal API` | Cloud sync payments on POS terminals |
+> | `Management API - Terminals read` | List terminals for POS and invoices, find the store of a terminal |
+> | `Adyen Payments Terminal API` | Cloud sync payments, refunds (reversals) and aborts on terminals |
 
 ---
 
@@ -244,8 +248,8 @@ The application uses **4 separate API keys**, each mapped to a dedicated `Client
 myplatform-demo/
 ├── backend/
 │   ├── src/main/java/com/myplatform/demo/
-│   │   ├── controller/          32 REST controllers
-│   │   ├── service/             43 services (Adyen API + business logic)
+│   │   ├── controller/          33 REST controllers
+│   │   ├── service/             45 services (Adyen API + business logic)
 │   │   ├── model/               JPA entities
 │   │   ├── dto/                 Data Transfer Objects
 │   │   ├── repository/          Spring Data repositories
@@ -258,7 +262,7 @@ myplatform-demo/
 │       ├── login / signup       Authentication & registration (company import)
 │       ├── layout               Sidebar + topbar shell
 │       ├── dashboard            Onboarding, KYC, bank account, external accounts, demo data
-│       ├── invoices             Customers & invoices (Pay by Link, PDF)
+│       ├── invoices             Customers & invoices (Pay by Link, PDF, terminal)
 │       ├── subscriptions        Subscriptions (token charges, Auto Rescue)
 │       ├── bills                Suppliers & bills (batch transfers, single-use cards)
 │       ├── accounting           Journal, payouts, CSV & CAMT.053 exports
@@ -278,6 +282,7 @@ myplatform-demo/
 │       ├── pos                  POS terminal payment
 │       └── device               SCA device management
 │
+├── android-terminal/           Android app for the payment terminals: collect & refund invoices
 ├── .github/workflows/ci.yml    GitHub Actions CI
 └── README.md
 ```
@@ -291,6 +296,7 @@ myplatform-demo/
 - **Node.js** 18+ / **npm** 9+
 - A modern browser (Chrome, Firefox, Edge)
 - An **Adyen TEST account** with Balance Platform, LEM, Checkout & Management access
+- For the terminal app: JDK 17 and the Android SDK (platform 34), see [android-terminal/README.md](android-terminal/README.md)
 
 ---
 

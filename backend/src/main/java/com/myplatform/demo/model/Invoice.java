@@ -29,6 +29,12 @@ public class Invoice {
      */
     public enum ChargeStatus { PENDING, REFUSED, RESCUING, AUTHORISED }
 
+    /**
+     * The last refund of the payment. REQUESTED: the terminal passed it on, and Adyen hasn't confirmed it yet. All the
+     * values are listed already, for the check constraint like the other enums.
+     */
+    public enum RefundStatus { REQUESTED, REFUNDED, FAILED }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -142,6 +148,38 @@ public class Invoice {
 
     /** Auto Rescue's reference of the refused charge it retries: stopping the rescue needs it. */
     private String rescueReference;
+
+    /** The terminal the invoice was paid at, null when it was paid otherwise. */
+    @Column(length = 50)
+    private String terminalId;
+
+    /** The transaction of the terminal, "tender.pspReference": a refund at a terminal references it. */
+    @Column(length = 100)
+    private String terminalTransactionId;
+
+    private Instant terminalTransactionAt;
+
+    /** Null until a refund is requested at a terminal, or Adyen reports one. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private RefundStatus refundStatus;
+
+    /** What the refunds Adyen confirmed gave back, in minor units. */
+    private Long refundedAmount;
+
+    /** The last refund. */
+    private String refundPspReference;
+
+    private Instant refundRequestedAt;
+
+    private Instant refundedAt;
+
+    @Column(length = 200)
+    private String refundFailureReason;
+
+    /** The terminal the last refund was requested at. */
+    @Column(length = 50)
+    private String refundTerminalId;
 
     // Two eager lists can't be fetched in one join: each one is loaded with its own query.
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
