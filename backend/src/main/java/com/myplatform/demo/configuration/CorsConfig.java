@@ -20,6 +20,12 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // The terminal page calls these from wherever the web app is served, e.g. a computer on the local network,
+        // and sends no credentials. The first mapping that matches a request applies, so this one comes first.
+        registry.addMapping("/api/terminals/**")
+                .allowedOrigins("*")
+                .allowedMethods("GET", "POST", "OPTIONS")
+                .allowedHeaders("*");
         registry.addMapping("/**")
                 .allowedOrigins(frontendUrl)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")

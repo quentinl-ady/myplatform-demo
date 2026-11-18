@@ -1,0 +1,250 @@
+/* Shared by the pages of the terminal. Sized for the small touch screens of payment terminals: 48px targets. */
+
+/* Top bar */
+.app-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: calc(4px + env(safe-area-inset-top)) 4px 4px 16px;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid var(--fintech-border);
+}
+.app-bar .icon-btn:first-child { margin-left: -12px; }
+.app-bar-title {
+  flex: 1;
+  min-width: 0;
+}
+.app-bar-title h1 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-bar-subtitle {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--fintech-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--fintech-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:active { background: var(--fintech-surface-muted); }
+.icon-btn:disabled {
+  color: var(--fintech-text-secondary);
+  cursor: default;
+}
+.icon-btn mat-icon { font-size: 1.5rem; }
+
+/* Scrolling content */
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.content-inner {
+  box-sizing: border-box;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Buttons */
+.btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn.large {
+  min-height: 56px;
+  border-radius: 28px;
+  font-size: 1.0625rem;
+}
+.btn.primary {
+  background: var(--fintech-primary);
+  color: var(--fintech-on-primary);
+}
+.btn.secondary {
+  background: transparent;
+  color: var(--fintech-text);
+  border-color: var(--fintech-border-strong);
+}
+.btn.danger {
+  background: transparent;
+  color: var(--fintech-danger);
+  border-color: var(--fintech-danger);
+}
+.btn:disabled {
+  background: var(--fintech-surface-muted);
+  border-color: transparent;
+  color: var(--fintech-text-secondary);
+  cursor: default;
+}
+.btn mat-icon { font-size: 1.25rem; }
+
+/* A message in the middle of the screen: an empty list, an error */
+.message-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 32px 8px;
+  text-align: center;
+}
+.message-panel h1,
+.message-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.panel-icon {
+  font-size: 3rem;
+  color: var(--fintech-text-secondary);
+}
+.panel-icon[data-tone="success"] { color: var(--fintech-success); }
+.panel-icon[data-tone="warning"] { color: var(--fintech-warning); }
+.panel-text,
+.panel-details {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--fintech-text-secondary);
+  overflow-wrap: anywhere;
+}
+.panel-details { font-size: 0.8125rem; }
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 8px;
+}
+
+.loading-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 8px;
+  text-align: center;
+}
+.loading-text {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.loading-hint {
+  margin: 0;
+  max-width: 420px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--fintech-text-secondary);
+}
+
+/* A problem next to what it's about, e.g. a refresh that failed */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 8px 10px 14px;
+  border: 1px solid var(--fintech-warning-border);
+  border-radius: 12px;
+  background: var(--fintech-warning-bg);
+  color: var(--fintech-text);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.notice > span { flex: 1; min-width: 0; }
+.notice-action {
+  flex: none;
+  min-height: 44px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fintech-warning);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.badge {
+  flex: none;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--fintech-surface-muted);
+  color: var(--fintech-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.badge[data-tone="success"] { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.badge[data-tone="warning"] { background: var(--fintech-warning-bg); color: var(--fintech-warning); }
+.badge[data-tone="danger"] { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
+.badge[data-tone="info"] { background: var(--fintech-info-bg); color: var(--fintech-info); }
+
+.mono {
+  font-family: var(--fintech-font-mono);
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
+
+.spinning { animation: terminal-spin 1s linear infinite; }
+@keyframes terminal-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning { animation: none; }
+}
+@media (forced-colors: active) {
+  .btn,
+  .badge { border: 1px solid ButtonText; }
+}

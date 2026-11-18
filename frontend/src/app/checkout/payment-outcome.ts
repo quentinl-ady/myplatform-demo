@@ -130,6 +130,9 @@ const CARD_BRANDS: Record<string, string> = {
   diners: 'Diners Club',
   discover: 'Discover',
   jcb: 'JCB',
+  girocard: 'girocard',
+  interac_card: 'Interac',
+  eftpos_australia: 'eftpos',
 };
 
 /** Display name of an Adyen card brand code ("mc" → "Mastercard"). */
@@ -137,6 +140,13 @@ export function cardBrandLabel(brand: string | null | undefined): string {
   const code = (brand || '').trim();
   if (!code) return 'Card';
   return CARD_BRANDS[code.toLowerCase()] ?? code.charAt(0).toUpperCase() + code.slice(1);
+}
+
+/** "Visa •••• 1111" for a card a terminal read, null when it read none. */
+export function cardText(brand: string | null | undefined, maskedPan: string | null | undefined): string | null {
+  const lastFour = /(\d{4})$/.exec((maskedPan ?? '').trim())?.[1];
+  if (!brand?.trim() && !lastFour) return null;
+  return `${cardBrandLabel(brand)}${lastFour ? ` •••• ${lastFour}` : ''}`;
 }
 
 /**

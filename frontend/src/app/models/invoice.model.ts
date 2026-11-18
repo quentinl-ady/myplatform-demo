@@ -155,6 +155,20 @@ export interface InvoiceTerminal {
   storeCity?: string | null;
 }
 
+/** The store a terminal is assigned to, and the business whose invoices it collects. */
+export interface TerminalContext {
+  terminalId: string;
+  model?: string | null;
+  storeId?: string | null;
+  storeReference?: string | null;
+  storeCity?: string | null;
+  userId?: string | null;
+  /** The business, as its customers know it. */
+  companyName?: string | null;
+  /** The currency of its invoices. */
+  currency?: string | null;
+}
+
 /**
  * How a terminal answered. A payment: APPROVED, DECLINED, CANCELLED, ERROR (nothing was charged) or UNKNOWN (the answer
  * was lost: the card may have been charged). A refund: REQUESTED (confirmed later), DECLINED, ERROR or UNKNOWN.

@@ -59,7 +59,7 @@ Send the standard webhooks and the balance platform transfer webhooks (`balanceP
 | `/api/invoices/{userId}/terminals` | Terminals ready in the stores of the user |
 | `POST /api/invoices/{userId}/{id}/terminal-payment` | Collect at a terminal (`{terminalId}`); `/cancel` stops the payment |
 | `POST /api/invoices/{userId}/{id}/terminal-refund` | Refund at a terminal (`{terminalId}`) |
-| `/api/terminals/{terminalId}` | [Terminal app](android-terminal/README.md), no login: store of the terminal, `/invoices`, `/invoices/{id}`, `POST /invoices/{id}/payment`, `POST /invoices/{id}/refund` |
+| `/api/terminals/{terminalId}` | [Terminal apps](android-terminal/README.md) and the `/terminal` page, no login, any origin (CORS): store of the terminal, `/invoices`, `/invoices/{id}`, `POST /invoices/{id}/payment`, `POST /invoices/{id}/refund` |
 | `/api/subscriptions/{userId}` | Subscriptions: run a cycle, stop Auto Rescue, cancel |
 | `/api/suppliers/{userId}` | Suppliers |
 | `/api/bills/{userId}` | Bills: payee checks, transfer speeds, payment by transfer or by card |
@@ -280,9 +280,10 @@ myplatform-demo/
 │       ├── paybylink            Pay By Link (Platform Experience)
 │       ├── business-loans       Capital (Platform Experience)
 │       ├── pos                  POS terminal payment
+│       ├── terminal             Terminal page (/terminal): invoices collected & refunded at a terminal, no login
 │       └── device               SCA device management
 │
-├── android-terminal/           Android app for the payment terminals: collect & refund invoices
+├── android-terminal/           Android apps for the payment terminals: collect & refund invoices (native, WebView)
 ├── .github/workflows/ci.yml    GitHub Actions CI
 └── README.md
 ```
@@ -296,7 +297,7 @@ myplatform-demo/
 - **Node.js** 18+ / **npm** 9+
 - A modern browser (Chrome, Firefox, Edge)
 - An **Adyen TEST account** with Balance Platform, LEM, Checkout & Management access
-- For the terminal app: JDK 17 and the Android SDK (platform 34), see [android-terminal/README.md](android-terminal/README.md)
+- For the terminal apps: JDK 17 and the Android SDK (platform 34), see [android-terminal/README.md](android-terminal/README.md)
 
 ---
 

@@ -1,0 +1,76 @@
+<header class="app-bar">
+  <div class="app-bar-title">
+    <h1>{{ title() }}</h1>
+    <p class="app-bar-subtitle" *ngIf="storeText()">{{ storeText() }}</p>
+  </div>
+  <button type="button" class="icon-btn" (click)="store.refresh()" [disabled]="store.loading()" aria-label="Refresh">
+    <mat-icon [class.spinning]="store.loading()" aria-hidden="true">refresh</mat-icon>
+  </button>
+  <a class="icon-btn" *ngIf="store.session.inApp" href="myplatform-terminal://settings" aria-label="Settings">
+    <mat-icon aria-hidden="true">settings</mat-icon>
+  </a>
+</header>
+
+<div class="filters" role="group" aria-label="Invoices to show">
+  <button type="button" class="filter" *ngFor="let item of filters" [class.selected]="store.filter() === item.id"
+          [attr.aria-pressed]="store.filter() === item.id" (click)="select(item.id)">
+    {{ item.label }}<ng-container *ngIf="item.id === 'toCollect' && toCollect() > 0"> ({{ toCollect() }})</ng-container>
+  </button>
+</div>
+
+<main class="content" #scroller>
+  <div class="content-inner">
+    <div class="loading-panel" *ngIf="!store.loaded() && store.loading()" role="status">
+      <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
+      <p class="loading-text">Loading the invoices…</p>
+    </div>
+
+    <section class="message-panel" *ngIf="!store.loaded() && !store.loading() && store.listError() as error" role="alert">
+      <mat-icon class="panel-icon" data-tone="warning" aria-hidden="true">warning</mat-icon>
+      <h2>Couldn't load the invoices</h2>
+      <p class="panel-text">{{ error }}</p>
+      <div class="panel-actions">
+        <button type="button" class="btn primary" (click)="store.refresh()">Try again</button>
+      </div>
+    </section>
+
+    <ng-container *ngIf="store.loaded()">
+      <div class="notice" *ngIf="store.listError() as error" role="alert">
+        <span>{{ error }}</span>
+        <button type="button" class="notice-action" (click)="store.refresh()">Try again</button>
+      </div>
+
+      <section class="message-panel" *ngIf="!rows().length" [ngSwitch]="store.filter()">
+        <ng-container *ngSwitchCase="'toCollect'">
+          <mat-icon class="panel-icon" data-tone="success" aria-hidden="true">check_circle</mat-icon>
+          <h2>Nothing to collect</h2>
+          <p class="panel-text">Invoices sent to customers show here.</p>
+        </ng-container>
+        <ng-container *ngSwitchCase="'paid'">
+          <mat-icon class="panel-icon" aria-hidden="true">check_circle</mat-icon>
+          <h2>No paid invoices yet</h2>
+        </ng-container>
+        <ng-container *ngSwitchDefault>
+          <mat-icon class="panel-icon" aria-hidden="true">check_circle</mat-icon>
+          <h2>No invoices</h2>
+        </ng-container>
+      </section>
+
+      <ul class="invoice-list" *ngIf="rows().length">
+        <li *ngFor="let row of rows(); trackBy: trackRow">
+          <a class="invoice-row" [routerLink]="['invoices', row.id]" queryParamsHandling="preserve" [state]="fromList"
+             (click)="rememberScroll()">
+            <span class="row-line">
+              <span class="row-name">{{ row.name }}</span>
+              <span class="row-amount">{{ row.amount }}</span>
+            </span>
+            <span class="row-line">
+              <span class="row-meta" [class.overdue]="row.overdue">{{ row.meta }}</span>
+              <span class="badge" [attr.data-tone]="row.badge.tone">{{ row.badge.label }}</span>
+            </span>
+          </a>
+        </li>
+      </ul>
+    </ng-container>
+  </div>
+</main>

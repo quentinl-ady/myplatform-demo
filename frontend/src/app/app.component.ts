@@ -1,7 +1,15 @@
-import {Component} from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import {Component, inject} from '@angular/core';
+import { NgIf } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import { MatIconModule } from '@angular/material/icon';
+import { filter, map } from 'rxjs';
+
+/** The page of the payment terminals fills their small screen, like an app. */
+function isTerminalPage(url: string): boolean {
+  return /^\/terminal(?:[/?#]|$)/.test(url);
+}
 
 // Default change detection on purpose: with an OnPush root, state set in HTTP callbacks of the
 // (Default) pages below was only rendered after the next click or poll.
@@ -9,12 +17,13 @@ import { MatIconModule } from '@angular/material/icon';
   selector: 'app-root',
   standalone: true,
   imports: [
+    NgIf,
     RouterOutlet,
     CdkScrollable,
     MatIconModule
   ],
   template: `
-    <div class="demo-banner" role="note">
+    <div class="demo-banner" role="note" *ngIf="showBanner()">
       <mat-icon aria-hidden="true">science</mat-icon>
       <span><strong>Demo environment:</strong> test data only, no real money. For information purposes only.</span>
     </div>
@@ -71,4 +80,13 @@ import { MatIconModule } from '@angular/material/icon';
 })
 export class AppComponent {
   title = 'welcome';
+
+  // Until the first navigation ends, the address tells which page opens.
+  readonly showBanner = toSignal(
+    inject(Router).events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map(event => !isTerminalPage(event.urlAfterRedirects))
+    ),
+    { initialValue: typeof window === 'undefined' || !isTerminalPage(window.location.pathname) }
+  );
 }

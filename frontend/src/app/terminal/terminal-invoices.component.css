@@ -1,0 +1,95 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--fintech-bg);
+  color: var(--fintech-text);
+  font-family: var(--fintech-font);
+}
+
+.filters {
+  flex: none;
+  display: flex;
+  background: var(--fintech-surface);
+  border-bottom: 1px solid var(--fintech-border);
+}
+.filter {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 6px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fintech-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.filter.selected {
+  color: var(--fintech-text);
+  border-bottom-color: var(--fintech-primary);
+}
+
+.invoice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.invoice-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--fintech-border);
+  border-radius: 12px;
+  background: var(--fintech-surface);
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.invoice-row:active { background: var(--fintech-surface-subtle); }
+.row-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+.row-amount {
+  flex: none;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.row-meta {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--fintech-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-meta.overdue { color: var(--fintech-danger); }
+
+@media (forced-colors: active) {
+  .filter.selected { border-bottom-color: Highlight; }
+}

@@ -17,6 +17,7 @@ export {IssuingPaymentService} from './issuing-payment.service';
 export {CaptureService} from './capture.service';
 export {RemoteSessionService} from './remote-session.service';
 export {InvoiceService} from './invoice.service';
+export {TerminalAppService} from './terminal-app.service';
 export {SubscriptionService} from './subscription.service';
 export {CustomerService} from './customer.service';
 export {DemoDataService, demoDataSummary} from './demo-data.service';

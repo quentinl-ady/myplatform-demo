@@ -1,0 +1,48 @@
+<ng-container *ngIf="store.context(); else start">
+  <router-outlet></router-outlet>
+</ng-container>
+
+<ng-template #start>
+  <main class="start">
+    <section class="message-panel" *ngIf="!store.session.terminalId" role="alert" aria-labelledby="start-title">
+      <mat-icon class="panel-icon" data-tone="warning" aria-hidden="true">warning</mat-icon>
+      <h1 id="start-title">Terminal ID missing</h1>
+      <p class="panel-text" *ngIf="store.session.inApp">
+        This device doesn't report a terminal ID. Enter it in Settings, e.g. S1F2-000158213200001.
+      </p>
+      <p class="panel-text" *ngIf="!store.session.inApp">
+        Add the ID of the terminal to the address of this page, e.g. <span class="mono">?terminalId=S1F2-000158213200001</span>.
+      </p>
+      <div class="panel-actions" *ngIf="store.session.inApp">
+        <a class="btn secondary" href="myplatform-terminal://settings">
+          <mat-icon aria-hidden="true">settings</mat-icon>
+          <span>Settings</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="message-panel" *ngIf="store.session.terminalId && !store.identifying() && store.identifyError() as error"
+             role="alert" aria-labelledby="start-title">
+      <mat-icon class="panel-icon" data-tone="warning" aria-hidden="true">warning</mat-icon>
+      <h1 id="start-title">Couldn't open the invoices</h1>
+      <p class="panel-text">{{ error }}</p>
+      <p class="panel-details">
+        Terminal <span class="mono">{{ store.session.terminalId }}</span><br>
+        Server <span class="mono">{{ store.session.apiBase }}</span>
+      </p>
+      <div class="panel-actions">
+        <button type="button" class="btn primary" (click)="store.identify()">Try again</button>
+        <a class="btn secondary" *ngIf="store.session.inApp" href="myplatform-terminal://settings">
+          <mat-icon aria-hidden="true">settings</mat-icon>
+          <span>Settings</span>
+        </a>
+      </div>
+    </section>
+
+    <div class="loading-panel" *ngIf="store.session.terminalId && (store.identifying() || !store.identifyError())" role="status">
+      <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
+      <p class="loading-text">Connecting terminal {{ store.session.terminalId }}…</p>
+      <p class="loading-hint" *ngIf="store.slowStart()">The server can take up to a minute to wake up.</p>
+    </div>
+  </main>
+</ng-template>

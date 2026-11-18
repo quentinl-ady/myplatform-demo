@@ -24,6 +24,11 @@ const routeConfig: Routes = [
     title: 'Continue on your phone'
   },
   {
+    // The page of the payment terminals, where the terminal stands in for a login. Before ':id' too.
+    path: 'terminal',
+    loadChildren: () => import('./terminal/terminal.routes').then(m => m.TERMINAL_ROUTES)
+  },
+  {
     path: ':id',
     component: LayoutComponent,
     children: [

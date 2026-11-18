@@ -1,0 +1,150 @@
+<!-- Only state changes are announced; the elapsed seconds stay outside this region. -->
+<p class="cdk-visually-hidden" aria-live="polite" aria-atomic="true">{{ liveMessage() }}</p>
+
+<main class="operation" *ngIf="waiting() as waiting">
+  <mat-spinner diameter="56" aria-hidden="true"></mat-spinner>
+  <h1 class="operation-title" id="operation-title" tabindex="-1">{{ waiting.title }}</h1>
+  <p class="operation-subtitle" *ngIf="waiting.subtitle">{{ waiting.subtitle }}</p>
+  <p class="operation-text">{{ waiting.text }}</p>
+  <p class="elapsed">{{ elapsed() }} s</p>
+  <p class="slow" *ngIf="slow()">
+    <mat-icon aria-hidden="true">schedule</mat-icon>
+    <span>{{ waiting.slowText }}</span>
+  </p>
+</main>
+
+<main class="operation result" *ngIf="done() as done" [attr.data-kind]="done.view.kind">
+  <mat-icon class="result-icon" aria-hidden="true">{{ resultIcons[done.view.kind] }}</mat-icon>
+  <h1 class="operation-title" id="operation-title" tabindex="-1">{{ done.view.title }}</h1>
+  <p class="operation-message">{{ done.view.message }}</p>
+  <p class="notice" *ngIf="done.view.warning"><span>{{ done.view.warning }}</span></p>
+  <dl class="rows result-rows" *ngIf="done.view.card || done.view.pspReference">
+    <div class="row" *ngIf="done.view.card">
+      <dt>Card</dt>
+      <dd>{{ done.view.card }}</dd>
+    </div>
+    <div class="row" *ngIf="done.view.pspReference">
+      <dt>PSP reference</dt>
+      <dd class="mono">{{ done.view.pspReference }}</dd>
+    </div>
+  </dl>
+  <div class="operation-actions">
+    <ng-container *ngIf="done.view.kind === 'success'">
+      <button type="button" class="btn primary large" (click)="backToList()">Back to invoices</button>
+      <button type="button" class="btn secondary" (click)="closeResult()">View invoice</button>
+    </ng-container>
+    <ng-container *ngIf="done.view.kind !== 'success' && done.view.retry">
+      <button type="button" class="btn primary large" (click)="tryAgain()">Try again</button>
+      <button type="button" class="btn secondary" (click)="closeResult()">Close</button>
+    </ng-container>
+    <button type="button" class="btn primary large" *ngIf="done.view.kind !== 'success' && !done.view.retry"
+            (click)="closeResult()">Check the invoice</button>
+  </div>
+</main>
+
+<ng-container *ngIf="!waiting() && !done()">
+  <header class="app-bar">
+    <button type="button" class="icon-btn" (click)="backToList()" aria-label="Back to invoices">
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    </button>
+    <div class="app-bar-title">
+      <h1>{{ invoice()?.number || 'Invoice' }}</h1>
+    </div>
+    <button type="button" class="icon-btn" (click)="load()" [disabled]="loading()" aria-label="Refresh">
+      <mat-icon [class.spinning]="loading()" aria-hidden="true">refresh</mat-icon>
+    </button>
+  </header>
+
+  <main class="content">
+    <div class="content-inner">
+      <div class="loading-panel" *ngIf="!view() && loading()" role="status">
+        <mat-spinner diameter="40" aria-hidden="true"></mat-spinner>
+        <p class="loading-text">Loading the invoice…</p>
+      </div>
+
+      <section class="message-panel" *ngIf="!view() && !loading() && error() as message" role="alert">
+        <mat-icon class="panel-icon" data-tone="warning" aria-hidden="true">warning</mat-icon>
+        <h2>Couldn't load the invoice</h2>
+        <p class="panel-text">{{ message }}</p>
+        <div class="panel-actions">
+          <button type="button" class="btn primary" (click)="load()">Try again</button>
+        </div>
+      </section>
+
+      <ng-container *ngIf="view() as v">
+        <p class="notice" *ngIf="error() as message" role="alert"><span>{{ message }}</span></p>
+
+        <section class="summary">
+          <p class="summary-name">{{ v.name }}</p>
+          <p class="summary-amount">{{ v.amount }}</p>
+          <p class="summary-status">
+            <span class="badge" [attr.data-tone]="v.badge.tone">{{ v.badge.label }}</span>
+            <span class="summary-due" [class.overdue]="v.overdue" *ngIf="v.due">{{ v.due }}</span>
+          </p>
+        </section>
+
+        <section class="card">
+          <dl class="rows">
+            <div class="row" *ngFor="let row of v.rows">
+              <dt>{{ row.label }}</dt>
+              <dd [class.mono]="row.mono" [class.danger]="row.danger">{{ row.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" *ngIf="v.refund as refund" aria-labelledby="refund-title">
+          <div class="card-head">
+            <h2 class="card-title" id="refund-title">Refund</h2>
+            <span class="badge" [attr.data-tone]="refund.badge.tone">{{ refund.badge.label }}</span>
+          </div>
+          <p class="card-text">{{ refund.text }}</p>
+          <dl class="rows" *ngIf="refund.rows.length">
+            <div class="row" *ngFor="let row of refund.rows">
+              <dt>{{ row.label }}</dt>
+              <dd [class.mono]="row.mono" [class.danger]="row.danger">{{ row.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" *ngIf="v.lines.length" aria-labelledby="lines-title">
+          <h2 class="card-title" id="lines-title">Lines</h2>
+          <ul class="lines">
+            <li class="line" *ngFor="let line of v.lines">
+              <span class="line-text">
+                <span>{{ line.description }}</span>
+                <span class="line-detail">{{ line.detail }}</span>
+              </span>
+              <span class="line-amount">{{ line.amount }}</span>
+            </li>
+          </ul>
+          <dl class="rows totals">
+            <div class="row" *ngFor="let row of v.totals">
+              <dt>{{ row.label }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" *ngIf="v.notes" aria-labelledby="notes-title">
+          <h2 class="card-title" id="notes-title">Notes</h2>
+          <p class="card-text notes">{{ v.notes }}</p>
+        </section>
+      </ng-container>
+    </div>
+  </main>
+
+  <ng-container *ngIf="view() as v">
+    <footer class="actions-bar" *ngIf="v.collect || v.refundAction || v.blocked">
+      <div class="actions-inner">
+        <button type="button" class="btn primary large" *ngIf="v.collect" (click)="collect()"
+                [disabled]="operation().type !== 'idle'">{{ v.collect }}</button>
+        <button type="button" class="btn danger large" *ngIf="v.refundAction" (click)="askRefund()"
+                [disabled]="operation().type !== 'idle'">{{ v.refundAction }}</button>
+        <p class="blocked" *ngIf="v.blocked">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span>{{ v.blocked }}</span>
+        </p>
+      </div>
+    </footer>
+  </ng-container>
+</ng-container>

@@ -8,7 +8,7 @@ import { Subscription, TimeoutError, timeout } from 'rxjs';
 import { Invoice, InvoiceTerminal, TerminalResult } from '../models';
 import { InvoiceService } from '../services';
 import { InlineAlertComponent, formatMoney, httpErrorMessage, httpStatus } from '../shared';
-import { cardBrandLabel } from '../checkout/payment-outcome';
+import { cardText } from '../checkout/payment-outcome';
 
 export type TerminalDialogMode = 'payment' | 'refund';
 
@@ -64,13 +64,6 @@ function groupByStore(terminals: InvoiceTerminal[]): StoreGroup[] {
     group.terminals.push(terminal);
   }
   return [...groups.values()];
-}
-
-/** "Visa •••• 1111", null when the terminal didn't read a card. */
-function cardText(brand: string | null | undefined, maskedPan: string | null | undefined): string | null {
-  const lastFour = /(\d{4})$/.exec(maskedPan ?? '')?.[1];
-  if (!brand && !lastFour) return null;
-  return `${cardBrandLabel(brand)}${lastFour ? ` •••• ${lastFour}` : ''}`;
 }
 
 /**
