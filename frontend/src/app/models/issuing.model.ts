@@ -33,6 +33,24 @@ export interface TransactionRuleResponse {
   blockedMccs?: string[];
 }
 
+/** How much of a total spending limit or transaction limit is used. */
+export interface CardLimitUsage {
+  transactionRuleId: string;
+  /** `amount`: values in minor units of `currency`; `count`: number of payments. */
+  unit: 'amount' | 'count';
+  limit: number;
+  spent: number;
+  remaining: number;
+  currency?: string;
+  /** When the counter resets: lifetime, daily, weekly, monthly… */
+  interval?: string;
+}
+
+export interface CardLimits {
+  calculatedAt?: string;
+  limits: CardLimitUsage[];
+}
+
 export interface CardResponse {
   paymentInstrumentId: string;
   cardholderName: string;

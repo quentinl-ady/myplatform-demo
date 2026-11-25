@@ -63,6 +63,22 @@
     <button mat-stroked-button type="button" class="fintech-btn secondary" (click)="clearSearch()">Clear search</button>
   </div>
 
+  <!-- Usage of a total spending or transaction limit, under the card and in the rules panel -->
+  <ng-template #usageBar let-usage let-label="label">
+    <div class="usage-track" role="progressbar" aria-valuemin="0"
+         [attr.aria-valuemax]="usage.limit" [attr.aria-valuenow]="usage.spent"
+         [attr.aria-valuetext]="usageText(usage) + ', ' + usageRemainingText(usage)"
+         [attr.aria-label]="label">
+      <div class="usage-fill" [class.warning]="usageLevel(usage) === 'warning'"
+           [class.exhausted]="usageLevel(usage) === 'exhausted'" [style.width.%]="usagePercent(usage)"></div>
+    </div>
+    <div class="usage-text" aria-hidden="true">
+      <span>{{ usageText(usage) }}</span>
+      <span class="usage-remaining" [class.warning]="usageLevel(usage) === 'warning'"
+            [class.exhausted]="usageLevel(usage) === 'exhausted'">{{ usageRemainingText(usage) }}</span>
+    </div>
+  </ng-template>
+
   <!-- Card visual, shared by every section -->
   <ng-template #cardTpl let-card>
     <div class="card-item" [class.selected]="isSelected(card)">
@@ -163,6 +179,19 @@
           </mat-menu>
         </ng-container>
       </div>
+
+      <ul class="card-limits" *ngIf="card.status !== 'closed' && trackedRules(card).length"
+          [attr.aria-label]="'Spending limits of ' + cardName(card)">
+        <li class="card-limit" *ngFor="let rule of trackedRules(card); trackBy: trackRule">
+          <span class="card-limit-name">{{ getRuleName(rule.type) }}</span>
+          <ng-container *ngIf="usageOf(card, rule) as usage; else cardUsagePending">
+            <ng-container *ngTemplateOutlet="usageBar; context: { $implicit: usage, label: getRuleName(rule.type) + ' usage' }"></ng-container>
+          </ng-container>
+          <ng-template #cardUsagePending>
+            <span class="usage-text muted">{{ usagePendingText(card) }}</span>
+          </ng-template>
+        </li>
+      </ul>
 
       <div class="card-actions-quick" *ngIf="isSelected(card) && card.status !== 'closed'">
         <button type="button" class="action-btn" (click)="revealCardDetails(card)" [disabled]="isRevealing">
@@ -283,7 +312,8 @@
       </div>
 
       <ul class="rules-list" *ngIf="!isRefreshingRules && selectedCard.transactionRules?.length">
-        <li class="rule-item" *ngFor="let rule of selectedCard.transactionRules" [class.mcc-rule]="rule.type === 'blockedMccs'">
+        <li class="rule-item" *ngFor="let rule of selectedCard.transactionRules" [class.mcc-rule]="rule.type === 'blockedMccs'"
+            [class.has-usage]="tracksUsage(rule)">
           <div class="rule-info">
             <mat-icon class="rule-icon" aria-hidden="true">{{ getRuleIcon(rule.type) }}</mat-icon>
             <div class="rule-details">
@@ -294,6 +324,14 @@
               <span class="rule-value" *ngIf="rule.type !== 'maxTransactions' && rule.type !== 'blockedMccs'">
                 {{ ruleAmount(rule) }}
               </span>
+              <ng-container *ngIf="tracksUsage(rule)">
+                <div class="limit-usage" *ngIf="usageOf(selectedCard, rule) as usage; else usagePending">
+                  <ng-container *ngTemplateOutlet="usageBar; context: { $implicit: usage, label: getRuleName(rule.type) + ' usage' }"></ng-container>
+                </div>
+                <ng-template #usagePending>
+                  <span class="usage-text muted">{{ usagePendingText(selectedCard) }}</span>
+                </ng-template>
+              </ng-container>
               <div class="mcc-list" *ngIf="rule.type === 'blockedMccs' && rule.blockedMccs">
                 <span class="mcc-tag" *ngFor="let mcc of rule.blockedMccs">
                   <span class="mcc-code">{{ mcc }}</span>

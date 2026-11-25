@@ -10,6 +10,7 @@ import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.CardRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.CardExpenseService;
+import com.myplatform.demo.service.CardLimitService;
 import com.myplatform.demo.service.CardRangeCatalog;
 import com.myplatform.demo.service.CardTransferService;
 import com.myplatform.demo.service.IssuingService;
@@ -29,6 +30,8 @@ public class IssuingController {
 
     private static final Logger log = LoggerFactory.getLogger(IssuingController.class);
     private static final Set<String> AMOUNT_RULE_TYPES = Set.of("maxAmountPerTransaction", "maxTotalAmount");
+    /** Rules adding up the card payments over time, whose usage Adyen tracks. */
+    private static final Set<String> CUMULATIVE_RULE_TYPES = Set.of("maxTotalAmount", "maxTransactions");
 
     private final IssuingService issuingService;
     private final CardRangeCatalog cardRangeCatalog;
@@ -36,19 +39,22 @@ public class IssuingController {
     private final UserRepository userRepository;
     private final CardRepository cardRepository;
     private final CardExpenseService cardExpenseService;
+    private final CardLimitService cardLimitService;
 
     public IssuingController(IssuingService issuingService,
                              CardRangeCatalog cardRangeCatalog,
                              CardTransferService cardTransferService,
                              UserRepository userRepository,
                              CardRepository cardRepository,
-                             CardExpenseService cardExpenseService) {
+                             CardExpenseService cardExpenseService,
+                             CardLimitService cardLimitService) {
         this.issuingService = issuingService;
         this.cardRangeCatalog = cardRangeCatalog;
         this.cardTransferService = cardTransferService;
         this.userRepository = userRepository;
         this.cardRepository = cardRepository;
         this.cardExpenseService = cardExpenseService;
+        this.cardLimitService = cardLimitService;
     }
 
     @PostMapping("/cards")
@@ -178,6 +184,22 @@ public class IssuingController {
     @GetMapping("/rules/{paymentInstrumentId}")
     public ResponseEntity<List<TransactionRuleResponseDTO>> getTransactionRules(@PathVariable String paymentInstrumentId) throws Exception {
         return ResponseEntity.ok(issuingService.getTransactionRulesForCard(paymentInstrumentId));
+    }
+
+    @GetMapping("/limits/{paymentInstrumentId}")
+    public ResponseEntity<CardLimits> getAvailableLimits(@PathVariable String paymentInstrumentId) throws Exception {
+        Card card = cardRepository.findByPaymentInstrumentId(paymentInstrumentId);
+        if (card == null) {
+            throw new ResourceNotFoundException("Card not found");
+        }
+        if (card.getUser() != null) {
+            ApiLogContext.setUserId(card.getUser().getId());
+        }
+        List<String> ruleIds = issuingService.getTransactionRulesForCard(paymentInstrumentId).stream()
+                .filter(rule -> CUMULATIVE_RULE_TYPES.contains(rule.getType()) && "active".equals(rule.getStatus()))
+                .map(TransactionRuleResponseDTO::getId)
+                .toList();
+        return ResponseEntity.ok(cardLimitService.getLimits(paymentInstrumentId, ruleIds));
     }
 
     @PutMapping("/rules/{ruleId}")

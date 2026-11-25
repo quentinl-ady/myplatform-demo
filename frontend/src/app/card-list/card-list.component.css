@@ -80,6 +80,22 @@
 .rule-actions { display: flex; align-items: center; gap: 8px; }
 .rule-status, .suggestion-brand, .suggestion-status, .risky-badge { font-size: .75rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
 .rule-status.active { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.rule-item.has-usage .rule-info, .rule-item.has-usage .rule-details { flex: 1 1 auto; }
+.limit-usage { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; min-width: 180px; }
+.card-limits { display: flex; flex-direction: column; gap: 10px; list-style: none; margin: 0; padding: 12px 14px; background: var(--fintech-surface); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.card-limit { display: flex; flex-direction: column; gap: 4px; }
+.card-limit-name { font-size: .75rem; font-weight: 600; color: var(--fintech-text); }
+.card-limit .usage-text.muted { margin-top: 0; }
+.usage-track { height: 6px; border-radius: 3px; background: var(--fintech-surface-muted); overflow: hidden; }
+.usage-fill { height: 100%; border-radius: 3px; background: var(--fintech-success-fill); transition: width .3s ease; }
+.usage-fill.warning { background: var(--fintech-warning-fill); }
+.usage-fill.exhausted { background: var(--fintech-danger); }
+.usage-text { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: .75rem; color: var(--fintech-text-secondary); }
+.usage-text.muted { margin-top: 4px; color: var(--fintech-text-tertiary); }
+.usage-remaining { font-weight: 600; }
+.usage-remaining.warning { color: var(--fintech-warning); }
+.usage-remaining.exhausted { color: var(--fintech-danger); }
+@media (prefers-reduced-motion: reduce) { .usage-fill { transition: none; } }
 .rule-item.mcc-rule { flex-direction: column; align-items: flex-start; }
 .rule-item.mcc-rule > div { width: 100%; }
 .rule-item.mcc-rule .rule-actions { justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--fintech-border); }

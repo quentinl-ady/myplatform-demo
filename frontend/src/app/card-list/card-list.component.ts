@@ -5,10 +5,11 @@ import { ReactiveFormsModule, FormBuilder, FormControl, Validators } from '@angu
 import { MatMenuModule } from '@angular/material/menu';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { A11yModule } from '@angular/cdk/a11y';
-import { forkJoin } from 'rxjs';
+import { Subscription, forkJoin } from 'rxjs';
 import { MaterialModule } from '../material.module';
 
 import {
+  CardLimitUsage,
   CardResponse,
   TransactionRuleResponse,
   AddTransactionRuleRequest
@@ -24,6 +25,11 @@ type CardAction = 'suspend' | 'activate' | 'close';
 type PageError = { title: string; message: string; retry?: () => void };
 
 const STATUS_LABELS: Record<string, string> = { active: 'Active', suspended: 'Suspended', closed: 'Closed' };
+/** Rules adding up the card payments over time, whose usage is tracked. */
+const CUMULATIVE_RULE_TYPES = ['maxTotalAmount', 'maxTransactions'];
+const USAGE_PERIODS: Record<string, string> = { daily: ' today', weekly: ' this week', monthly: ' this month' };
+/** Share of a limit from which its usage is shown as a warning. */
+const USAGE_WARNING_RATIO = 0.8;
 
 @Component({
   selector: 'app-card-list',
@@ -79,6 +85,11 @@ export class CardListComponent implements OnInit, OnDestroy {
   rulesError: PageError | null = null;
   addRuleError: string | null = null;
 
+  /** Usage of the card limits, by card then by transaction rule ID. */
+  private limitUsage = new Map<string, Map<string, CardLimitUsage>>();
+  private limitsState = new Map<string, 'loading' | 'loaded' | 'error'>();
+  private limitsSubscriptions = new Map<string, Subscription>();
+
   revealedCardId?: string;
   revealedData?: RevealedCard;
   private revealTimer?: ReturnType<typeof setTimeout>;
@@ -113,6 +124,7 @@ export class CardListComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     clearTimeout(this.revealTimer);
+    this.limitsSubscriptions.forEach(subscription => subscription.unsubscribe());
   }
 
   loadActiveAndSuspended() {
@@ -129,6 +141,7 @@ export class CardListComponent implements OnInit, OnDestroy {
         this.suspendedCards = suspended || [];
         this.isLoadingActive = false;
         this.filterCards(this.searchControl.value || '');
+        [...this.activeCards, ...this.suspendedCards].forEach(card => this.loadLimitUsage(card));
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -356,6 +369,7 @@ export class CardListComponent implements OnInit, OnDestroy {
     this.resetRuleForm();
     this.rulesError = null;
     this.showRulesPanel = true;
+    this.loadLimitUsage(card);
     this.cdr.detectChanges();
   }
 
@@ -397,6 +411,73 @@ export class CardListComponent implements OnInit, OnDestroy {
 
   ruleAmount(rule: TransactionRuleResponse): string {
     return formatMoney(rule.value ?? 0, rule.currencyCode);
+  }
+
+  /** The usage already shown stays until the new one arrives, so the bars don't flicker on refresh. */
+  loadLimitUsage(card: CardResponse) {
+    const id = card.paymentInstrumentId;
+    this.limitsSubscriptions.get(id)?.unsubscribe();
+    if (!this.trackedRules(card).length) {
+      this.limitUsage.delete(id);
+      this.limitsState.set(id, 'loaded');
+      return;
+    }
+    this.limitsState.set(id, 'loading');
+    this.limitsSubscriptions.set(id, this.issuingService.getCardLimits(id).subscribe({
+      next: ({ limits }) => {
+        this.limitUsage.set(id, new Map((limits || []).map(usage => [usage.transactionRuleId, usage])));
+        this.limitsState.set(id, 'loaded');
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.limitsState.set(id, 'error');
+        this.cdr.detectChanges();
+      }
+    }));
+  }
+
+  tracksUsage(rule: TransactionRuleResponse): boolean {
+    return rule.status === 'active' && CUMULATIVE_RULE_TYPES.includes(rule.type);
+  }
+
+  trackedRules(card: CardResponse): TransactionRuleResponse[] {
+    return (card.transactionRules || []).filter(rule => this.tracksUsage(rule));
+  }
+
+  usageOf(card: CardResponse, rule: TransactionRuleResponse): CardLimitUsage | undefined {
+    return this.limitUsage.get(card.paymentInstrumentId)?.get(rule.id);
+  }
+
+  usagePendingText(card: CardResponse): string {
+    return (this.limitsState.get(card.paymentInstrumentId) ?? 'loading') === 'loading' ? 'Checking usage…' : 'Usage unavailable';
+  }
+
+  trackRule(_: number, rule: TransactionRuleResponse): string {
+    return rule.id;
+  }
+
+  usagePercent(usage: CardLimitUsage): number {
+    return usage.limit > 0 ? Math.min(100, Math.max(0, usage.spent / usage.limit * 100)) : 100;
+  }
+
+  usageLevel(usage: CardLimitUsage): 'ok' | 'warning' | 'exhausted' {
+    if (usage.remaining <= 0) return 'exhausted';
+    return usage.spent >= usage.limit * USAGE_WARNING_RATIO ? 'warning' : 'ok';
+  }
+
+  usageText(usage: CardLimitUsage): string {
+    const period = USAGE_PERIODS[usage.interval || ''] ?? '';
+    if (usage.unit === 'count') {
+      return `${usage.spent} of ${usage.limit} transactions used${period}`;
+    }
+    return `${formatMoney(usage.spent, usage.currency)} of ${formatMoney(usage.limit, usage.currency)} spent${period}`;
+  }
+
+  usageRemainingText(usage: CardLimitUsage): string {
+    if (usage.remaining <= 0) return 'Limit reached';
+    return usage.unit === 'count'
+      ? `${usage.remaining} left`
+      : `${formatMoney(usage.remaining, usage.currency)} left`;
   }
 
   getMccLabel(code: string): string {
@@ -483,6 +564,7 @@ export class CardListComponent implements OnInit, OnDestroy {
         rule.status = newStatus;
         this.busyRuleId = null;
         this.notify.success(newStatus === 'active' ? 'Rule enabled' : 'Rule disabled');
+        if (this.tracksUsage(rule) && this.selectedCard) this.loadLimitUsage(this.selectedCard);
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -547,6 +629,7 @@ export class CardListComponent implements OnInit, OnDestroy {
       next: (card) => {
         this.isRefreshingRules = false;
         this.selectedCard = card;
+        this.loadLimitUsage(card);
         const replace = (list: CardResponse[]) =>
           list.map(c => c.paymentInstrumentId === card.paymentInstrumentId ? card : c);
         this.activeCards = replace(this.activeCards);

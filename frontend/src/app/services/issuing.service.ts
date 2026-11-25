@@ -4,6 +4,7 @@ import {Observable} from 'rxjs';
 import {environment} from '../../environments/environment';
 import {
   AddTransactionRuleRequest,
+  CardLimits,
   CardNetworkOption,
   CardResponse,
   CardTransfer,
@@ -46,6 +47,10 @@ export class IssuingService {
 
   getTransactionRules(paymentInstrumentId: string): Observable<TransactionRuleResponse[]> {
     return this.http.get<TransactionRuleResponse[]>(`${this.baseUrl}/api/issuing/rules/${paymentInstrumentId}`);
+  }
+
+  getCardLimits(paymentInstrumentId: string): Observable<CardLimits> {
+    return this.http.get<CardLimits>(`${this.baseUrl}/api/issuing/limits/${paymentInstrumentId}`);
   }
 
   updateTransactionRule(ruleId: string, status: string): Observable<{ status: string }> {
