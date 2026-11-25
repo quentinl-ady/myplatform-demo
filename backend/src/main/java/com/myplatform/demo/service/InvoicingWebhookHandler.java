@@ -61,9 +61,17 @@ public class InvoicingWebhookHandler {
                 return;
             }
             data = root.path("data");
-            billService.applyTransferWebhook(data);
+            try {
+                billService.applyTransferWebhook(data);
+            } catch (Exception e) {
+                log.warn("Couldn't apply the transfer webhook {} to the bills: {}",
+                        AdyenNotifications.text(data, "id"), e.getMessage());
+            }
+            if (type.equals(TRANSFER_WEBHOOK + "created") || type.equals(TRANSFER_WEBHOOK + "updated")) {
+                invoiceService.applyTransferWebhook(data);
+            }
         } catch (Exception e) {
-            log.warn("Couldn't apply the transfer webhook {} to the bills: {}",
+            log.warn("Couldn't apply the transfer webhook {} to the invoices: {}",
                     data != null ? AdyenNotifications.text(data, "id") : null, e.getMessage());
         }
     }

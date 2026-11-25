@@ -59,6 +59,10 @@ export class InvoiceService {
     return this.http.post<TerminalResult>(`${this.baseUrl}/${userId}/${invoiceId}/terminal-refund`, {terminalId});
   }
 
+  refundOnline(userId: string, invoiceId: number): Observable<Invoice> {
+    return this.http.post<Invoice>(`${this.baseUrl}/${userId}/${invoiceId}/refund`, {});
+  }
+
   downloadPdf(userId: string, invoiceId: number): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/${userId}/${invoiceId}/pdf`, {responseType: 'blob'});
   }

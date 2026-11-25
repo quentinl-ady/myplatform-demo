@@ -1,0 +1,115 @@
+.fintech-wrapper { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+mat-card { background: var(--fintech-surface); border-radius: var(--fintech-radius); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04) !important; padding: 24px; }
+h1, h2, h3, p { margin: 0; }
+
+/* Page header */
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.page-title h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; color: var(--fintech-text); letter-spacing: -0.5px; }
+.page-title p { font-size: 0.9375rem; color: var(--fintech-text-secondary); }
+.card-title { font-size: 1.125rem; font-weight: 600; color: var(--fintech-text); margin-bottom: 4px; }
+.card-subtitle { font-size: 0.875rem; color: var(--fintech-text-secondary); margin-bottom: 16px; }
+.card-title + .empty, .card-title + .sweep-list { margin-top: 16px; }
+.loading-row { display: flex; align-items: center; gap: 12px; font-size: 0.875rem; color: var(--fintech-text-secondary); }
+.hint { font-size: 0.8125rem; line-height: 1.5; color: var(--fintech-text-secondary); }
+.empty { font-size: 0.875rem; color: var(--fintech-text-secondary); }
+
+/* Buttons */
+.fintech-btn { border-radius: 24px !important; padding: 8px 24px !important; font-weight: 600 !important; letter-spacing: 0 !important; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.fintech-btn.primary { background-color: var(--fintech-primary) !important; color: var(--fintech-on-primary) !important; }
+.fintech-btn.secondary { background-color: var(--fintech-surface-muted) !important; color: var(--fintech-text) !important; }
+.fintech-btn:disabled { background-color: var(--fintech-surface-muted) !important; color: var(--fintech-text-secondary) !important; cursor: not-allowed !important; }
+
+/* Badges */
+.badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 4px; white-space: nowrap; background: var(--fintech-warning-bg); color: var(--fintech-warning); }
+.badge.ok { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.badge.muted { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+
+/* Empty business account */
+.empty-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 48px 24px; }
+.empty-card mat-icon { font-size: 3rem; width: 3rem; height: 3rem; color: var(--fintech-text-tertiary); }
+.empty-card h2 { font-size: 1.125rem; font-weight: 600; color: var(--fintech-text); }
+.empty-card p { color: var(--fintech-text-secondary); margin-bottom: 12px; }
+
+/* Permission */
+.permission { border-left: 4px solid var(--fintech-warning) !important; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.permission-head { display: flex; gap: 16px; }
+.permission-icon { width: 2.75rem; height: 2.75rem; border-radius: 12px; background: var(--fintech-warning-bg); color: var(--fintech-warning); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.permission h2 { font-size: 1.0625rem; font-weight: 600; color: var(--fintech-text); margin-bottom: 4px; }
+.permission-head p { font-size: 0.8125rem; line-height: 1.5; color: var(--fintech-text-secondary); }
+.permission-list { width: 100%; margin: 0; display: flex; flex-direction: column; border: 1px solid var(--fintech-border); border-radius: 12px; }
+.permission-list div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; font-size: 0.875rem; color: var(--fintech-text); }
+.permission-list div + div { border-top: 1px solid var(--fintech-border); }
+.permission-list dd { margin: 0; }
+
+/* Bank accounts */
+.bank-list { border: 1px solid var(--fintech-border); border-radius: 12px; margin: 0; padding: 0; min-width: 0; overflow: hidden; }
+.bank-row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; transition: background 0.15s; }
+.bank-row + .bank-row { border-top: 1px solid var(--fintech-border); }
+.bank-row:hover { background: var(--fintech-bg); }
+.bank-row.selected { background: var(--fintech-bg); }
+.bank-row.disabled { cursor: not-allowed; opacity: 0.7; }
+.bank-row.disabled:hover { background: transparent; }
+.bank-row:focus-within { outline: 2px solid var(--fintech-primary); outline-offset: -2px; }
+.radio-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--fintech-border-strong); box-sizing: border-box; flex-shrink: 0; }
+.bank-row.selected .radio-dot { border: 6px solid var(--fintech-primary); }
+.bank-icon { width: 2.25rem; height: 2.25rem; border-radius: 10px; background: var(--fintech-surface-muted); color: var(--fintech-text); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bank-icon mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+.bank-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bank-name { font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); }
+.bank-country { font-weight: 400; color: var(--fintech-text-secondary); }
+.bank-number { font-family: var(--fintech-font-mono); font-size: 0.875rem; color: var(--fintech-text); overflow-wrap: anywhere; }
+
+/* Form */
+.top-up-form { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; margin-top: 16px; }
+.segmented { border-radius: 10px; }
+.amount-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; }
+.amount-field { width: 220px; }
+.summary { align-self: stretch; display: flex; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--fintech-info-bg); }
+.summary mat-icon { color: var(--fintech-info); flex-shrink: 0; }
+.summary p:first-child { font-size: 0.875rem; font-weight: 500; color: var(--fintech-text); margin-bottom: 2px; }
+.mandate { align-self: stretch; display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--fintech-border); }
+.mandate mat-checkbox { font-size: 0.875rem; }
+.mandate details { margin-left: 40px; font-size: 0.8125rem; color: var(--fintech-text-secondary); }
+.mandate summary { cursor: pointer; font-weight: 600; color: var(--fintech-text); width: fit-content; }
+.mandate details p { margin-top: 8px; line-height: 1.6; }
+.submit-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.submit-row .fintech-btn { padding: 10px 28px !important; }
+
+/* Result */
+.result { display: flex; align-items: flex-start; gap: 12px; margin-top: 20px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--fintech-warning-border); background: var(--fintech-warning-bg); }
+.result.ok { border-color: var(--fintech-success-border); background: var(--fintech-success-bg); }
+.result > mat-icon { color: var(--fintech-warning); flex-shrink: 0; margin-top: 2px; }
+.result.ok > mat-icon { color: var(--fintech-success); }
+.result > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.result h3 { font-size: 0.9375rem; font-weight: 600; color: var(--fintech-text); }
+.result p { font-size: 0.8125rem; line-height: 1.5; color: var(--fintech-text-secondary); }
+.result a { color: var(--fintech-text); font-weight: 600; }
+.result .reference { font-family: var(--fintech-font-mono); font-size: 0.75rem; overflow-wrap: anywhere; }
+
+/* Recurring top-ups */
+.sweep-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--fintech-border); border-radius: 12px; overflow: hidden; }
+.sweep-list li { display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 16px; }
+.sweep-list li + li { border-top: 1px solid var(--fintech-border); }
+.sweep-icon { width: 2.25rem; height: 2.25rem; border-radius: 10px; background: var(--fintech-info-bg); color: var(--fintech-info); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.sweep-icon mat-icon { font-size: 1.25rem; width: 1.25rem; height: 1.25rem; }
+li.paused .sweep-icon { background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+.sweep-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sweep-title { font-size: 0.875rem; font-weight: 600; color: var(--fintech-text); }
+.sweep-meta { font-size: 0.8125rem; color: var(--fintech-text-secondary); overflow-wrap: anywhere; }
+.sweep-actions { display: flex; flex-shrink: 0; }
+
+app-inline-alert { display: block; }
+
+@media (max-width: 600px) {
+  mat-card { padding: 20px 16px; }
+  .bank-row { flex-wrap: wrap; }
+  .bank-text { flex-basis: calc(100% - 5rem); }
+  .bank-row .badge { margin-left: calc(18px + 2.25rem + 28px); }
+  .amount-field { width: 100%; }
+  .amount-row, .submit-row, .submit-row .fintech-btn { width: 100%; }
+  .mandate details { margin-left: 0; }
+  .sweep-list li { flex-wrap: wrap; }
+  .sweep-text { flex-basis: calc(100% - 3rem); }
+  .sweep-list li .badge { margin-left: 3rem; }
+  .sweep-actions { margin-left: auto; }
+}

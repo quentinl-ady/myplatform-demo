@@ -144,6 +144,13 @@ export interface Invoice {
   refundedAmount: number;
   /** The last refund, null until there is one. */
   refund?: InvoiceRefund | null;
+  funds?: {
+    valueDate?: string | null;
+    amount?: number | null;
+    currency: string;
+    destination?: 'BUSINESS_ACCOUNT' | 'PAYOUT' | 'BALANCE' | null;
+    payoutSchedule?: string | null;
+  } | null;
 }
 
 /** A terminal boarded in a store of the account: it can collect and refund the payments of invoices. */

@@ -25,3 +25,4 @@ export {LedgerService} from './ledger.service';
 export {BillService} from './bill.service';
 export {SupplierService} from './supplier.service';
 export {CardExpenseService} from './card-expense.service';
+export {TopUpService} from './top-up.service';

@@ -226,6 +226,14 @@ public final class InvoiceTerminalRules {
         }
     }
 
+    public static void requestOnlineRefund(Invoice invoice, String pspReference, Instant requestedAt) {
+        invoice.setRefundStatus(Invoice.RefundStatus.REQUESTED);
+        invoice.setRefundPspReference(pspReference);
+        invoice.setRefundRequestedAt(requestedAt);
+        invoice.setRefundTerminalId(null);
+        invoice.setRefundFailureReason(null);
+    }
+
     /** Whether a webhook about the refund the terminal accepted at requestedAt already settled it. */
     private static boolean settledSince(Invoice invoice, String psp, Instant requestedAt) {
         if (psp != null) {
@@ -261,7 +269,9 @@ public final class InvoiceTerminalRules {
         invoice.setRefundedAmount(Math.min(invoice.getTotal(), refundedAmount(invoice) + amount));
         invoice.addEvent(InvoiceEvent.Type.REFUNDED, notification.at(), "cancel".equalsIgnoreCase(notification.action())
                 ? "Payment cancelled: the customer wasn't charged."
-                : "Refunded " + money(amount, invoice.getCurrency()) + " to the customer.", psp);
+                : "Refunded " + money(amount, invoice.getCurrency())
+                + (tracks(invoice, notification) && invoice.getRefundTerminalId() == null ? " online" : "")
+                + " to the customer.", psp);
         boolean tracked = tracks(invoice, notification);
         if (!tracked && invoice.getRefundStatus() == Invoice.RefundStatus.REQUESTED) {
             return true; // another refund: the one requested at the terminal is still awaited

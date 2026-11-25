@@ -1,0 +1,200 @@
+<div class="fintech-wrapper">
+
+  <div class="page-header">
+    <div class="page-title">
+      <h1>Fund your account</h1>
+      <p>Add money to your business account from your own verified bank account, by direct debit.</p>
+    </div>
+    <button mat-flat-button type="button" class="fintech-btn secondary" (click)="refresh()" [disabled]="loading || busy">
+      <mat-icon aria-hidden="true">refresh</mat-icon>Refresh
+    </button>
+  </div>
+
+  <app-inline-alert *ngIf="error" title="Unable to complete the request" [dismissible]="true"
+                    (dismiss)="error = ''">{{ error }}</app-inline-alert>
+
+  <mat-card *ngIf="contextState === 'loading' && !context">
+    <div class="loading-row" role="status">
+      <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+      <span>Loading top-up details…</span>
+    </div>
+  </mat-card>
+  <app-inline-alert *ngIf="contextState === 'error'" title="Unable to load the top-up details"
+                    actionLabel="Try again" (action)="loadContext()">{{ contextError }}</app-inline-alert>
+
+  <ng-container *ngIf="context as ctx">
+    <app-inline-alert *ngFor="let message of ctx.messages" kind="warning" title="Some details are unavailable"
+                      actionLabel="Try again" (action)="loadContext()">{{ message }}</app-inline-alert>
+
+    <mat-card *ngIf="!ctx.businessAccountExists" class="empty-card">
+      <mat-icon aria-hidden="true">account_balance</mat-icon>
+      <h2>No business account yet</h2>
+      <p>Set up your business account to add money to it.</p>
+      <a mat-flat-button class="fintech-btn primary" [routerLink]="['/', userId, 'business-account']">Go to Business account</a>
+    </mat-card>
+    <app-inline-alert *ngIf="ctx.businessAccountExists && !ctx.paymentMethod" kind="info" [live]="false">
+      Direct debit top-ups are not available for {{ ctx.currency }} accounts.
+    </app-inline-alert>
+
+    <ng-container *ngIf="canTopUp">
+      <!-- Permission -->
+      <mat-card class="permission" *ngIf="!capabilitiesAllowed" aria-labelledby="permission-title">
+        <div class="permission-head">
+          <span class="permission-icon" aria-hidden="true"><mat-icon>lock_clock</mat-icon></span>
+          <div>
+            <h2 id="permission-title">Enable direct debit top-ups</h2>
+            <p>Your account needs permission to receive money from your bank account. Verification may be required.</p>
+          </div>
+        </div>
+        <dl class="permission-list">
+          <div><dt>Funds from your bank account</dt>
+            <dd><span class="badge" [class.ok]="allowed('receiveFromTransferInstrument')">{{ capabilityStatus('receiveFromTransferInstrument') }}</span></dd></div>
+          <div><dt>Funds from platform payments</dt>
+            <dd><span class="badge" [class.ok]="allowed('receiveFromPlatformPayments')">{{ capabilityStatus('receiveFromPlatformPayments') }}</span></dd></div>
+        </dl>
+        <button mat-flat-button type="button" class="fintech-btn secondary" (click)="requestCapability()"
+                *ngIf="canRequestPermission" [disabled]="busy || loading">
+          {{ ctx.capabilities['receiveFromTransferInstrument']?.requested ? 'Enable direct debit top-ups' : 'Request permission' }}
+        </button>
+        <p class="hint" *ngIf="!canRequestPermission && !allowed('receiveFromTransferInstrument')">
+          Requested. Complete any outstanding verification, then refresh.
+        </p>
+      </mat-card>
+
+      <!-- Bank accounts -->
+      <mat-card aria-labelledby="banks-title">
+        <h2 class="card-title" id="banks-title">Bank account to debit</h2>
+        <p class="card-subtitle">The bank accounts verified during your onboarding.</p>
+
+        <div class="loading-row" *ngIf="bankState === 'loading'" role="status">
+          <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+          <span>Loading your bank accounts…</span>
+        </div>
+        <app-inline-alert *ngIf="bankState === 'error'" title="Unable to load your bank accounts"
+                          actionLabel="Try again" (action)="loadBankAccounts()">{{ bankError }}</app-inline-alert>
+        <app-inline-alert *ngIf="bankState === 'ready' && !bankAccounts.length" kind="info" [live]="false">
+          No bank account yet. Add one during account verification, then refresh.
+        </app-inline-alert>
+
+        <fieldset class="bank-list" *ngIf="bankState === 'ready' && bankAccounts.length">
+          <legend class="cdk-visually-hidden">Bank account to debit</legend>
+          <label class="bank-row" *ngFor="let account of bankAccounts; trackBy: trackBank"
+                 [class.selected]="bank.value === account.transferInstrumentId && selectable(account)"
+                 [class.disabled]="!selectable(account)">
+            <input type="radio" name="topUpBank" class="cdk-visually-hidden" [value]="account.transferInstrumentId"
+                   [checked]="bank.value === account.transferInstrumentId" [disabled]="!selectable(account)"
+                   (change)="selectBank(account)">
+            <span class="radio-dot" aria-hidden="true"></span>
+            <span class="bank-icon" aria-hidden="true"><mat-icon>account_balance</mat-icon></span>
+            <span class="bank-text">
+              <span class="bank-name">{{ account.bankName || 'Bank account' }}<span class="bank-country" *ngIf="account.countryCode"> · {{ countryName(account.countryCode) }}</span></span>
+              <span class="bank-number">{{ account.accountNumber }}</span>
+            </span>
+            <span class="badge" [class.ok]="account.status === 'verified'" [class.muted]="account.status === 'unknown'">{{ bankStatusLabel(account.status) }}</span>
+          </label>
+        </fieldset>
+      </mat-card>
+
+      <!-- Top-up form -->
+      <mat-card aria-labelledby="add-title">
+        <h2 class="card-title" id="add-title">Add money</h2>
+        <form class="top-up-form" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-button-toggle-group formControlName="mode" class="segmented" aria-label="Top-up type">
+            <mat-button-toggle value="once">One time</mat-button-toggle>
+            <mat-button-toggle value="recurring">Recurring</mat-button-toggle>
+          </mat-button-toggle-group>
+
+          <div class="amount-row">
+            <mat-form-field appearance="outline" class="amount-field" subscriptSizing="dynamic">
+              <mat-label>Amount</mat-label>
+              <input matInput type="number" min="0.01" step="0.01" inputmode="decimal" formControlName="amount">
+              <span matTextSuffix>{{ ctx.currency }}</span>
+              <mat-error>Enter an amount greater than zero.</mat-error>
+            </mat-form-field>
+            <mat-button-toggle-group *ngIf="recurring" formControlName="schedule" class="segmented" aria-label="Frequency">
+              <mat-button-toggle value="weekly">Weekly</mat-button-toggle>
+              <mat-button-toggle value="monthly">Monthly</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          <div class="summary" *ngIf="summary">
+            <mat-icon aria-hidden="true">{{ recurring ? 'event_repeat' : 'south_west' }}</mat-icon>
+            <div>
+              <p>{{ summary }}</p>
+              <p class="hint">{{ recurring ? 'Collections start at 07:00 CET on each date.' : 'Collected right away.' }}
+                Funds usually arrive within a few business days.</p>
+            </div>
+          </div>
+
+          <div class="mandate" [formGroup]="authorization">
+            <mat-checkbox formControlName="accepted">
+              <ng-container [ngSwitch]="ctx.mandateKind">
+                <span *ngSwitchCase="'BACS'">I agree that {{ platformName }} can deduct funds from my bank account to cover negative balances on my balance account.</span>
+                <span *ngSwitchCase="'ACH'">I authorize {{ platformName }} to debit my selected bank account for the one-time or recurring top-ups I confirm.</span>
+                <span *ngSwitchDefault>I authorize {{ platformName }} to debit my bank account under the SEPA direct debit mandate.</span>
+              </ng-container>
+            </mat-checkbox>
+            <mat-checkbox *ngIf="ctx.mandateKind === 'BACS'" formControlName="signatory">I confirm that the bank account is in my name and that I am the only signatory required to authorize the direct debit on this bank account.</mat-checkbox>
+            <details *ngIf="ctx.mandateKind === 'SEPA'">
+              <summary>Read the mandate</summary>
+              <p>By providing your payment details and confirming this payment, you authorize (A) {{ platformName }} and our payment service provider to send instructions to your bank to debit your account and (B) your bank to debit your account by the payment instruction. As part of your rights, you're entitled to a refund from your bank under the terms and conditions of your agreement with your bank. You must claim a refund within 8 weeks from the date your account was debited. You can request a statement from your bank explaining your rights.</p>
+            </details>
+          </div>
+
+          <div class="submit-row">
+            <button mat-flat-button type="submit" class="fintech-btn primary" [disabled]="busy || loading || !!blockReason">
+              <mat-spinner *ngIf="busy" diameter="18" aria-hidden="true"></mat-spinner>
+              {{ submitLabel }}
+            </button>
+            <p class="hint" aria-live="polite">{{ blockReason }}</p>
+          </div>
+        </form>
+
+        <div *ngIf="result as recap" class="result" [class.ok]="resultSubmitted" role="status">
+          <mat-icon aria-hidden="true">{{ resultSubmitted ? 'schedule' : 'error_outline' }}</mat-icon>
+          <div>
+            <h3>{{ resultSubmitted ? 'Top-up requested' : 'Top-up not confirmed' }}: {{ recap.amount | money:recap.currency }}</h3>
+            <p *ngIf="resultSubmitted">The money arrives once the direct debit is collected. You can follow it in
+              <a [routerLink]="['/', userId, 'business-account']">Business account</a>.</p>
+            <p *ngIf="!resultSubmitted">{{ recap.refusalReason || 'Result: ' + (recap.resultCode || 'unknown') }}. Check your bank transactions before trying again.</p>
+            <p class="reference" *ngIf="recap.pspReference">Reference {{ recap.pspReference }}</p>
+          </div>
+          <button mat-icon-button type="button" (click)="result = undefined" aria-label="Dismiss the top-up result">
+            <mat-icon aria-hidden="true">close</mat-icon>
+          </button>
+        </div>
+      </mat-card>
+
+      <!-- Recurring top-ups -->
+      <mat-card aria-labelledby="scheduled-title">
+        <h2 class="card-title" id="scheduled-title">Recurring top-ups</h2>
+        <p class="empty" *ngIf="!ctx.sweeps.length">None yet. Choose “Recurring” above to add money every week or month.</p>
+        <ul class="sweep-list" *ngIf="ctx.sweeps.length">
+          <li *ngFor="let sweep of ctx.sweeps; trackBy: trackSweep" [class.paused]="sweep.status !== 'active'">
+            <span class="sweep-icon" aria-hidden="true"><mat-icon>event_repeat</mat-icon></span>
+            <div class="sweep-text">
+              <span class="sweep-title">{{ sweep.amount | money:sweep.currency }} {{ frequency(sweep.schedule) }}</span>
+              <span class="sweep-meta">
+                From {{ bankAccount(sweep.transferInstrumentId)?.accountNumber || 'your bank account' }}
+                <ng-container *ngIf="sweep.minimumBalance !== null"> · only when the balance is at or below {{ sweep.minimumBalance | money:sweep.currency }}</ng-container>
+              </span>
+            </div>
+            <span class="badge" [class.ok]="sweep.status === 'active'" [class.muted]="sweep.status !== 'active'">{{ sweep.status === 'active' ? 'Active' : 'Paused' }}</span>
+            <div class="sweep-actions">
+              <button mat-icon-button type="button" (click)="toggle(sweep)"
+                      [disabled]="busy || loading || (sweep.status !== 'active' && !capabilitiesAllowed)"
+                      [matTooltip]="sweep.status === 'active' ? 'Pause' : 'Resume'"
+                      [attr.aria-label]="(sweep.status === 'active' ? 'Pause' : 'Resume') + ' the recurring top-up of ' + (sweep.amount | money:sweep.currency)">
+                <mat-icon aria-hidden="true">{{ sweep.status === 'active' ? 'pause' : 'play_arrow' }}</mat-icon>
+              </button>
+              <button mat-icon-button type="button" (click)="deleteSweep(sweep)" [disabled]="busy || loading"
+                      matTooltip="Delete" [attr.aria-label]="'Delete the recurring top-up of ' + (sweep.amount | money:sweep.currency)">
+                <mat-icon aria-hidden="true">delete_outline</mat-icon>
+              </button>
+            </div>
+          </li>
+        </ul>
+      </mat-card>
+    </ng-container>
+  </ng-container>
+</div>

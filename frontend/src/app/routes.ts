@@ -118,6 +118,11 @@ const routeConfig: Routes = [
         title: 'Business account'
       },
       {
+        path: 'fund-account',
+        loadComponent: () => import('./fund-account/fund-account.component').then(m => m.FundAccountComponent),
+        title: 'Fund your account'
+      },
+      {
         path: 'banktransfer',
         loadComponent: () => import('./banktransfer/banktransfer.component').then(m => m.BankTransferComponent),
         title: 'Bank transfers'

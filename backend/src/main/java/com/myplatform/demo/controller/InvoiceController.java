@@ -93,6 +93,11 @@ public class InvoiceController {
         return ResponseEntity.ok(invoiceTerminalService.refund(userId, invoiceId, request.terminalId()));
     }
 
+    @PostMapping("/{userId}/{invoiceId}/refund")
+    public ResponseEntity<InvoiceDTO> refund(@PathVariable String userId, @PathVariable Long invoiceId) throws Exception {
+        return ResponseEntity.ok(invoiceService.refund(userId, invoiceId));
+    }
+
     @GetMapping("/{userId}/{invoiceId}/pdf")
     public ResponseEntity<byte[]> pdf(@PathVariable String userId, @PathVariable Long invoiceId) {
         InvoiceService.InvoicePdf pdf = invoiceService.pdf(userId, invoiceId);

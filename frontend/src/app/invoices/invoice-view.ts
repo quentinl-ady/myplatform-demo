@@ -63,32 +63,70 @@ export function displayStatus(invoice: Invoice): StatusView {
 export function refundView(invoice: Invoice): StatusView | null {
   switch (invoice.refund?.status) {
     case 'REQUESTED':
-      return { label: 'Refund pending', icon: 'hourglass_top', tone: 'warning' };
+      return { label: invoice.refund.terminalId ? 'Refund pending' : 'Online refund pending', icon: 'hourglass_top', tone: 'warning' };
     case 'FAILED':
-      return { label: 'Refund failed', icon: 'error_outline', tone: 'danger' };
+      return { label: invoice.refund.terminalId ? 'Refund failed' : 'Online refund failed', icon: 'error_outline', tone: 'danger' };
   }
   const refunded = invoice.refundedAmount ?? 0;
   if (refunded <= 0) return null;
+  const online = !!invoice.refund && !invoice.refund.terminalId;
   return refunded >= invoice.total
-    ? { label: 'Refunded', icon: 'undo', tone: 'neutral' }
-    : { label: 'Partially refunded', icon: 'undo', tone: 'info' };
+    ? { label: online ? 'Refunded online' : 'Refunded', icon: 'undo', tone: 'neutral' }
+    : { label: online ? 'Partially refunded online' : 'Partially refunded', icon: 'undo', tone: 'info' };
 }
 
 /** "€40.00 of €120.00 refunded", "€120.00 requested, awaiting confirmation". */
 export function refundText(invoice: Invoice): string {
   const refunded = invoice.refundedAmount ?? 0;
+  const channel = invoice.refund?.terminalId ? `at terminal ${invoice.refund.terminalId}` : 'online';
   switch (invoice.refund?.status) {
     case 'REQUESTED':
-      return `${formatMoney(Math.max(0, invoice.total - refunded), invoice.currency)} requested, awaiting confirmation`;
+      return `${formatMoney(Math.max(0, invoice.total - refunded), invoice.currency)} requested ${channel}, awaiting confirmation`;
     case 'FAILED':
-      if (refunded <= 0) return 'Nothing was refunded';
+      if (refunded <= 0) return `Nothing was refunded ${channel}`;
   }
   return refunded >= invoice.total
-    ? `${formatMoney(refunded, invoice.currency)} refunded`
-    : `${formatMoney(refunded, invoice.currency)} of ${formatMoney(invoice.total, invoice.currency)} refunded`;
+    ? `${formatMoney(refunded, invoice.currency)} refunded ${channel}`
+    : `${formatMoney(refunded, invoice.currency)} of ${formatMoney(invoice.total, invoice.currency)} refunded ${channel}`;
 }
 
-/** A refund requested at a terminal that isn't confirmed yet. */
+/** A paid invoice whose value date may still come: settlements take days, older ones won't get one any more. */
+export function awaitingFunds(invoice: Invoice, now: Date = new Date(), days = 7): boolean {
+  const paidAt = parseServerDate(invoice.paidAt);
+  return invoice.status === 'PAID' && !invoice.funds?.valueDate && !!paidAt
+    && now.getTime() - paidAt.getTime() < days * 24 * 3600 * 1000;
+}
+
+export function fundsText(invoice: Invoice, now: Date = new Date()): string {
+  if (invoice.status !== 'PAID') return '';
+  const funds = invoice.funds;
+  const date = parseServerDate(funds?.valueDate);
+  if (!date) {
+    return awaitingFunds(invoice, now)
+      ? 'Funds: settlement pending. The date they become available shows once the payment is booked.'
+      : '';
+  }
+  const future = date.getTime() > now.getTime();
+  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date);
+  const amount = funds?.amount != null ? `${formatMoney(funds.amount, funds.currency)} ` : '';
+  const available = `${amount}available ${future ? 'on' : 'since'} ${day}`;
+  switch (funds?.destination) {
+    case 'BUSINESS_ACCOUNT':
+      return `Funds: ${available}, on your business account.`;
+    case 'PAYOUT': {
+      const schedule = funds.payoutSchedule;
+      const next = schedule === 'daily' || schedule === 'weekly' || schedule === 'monthly'
+        ? `next ${schedule} payout` : 'next scheduled payout';
+      return `Funds: ${available}, then sent to your bank account with the ${next}.`;
+    }
+    case 'BALANCE':
+      return `Funds: ${amount}available in your balance account ${future ? 'on' : 'since'} ${day}, ready to be paid out.`;
+    default:
+      return `Funds: ${available}.`;
+  }
+}
+
+/** A refund that isn't confirmed yet. */
 export function refundPending(invoice: Invoice): boolean {
   return invoice.status === 'PAID' && invoice.refund?.status === 'REQUESTED';
 }

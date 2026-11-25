@@ -17,3 +17,4 @@ export * from './subscription.model';
 export * from './ledger.model';
 export * from './bill.model';
 export * from './card-expense.model';
+export * from './top-up.model';

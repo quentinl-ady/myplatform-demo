@@ -10,6 +10,8 @@ import com.adyen.model.checkout.PaymentLinkRequest;
 import com.adyen.model.checkout.PaymentLinkResponse;
 import com.adyen.model.checkout.PaymentRequest;
 import com.adyen.model.checkout.PaymentResponse;
+import com.adyen.model.checkout.PaymentRefundRequest;
+import com.adyen.model.checkout.PaymentRefundResponse;
 import com.adyen.model.checkout.SepaDirectDebitDetails;
 import com.adyen.model.checkout.UpdatePaymentLinkRequest;
 import com.adyen.model.payment.CancelRequest;
@@ -40,6 +42,7 @@ import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.repository.WebhookEventRepository;
 import com.myplatform.demo.util.AdyenNotifications;
 import com.myplatform.demo.util.InvoiceMath;
+import com.myplatform.demo.util.InvoiceFunds;
 import com.myplatform.demo.util.InvoiceTerminalRules;
 import com.myplatform.demo.util.PaymentLinks;
 import com.myplatform.demo.util.PaymentMethodNames;
@@ -102,6 +105,8 @@ public class InvoiceService {
     private static final Duration CHARGE_CHECK_INTERVAL = Duration.ofSeconds(30);
     /** How often a refund Adyen hasn't confirmed is looked up in the webhooks other backends stored. */
     private static final Duration REFUND_CHECK_INTERVAL = Duration.ofSeconds(30);
+    /** Payments settle within days: older paid invoices without a value date don't get one from stored webhooks. */
+    private static final Duration FUNDS_LOOKBACK = Duration.ofDays(7);
     /**
      * A terminal answers within 3 minutes. An operation older than this was left behind by a request that ended
      * without saying so: the invoice is free again.
@@ -137,6 +142,9 @@ public class InvoiceService {
     private final PaymentsApi paymentsApi;
     private final ModificationsApi modificationsApi;
     private final String merchantAccount;
+    private final com.adyen.service.checkout.ModificationsApi checkoutModificationsApi;
+    private final InvoiceFundsService invoiceFundsService;
+    private final Map<Long, Instant> fundsCheckedAt = new ConcurrentHashMap<>();
     /**
      * Webhooks, checks of payment links and the user's actions change invoices from different threads: the changes
      * of an invoice run one at a time, under the lock its id maps to.
@@ -199,7 +207,10 @@ public class InvoiceService {
                           AccountStatementService accountStatementService,
                           InvoicePdfService pdfService,
                           ObjectMapper objectMapper,
-                          EntityManager entityManager) {
+                          EntityManager entityManager,
+                          InvoiceFundsService invoiceFundsService) {
+        this.invoiceFundsService = invoiceFundsService;
+        this.checkoutModificationsApi = new com.adyen.service.checkout.ModificationsApi(pspClient);
         this.paymentLinksApi = new PaymentLinksApi(pspClient);
         this.paymentsApi = new PaymentsApi(pspClient);
         this.modificationsApi = new ModificationsApi(pspClient);
@@ -263,7 +274,8 @@ public class InvoiceService {
                 MAX_CHECKS_PER_LIST, now);
         boolean charges = checkCharges(invoices, now);
         boolean refunds = checkRefunds(invoices, now);
-        return links || charges || refunds;
+        boolean funds = checkFunds(invoices, now);
+        return links || charges || refunds || funds;
     }
 
     public InvoicePdf pdf(String userId, Long invoiceId) {
@@ -1031,6 +1043,78 @@ public class InvoiceService {
         return changed;
     }
 
+    public InvoiceDTO refund(String userId, Long invoiceId) throws IOException, ApiException {
+        User user = user(userId);
+        Invoice found = owned(userId, invoiceId);
+        synchronized (lockOf(invoiceId)) {
+            Invoice invoice = current(found);
+            Instant now = Instant.now();
+            rejectWhileAtTerminal(invoice, now);
+            String issue = InvoiceTerminalRules.notRefundable(invoice);
+            if (issue != null) throw new ConflictException(issue);
+            long amount = InvoiceTerminalRules.refundableAmount(invoice);
+            String reference = truncate(invoice.getNumber() + "-REFUND-" + randomSuffix(), 80);
+            ResolvedPaymentOptions options = checkoutPaymentService.resolve(null, target(user, invoice.getStoreReference()),
+                    amount, invoice.getCurrency(), reference);
+            PaymentRefundRequest request = new PaymentRefundRequest().merchantAccount(merchantAccount)
+                    .amount(new Amount().currency(invoice.getCurrency()).value(amount)).reference(reference);
+            if (options.splits() != null) request.setSplits(options.splits());
+            PaymentRefundResponse response = checkoutModificationsApi.refundCapturedPayment(invoice.getPspReference(), request);
+            InvoiceTerminalRules.requestOnlineRefund(invoice, response.getPspReference(), now);
+            return toDto(invoiceRepository.save(invoice), today());
+        }
+    }
+
+    public void applyTransferWebhook(JsonNode data) {
+        String psp = AdyenNotifications.text(data.path("categoryData"), "pspPaymentReference");
+        if (psp == null) return;
+        invoiceRepository.findFirstByPspReference(psp).ifPresent(found -> {
+            synchronized (lockOf(found.getId())) {
+                Invoice invoice = current(found);
+                if (applyFunds(invoice, data)) invoiceRepository.save(invoice);
+            }
+        });
+    }
+
+    private boolean applyFunds(Invoice invoice, JsonNode data) {
+        User user = user(invoice.getUserId());
+        return InvoiceFunds.apply(invoice, InvoiceFunds.settlement(data, invoice.getPspReference(),
+                user.getBalanceAccountId(), invoice.getCurrency()));
+    }
+
+    private boolean checkFunds(List<Invoice> invoices, Instant now) {
+        boolean changed = false;
+        for (Invoice found : invoices) {
+            if (found.getStatus() != Invoice.Status.PAID || found.getPspReference() == null
+                    || found.getFundsValueDate() != null || found.getPaidAt() == null
+                    || found.getPaidAt().isBefore(now.minus(FUNDS_LOOKBACK))) continue;
+            Instant checked = fundsCheckedAt.get(found.getId());
+            if (checked != null && checked.plus(REFUND_CHECK_INTERVAL).isAfter(now)) continue;
+            fundsCheckedAt.put(found.getId(), now);
+            synchronized (lockOf(found.getId())) {
+                Invoice invoice = current(found);
+                boolean updated = false;
+                try {
+                    Map<Long, WebhookEvent> events = new TreeMap<>();
+                    for (String type : List.of("balancePlatform.transfer.created", "balancePlatform.transfer.updated")) {
+                        webhookEventRepository.findByEventTypeAndRawJsonContainingOrderByReceivedAtAsc(type,
+                                invoice.getPspReference()).forEach(event -> events.put(event.getId(), event));
+                    }
+                    for (WebhookEvent event : events.values()) {
+                        updated |= applyFunds(invoice, objectMapper.readTree(event.getRawJson()).path("data"));
+                    }
+                } catch (Exception e) {
+                    log.warn("Couldn't read the stored settlement webhooks of invoice {}", invoice.getNumber());
+                }
+                if (updated) {
+                    invoiceRepository.save(invoice);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
     // ---------- Terminals ----------
 
     /**
@@ -1531,7 +1615,8 @@ public class InvoiceService {
                 !atTerminal && InvoiceTerminalRules.notPayable(invoice) == null,
                 !atTerminal && InvoiceTerminalRules.notRefundable(invoice) == null,
                 InvoiceTerminalRules.refundedAmount(invoice),
-                refund);
+                refund,
+                status == Invoice.Status.PAID ? invoiceFundsService.funds(invoice, user(invoice.getUserId())) : null);
     }
 
     /** The seller as Adyen verified it, else the name the user signed up with. */

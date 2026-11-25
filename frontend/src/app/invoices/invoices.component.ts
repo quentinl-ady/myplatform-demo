@@ -19,12 +19,12 @@ import { CustomerDialogComponent, CustomerDialogData } from './customer-dialog.c
 import { InvoiceDialogComponent, InvoiceDialogData, InvoiceDialogResult } from './invoice-dialog.component';
 import {
   awaitingPayment, chargeText, countryName, displayStatus, dueText, eventView, formatRate, linkStatusLabel, linkTone, plural,
-  refundPending, refundText, refundView
+  awaitingFunds, fundsText, refundPending, refundText, refundView
 } from './invoice-view';
 import { TerminalDialogComponent, TerminalDialogData, TerminalDialogMode, TerminalDialogResult } from './terminal-dialog.component';
 
 type Filter = 'all' | 'unpaid' | 'draft' | 'paid';
-type InvoiceAction = 'send' | 'void';
+type InvoiceAction = 'send' | 'void' | 'refund';
 
 /**
  * While a payment link is open or a refund unconfirmed, the list refreshes on its own, so a payment or a refund shows
@@ -130,6 +130,7 @@ export class InvoicesComponent implements OnInit {
   readonly plural = plural;
   readonly countryName = countryName;
   readonly refundText = refundText;
+  readonly fundsText = fundsText;
   readonly refundView = refundView;
 
   readonly currency = computed(() => this.settings()?.currency ?? this.invoices()[0]?.currency ?? null);
@@ -251,7 +252,8 @@ export class InvoicesComponent implements OnInit {
   }
 
   private refreshWhileWaiting(): void {
-    if (document.hidden || !this.invoices().some(invoice => awaitingPayment(invoice) || refundPending(invoice))) return;
+    if (document.hidden || !this.invoices().some(invoice => awaitingPayment(invoice) || refundPending(invoice)
+      || awaitingFunds(invoice, new Date(), 1))) return;
     this.refresh();
   }
 
@@ -479,6 +481,48 @@ export class InvoicesComponent implements OnInit {
         });
         // The customer may have just paid it.
         this.refresh();
+      }
+    });
+  }
+
+  async refundOnline(invoice: Invoice): Promise<void> {
+    if (this.pending() || !invoice.refundable) return;
+    const userId = this.userId;
+    const paid = invoice.events.find(event => event.type === 'PAID' && event.pspReference === invoice.pspReference);
+    const lastFour = paid?.detail?.match(/••••\s*(\d{4})/)?.[1];
+    const paymentMethod = (invoice.paymentMethodName || 'Original payment method') + (lastFour ? ` •••• ${lastFour}` : '');
+    const confirmed = await this.confirmService.confirm({
+      title: `Refund ${invoice.number} online?`,
+      message: 'The remaining payment is returned to the original payment method. The refund is confirmed in a few minutes.',
+      details: [
+        { label: 'Amount', value: formatMoney(Math.max(0, invoice.total - invoice.refundedAmount), invoice.currency) },
+        { label: 'Payment method', value: paymentMethod },
+      ],
+      confirmText: 'Refund online',
+      cancelText: 'Keep payment',
+      danger: true,
+    });
+    if (!confirmed || this.pending() || userId !== this.userId) return;
+    const current = this.invoices().find(item => item.id === invoice.id);
+    if (!current?.refundable) return;
+    this.cancelRefresh();
+    this.rowError.set(null);
+    this.pending.set({ id: invoice.id, action: 'refund' });
+    this.invoiceService.refundOnline(userId, invoice.id).subscribe({
+      next: updated => {
+        this.pending.set(null);
+        if (userId !== this.userId) return;
+        this.upsert(updated);
+        this.notify.info(`Online refund requested for ${updated.number}. Confirmation follows in a few minutes.`);
+      },
+      error: err => {
+        this.pending.set(null);
+        if (userId !== this.userId) return;
+        this.rowError.set({
+          id: invoice.id,
+          title: `Unable to refund ${invoice.number}`,
+          message: httpErrorMessage(err, 'Unable to request the refund. Try again.'),
+        });
       }
     });
   }

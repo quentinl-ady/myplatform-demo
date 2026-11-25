@@ -74,7 +74,7 @@ class InvoiceTerminalServiceTest {
             invoiceRepository, mock(CustomerRepository.class), userRepository, mock(StoreCustomerRepository.class),
             mock(WebhookEventRepository.class), mock(CheckoutPaymentService.class), mock(LegalEntityService.class),
             mock(AccountStatementService.class), mock(InvoicePdfService.class), new ObjectMapper(),
-            mock(EntityManager.class));
+            mock(EntityManager.class), mock(InvoiceFundsService.class));
     private final InvoiceTerminalService service = new InvoiceTerminalService(invoiceService, terminalDirectory,
             posService, subscriptionService, userRepository);
     private final ExecutorService otherRequests = Executors.newSingleThreadExecutor();

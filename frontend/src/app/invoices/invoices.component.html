@@ -181,7 +181,7 @@
                           <span>{{ refundText(inv) }}</span>
                         </span>
                         <ng-container *ngIf="inv.refund as last">
-                          <span class="muted-text" *ngIf="last.requestedAt">Requested {{ dateTime(last.requestedAt) }}<ng-container *ngIf="last.terminalId"> at terminal {{ last.terminalId }}</ng-container></span>
+                          <span class="muted-text" *ngIf="last.requestedAt">Requested {{ dateTime(last.requestedAt) }}<ng-container *ngIf="last.terminalId"> at terminal {{ last.terminalId }}</ng-container><ng-container *ngIf="!last.terminalId"> online</ng-container></span>
                           <span class="muted-text" *ngIf="last.refundedAt">Refunded {{ dateTime(last.refundedAt) }}</span>
                           <span class="danger-text" *ngIf="last.status === 'FAILED' && last.failureReason">{{ last.failureReason }}</span>
                           <span class="muted-text mono" *ngIf="last.pspReference">PSP reference {{ last.pspReference }}</span>
@@ -305,6 +305,9 @@
                         </div>
                         <div class="timeline-detail" *ngIf="event.detail">{{ event.detail }}</div>
                         <div class="timeline-ref mono" *ngIf="event.pspReference">PSP reference {{ event.pspReference }}</div>
+                        <ng-container *ngIf="event.type === 'PAID' && inv.status === 'PAID' && (!event.pspReference || event.pspReference === inv.pspReference)">
+                          <div class="timeline-detail" *ngIf="fundsText(inv) as funds">{{ funds }}</div>
+                        </ng-container>
                       </div>
                     </li>
                   </ol>
@@ -332,6 +335,12 @@
                     <mat-spinner *ngIf="isPending(inv, 'void')" diameter="16" aria-hidden="true"></mat-spinner>
                     <mat-icon *ngIf="!isPending(inv, 'void')" aria-hidden="true">block</mat-icon>
                     {{ isPending(inv, 'void') ? 'Voiding…' : 'Void invoice…' }}
+                  </button>
+                  <button mat-stroked-button type="button" class="action-btn danger" *ngIf="inv.refundable"
+                          (click)="refundOnline(inv)" [disabled]="!!pending()">
+                    <mat-spinner *ngIf="isPending(inv, 'refund')" diameter="16" aria-hidden="true"></mat-spinner>
+                    <mat-icon *ngIf="!isPending(inv, 'refund')" aria-hidden="true">undo</mat-icon>
+                    {{ isPending(inv, 'refund') ? 'Requesting refund…' : 'Refund online…' }}
                   </button>
                   <button mat-stroked-button type="button" class="action-btn danger" *ngIf="inv.refundable && terminalsAvailable()"
                           (click)="refundAtTerminal(inv)" [disabled]="!!pending()">

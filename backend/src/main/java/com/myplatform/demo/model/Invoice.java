@@ -111,6 +111,14 @@ public class Invoice {
 
     private Instant voidedAt;
 
+    private Instant fundsValueDate;
+
+    private Long fundsAmount;
+
+    private String fundsTransferId;
+
+    private Integer fundsSequenceNumber;
+
     /** Set on the invoices created by the demo data, so loading it again doesn't duplicate them. */
     @Column(length = 40)
     private String demoKey;

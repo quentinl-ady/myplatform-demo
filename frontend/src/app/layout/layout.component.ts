@@ -102,6 +102,7 @@ export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
       title: 'Banking',
       items: [
         { label: 'Business account', icon: 'sync_alt', path: 'business-account', lock: 'bankAccount' },
+        { label: 'Fund your account', icon: 'savings', path: 'fund-account', lock: 'bankAccount' },
         { label: 'Cash management', icon: 'account_balance_wallet', path: 'cash-management' },
         { label: 'Loans', icon: 'attach_money', path: 'businessloans', lock: 'capital' },
         { label: 'Trusted devices', icon: 'devices', path: 'business-account-device', lock: 'bankAccount' },

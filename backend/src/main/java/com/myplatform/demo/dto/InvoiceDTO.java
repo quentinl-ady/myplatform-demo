@@ -62,7 +62,11 @@ public record InvoiceDTO(Long id,
                          boolean terminalPayable,
                          boolean refundable,
                          long refundedAmount,
-                         Refund refund) {
+                         Refund refund,
+                         Funds funds) {
+
+    public record Funds(Instant valueDate, Long amount, String currency, String destination, String payoutSchedule) {
+    }
 
     public record CustomerRef(Long id, String displayName, String name, String company, String email,
                               String country, String vatNumber, String addressLine, String postalCode, String city) {
