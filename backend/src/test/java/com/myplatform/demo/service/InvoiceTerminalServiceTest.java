@@ -15,6 +15,7 @@ import com.myplatform.demo.model.User;
 import com.myplatform.demo.repository.CustomerRepository;
 import com.myplatform.demo.repository.InvoiceRepository;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import com.myplatform.demo.repository.UserBrandingRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.repository.WebhookEventRepository;
 import com.myplatform.demo.util.InvoiceTerminalRules.OriginalTransaction;
@@ -74,7 +75,7 @@ class InvoiceTerminalServiceTest {
             invoiceRepository, mock(CustomerRepository.class), userRepository, mock(StoreCustomerRepository.class),
             mock(WebhookEventRepository.class), mock(CheckoutPaymentService.class), mock(LegalEntityService.class),
             mock(AccountStatementService.class), mock(InvoicePdfService.class), new ObjectMapper(),
-            mock(EntityManager.class), mock(InvoiceFundsService.class));
+            mock(EntityManager.class), mock(InvoiceFundsService.class), mock(UserBrandingRepository.class));
     private final InvoiceTerminalService service = new InvoiceTerminalService(invoiceService, terminalDirectory,
             posService, subscriptionService, userRepository);
     private final ExecutorService otherRequests = Executors.newSingleThreadExecutor();

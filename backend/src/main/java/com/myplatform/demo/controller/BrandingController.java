@@ -54,6 +54,10 @@ public class BrandingController {
         if (body.containsKey("themeId")) {
             branding.setThemeId(body.get("themeId"));
         }
+        if (body.containsKey("payByLinkThemeId")) {
+            String theme = body.get("payByLinkThemeId");
+            branding.setPayByLinkThemeId(theme == null || theme.isBlank() ? null : theme.trim());
+        }
 
         brandingRepository.save(branding);
         return ResponseEntity.ok(branding);

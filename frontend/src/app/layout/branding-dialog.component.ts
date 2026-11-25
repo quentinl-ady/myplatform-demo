@@ -12,12 +12,14 @@ export interface BrandingPayload {
   logoData?: string;
   logoType?: string;
   themeId?: string;
+  payByLinkThemeId?: string;
 }
 
 export interface BrandingDialogData {
   platformName: string;
   logoPreview: string | null;
   themeId: string | null;
+  payByLinkThemeId: string | null;
   /** The dialog stays open while these run, so a failure is shown next to the form. */
   save: (payload: BrandingPayload) => Observable<UserBranding>;
   reset: () => Observable<void>;
@@ -95,6 +97,12 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
         <mat-label>Hosted onboarding theme ID</mat-label>
         <input matInput [(ngModel)]="themeId" placeholder="e.g. 37a3b051-…" autocomplete="off" />
         <mat-hint>Optional. The ID of your hosted onboarding theme.</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width theme-field">
+        <mat-label>Pay by Link theme ID</mat-label>
+        <input matInput [(ngModel)]="payByLinkThemeId" autocomplete="off" />
+        <mat-hint>Optional. Applied to the payment links of new invoices and subscriptions.</mat-hint>
       </mat-form-field>
 
       <app-inline-alert
@@ -238,6 +246,7 @@ export class BrandingDialogComponent implements OnInit {
   logoData: string | null = null;
   logoType: string | null = null;
   themeId: string = '';
+  payByLinkThemeId: string = '';
   errorMsg: string = '';
   loadingUrl: boolean = false;
   busy: 'save' | 'reset' | null = null;
@@ -247,6 +256,7 @@ export class BrandingDialogComponent implements OnInit {
     this.platformName = this.data.platformName || '';
     this.logoPreview = this.data.logoPreview || null;
     this.themeId = this.data.themeId || '';
+    this.payByLinkThemeId = this.data.payByLinkThemeId || '';
     if (this.logoPreview) {
       this.logoData = this.logoPreview;
     }
@@ -331,6 +341,7 @@ export class BrandingDialogComponent implements OnInit {
       payload.logoType = this.logoType as string;
     }
     payload.themeId = this.themeId.trim();
+    payload.payByLinkThemeId = this.payByLinkThemeId.trim();
     this.run('save', this.data.save(payload), 'Unable to save the branding. Try again.',
       branding => ({ action: 'saved', branding }));
   }

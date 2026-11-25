@@ -34,10 +34,12 @@ import com.myplatform.demo.model.InvoiceEvent;
 import com.myplatform.demo.model.InvoiceLine;
 import com.myplatform.demo.model.StoreCustomer;
 import com.myplatform.demo.model.User;
+import com.myplatform.demo.model.UserBranding;
 import com.myplatform.demo.model.WebhookEvent;
 import com.myplatform.demo.repository.CustomerRepository;
 import com.myplatform.demo.repository.InvoiceRepository;
 import com.myplatform.demo.repository.StoreCustomerRepository;
+import com.myplatform.demo.repository.UserBrandingRepository;
 import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.repository.WebhookEventRepository;
 import com.myplatform.demo.util.AdyenNotifications;
@@ -144,6 +146,7 @@ public class InvoiceService {
     private final String merchantAccount;
     private final com.adyen.service.checkout.ModificationsApi checkoutModificationsApi;
     private final InvoiceFundsService invoiceFundsService;
+    private final UserBrandingRepository brandingRepository;
     private final Map<Long, Instant> fundsCheckedAt = new ConcurrentHashMap<>();
     /**
      * Webhooks, checks of payment links and the user's actions change invoices from different threads: the changes
@@ -208,8 +211,10 @@ public class InvoiceService {
                           InvoicePdfService pdfService,
                           ObjectMapper objectMapper,
                           EntityManager entityManager,
-                          InvoiceFundsService invoiceFundsService) {
+                          InvoiceFundsService invoiceFundsService,
+                          UserBrandingRepository brandingRepository) {
         this.invoiceFundsService = invoiceFundsService;
+        this.brandingRepository = brandingRepository;
         this.checkoutModificationsApi = new com.adyen.service.checkout.ModificationsApi(pspClient);
         this.paymentLinksApi = new PaymentLinksApi(pspClient);
         this.paymentsApi = new PaymentsApi(pspClient);
@@ -1378,6 +1383,8 @@ public class InvoiceService {
             request.storePaymentMethodMode(PaymentLinkRequest.StorePaymentMethodModeEnum.ENABLED)
                     .recurringProcessingModel(PaymentLinkRequest.RecurringProcessingModelEnum.SUBSCRIPTION);
         }
+        brandingRepository.findById(user.getId()).map(UserBranding::getPayByLinkThemeId)
+                .filter(theme -> !theme.isBlank()).ifPresent(request::themeId);
         options.applyTo(request);
         return request;
     }

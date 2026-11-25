@@ -24,6 +24,11 @@ public class UserBranding {
     @Column(length = 20)
     private String logoType;
 
+    /** Hosted onboarding theme. */
     @Column(length = 100)
     private String themeId;
+
+    /** Theme of the payment links the platform creates for the user. */
+    @Column(length = 100)
+    private String payByLinkThemeId;
 }

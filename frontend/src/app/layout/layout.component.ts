@@ -32,7 +32,7 @@ interface NavSection {
 type AccountState = 'loading' | 'ready' | 'notFound' | 'error';
 
 function hasCustomBranding(branding: UserBranding): boolean {
-  return !!(branding.platformName || branding.logoData || branding.themeId);
+  return !!(branding.platformName || branding.logoData || branding.themeId || branding.payByLinkThemeId);
 }
 
 const MOBILE_QUERY = '(max-width: 959.98px)';
@@ -382,6 +382,7 @@ export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
       platformName: this.platformName,
       logoPreview: this.customLogoSrc,
       themeId: this.customThemeId,
+      payByLinkThemeId: this.branding?.payByLinkThemeId || null,
       save: (payload) => this.brandingService.updateBranding(userId, payload),
       reset: () => this.brandingService.resetBranding(userId)
     };
@@ -411,7 +412,7 @@ export class LayoutComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private restoreBranding(userId: string, previous: UserBranding) {
-    const payload: BrandingPayload = { themeId: previous.themeId || '' };
+    const payload: BrandingPayload = { themeId: previous.themeId || '', payByLinkThemeId: previous.payByLinkThemeId || '' };
     if (previous.platformName) payload.platformName = previous.platformName;
     if (previous.logoData) {
       payload.logoData = previous.logoData;
