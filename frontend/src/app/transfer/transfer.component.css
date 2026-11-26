@@ -148,6 +148,27 @@ button.tx-row:focus-visible { outline: 2px solid var(--fintech-primary); outline
 .event-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; color: var(--fintech-text-secondary); }
 .event-amount { font-weight: 500; }
 
+/* Movements included in an automatic transfer */
+.included-loading { display: flex; align-items: center; gap: 10px; font-size: 0.8125rem; color: var(--fintech-text-secondary); }
+.included-empty { font-size: 0.8125rem; color: var(--fintech-text-secondary); margin: 0 0 12px; }
+.included-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--fintech-border); border-radius: 12px; }
+.included-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 14px; }
+.included-item + .included-item { border-top: 1px solid var(--fintech-border); }
+.included-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.included-label { font-size: 0.875rem; font-weight: 500; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.included-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.75rem; color: var(--fintech-text-secondary); }
+.included-meta .mono { font-family: var(--fintech-font-mono); overflow-wrap: anywhere; }
+.included-amount { font-size: 0.875rem; font-weight: 600; white-space: nowrap; }
+.kind-badge { font-size: 0.6875rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; background: var(--fintech-surface-muted); color: var(--fintech-text-secondary); }
+.kind-badge.kind-payment { background: var(--fintech-success-bg); color: var(--fintech-success); }
+.kind-badge.kind-refund, .kind-badge.kind-chargeback { background: var(--fintech-danger-bg); color: var(--fintech-danger); }
+.included-totals { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; font-size: 0.8125rem; }
+.included-totals > div { display: flex; justify-content: space-between; gap: 12px; }
+.included-totals dt { color: var(--fintech-text-secondary); }
+.included-totals dd { margin: 0; font-weight: 500; }
+.included-totals .included-total { padding-top: 6px; border-top: 1px solid var(--fintech-border); }
+.included-totals .included-total dt, .included-totals .included-total dd { color: var(--fintech-text); font-weight: 700; }
+
 @media (max-width: 600px) {
   mat-card { padding: 20px 16px; }
   .account-balance { font-size: 2rem; }

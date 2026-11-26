@@ -11,7 +11,10 @@ import { RemoteSessionPanelComponent } from '../remote-session/remote-session-pa
 import { ApprovalSwitchComponent } from '../remote-session/approval-switch.component';
 
 import ScaWebauthn from '@adyen/bpscaweb';
-import { AccountStatement, BankAccountInformationResponse, BankTransaction, RemoteSession, TransferDetail } from "../models";
+import {
+  AccountStatement, BankAccountInformationResponse, BankTransaction, IncludedMovement, IncludedMovements, RemoteSession,
+  TransferDetail
+} from "../models";
 import { AccountService, RemoteSessionService, TransferService } from "../services";
 import {
   ApprovalChoice, ApprovalMode, InlineAlertComponent, MoneyPipe, NotifyService, StatementFormat, approvalChoice,
@@ -20,6 +23,17 @@ import {
 } from '../shared';
 import { formatDate, formatDateTime, speedLabel } from '../banktransfer/format-date';
 import { bankDetailRows, DetailRow } from '../banktransfer/bank-details';
+
+const SWEEP_REFERENCE_PREFIX = 'balance-sweep-';
+
+const KIND_LABELS: Record<string, string> = {
+  PAYMENT: 'Payment',
+  FEE: 'Fee',
+  REFUND: 'Refund',
+  CHARGEBACK: 'Chargeback',
+  TRANSFER: 'Transfer',
+  OTHER: 'Other'
+};
 
 const STATUS_LABELS: Record<string, string> = {
   booked: 'Booked',
@@ -104,6 +118,13 @@ export class TransferComponent implements OnInit, OnDestroy {
   isLoadingDetail = false;
   detailError = '';
   private detailTransaction: BankTransaction | null = null;
+  private detailRequest?: Subscription;
+
+  /** The movements an automatic transfer between balance accounts moved, for the transfer in the details. */
+  includedMovements?: IncludedMovements;
+  includedState: 'idle' | 'loading' | 'ready' | 'error' = 'idle';
+  includedError = '';
+  private includedRequest?: Subscription;
 
   lastUpdated: number | null = null;
   private lastUpdatedTimer: ReturnType<typeof setInterval> | null = null;
@@ -130,6 +151,8 @@ export class TransferComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.stopLastUpdatedTimer();
     this.statementsRequest?.unsubscribe();
+    this.detailRequest?.unsubscribe();
+    this.includedRequest?.unsubscribe();
   }
 
   get setupState(): LoadState {
@@ -301,13 +324,16 @@ export class TransferComponent implements OnInit, OnDestroy {
     this.transferDetail = undefined;
     this.detailError = '';
     this.isLoadingDetail = true;
+    this.resetIncludedMovements();
     this.cdr.detectChanges();
 
-    this.transferService.getTransferDetail(this.userId, tx.transferId).subscribe({
+    this.detailRequest?.unsubscribe();
+    this.detailRequest = this.transferService.getTransferDetail(this.userId, tx.transferId).subscribe({
       next: (detail) => {
         this.transferDetail = detail;
         this.isLoadingDetail = false;
         this.cdr.detectChanges();
+        if (this.isSweep(detail)) this.loadIncludedMovements();
       },
       error: (err) => {
         this.isLoadingDetail = false;
@@ -322,11 +348,55 @@ export class TransferComponent implements OnInit, OnDestroy {
   }
 
   closeDetail() {
+    this.detailRequest?.unsubscribe();
     this.detailTransaction = null;
     this.transferDetail = undefined;
     this.detailError = '';
     this.isLoadingDetail = false;
+    this.resetIncludedMovements();
     this.cdr.detectChanges();
+  }
+
+  /** An automatic transfer of the balance of another account of the user to the business account. */
+  isSweep(d: TransferDetail | undefined): boolean {
+    return !!d && d.category === 'internal' && !!d.reference?.startsWith(SWEEP_REFERENCE_PREFIX);
+  }
+
+  loadIncludedMovements() {
+    const detail = this.transferDetail;
+    if (!this.isSweep(detail)) return;
+    this.includedRequest?.unsubscribe();
+    this.includedMovements = undefined;
+    this.includedError = '';
+    this.includedState = 'loading';
+    this.cdr.detectChanges();
+    this.includedRequest = this.transferService.getIncludedMovements(this.userId, detail!.id).subscribe({
+      next: (movements) => {
+        this.includedMovements = movements;
+        this.includedState = 'ready';
+        this.cdr.detectChanges();
+      },
+      error: (err) => {
+        this.includedError = httpErrorMessage(err, "The movements of this transfer couldn't be loaded. Try again.");
+        this.includedState = 'error';
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  kindLabel(kind: string): string {
+    return KIND_LABELS[kind] || readableLabel(kind);
+  }
+
+  trackIncluded(_: number, item: IncludedMovement): string {
+    return item.transactionId;
+  }
+
+  private resetIncludedMovements() {
+    this.includedRequest?.unsubscribe();
+    this.includedMovements = undefined;
+    this.includedError = '';
+    this.includedState = 'idle';
   }
 
   /** Also called each time the menu opens: Adyen adds statements while the page stays open. */

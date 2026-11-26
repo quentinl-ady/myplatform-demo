@@ -20,6 +20,11 @@ import java.util.Map;
 @Service
 public class BankingProvisioningService {
 
+    /** Description of the sweep that moves the balance of the acquiring account to the business account. */
+    public static final String SETTLEMENT_SWEEP_DESCRIPTION = "Settlement";
+    /** What the sweeps created before were called: their transfers keep it. */
+    static final String LEGACY_SETTLEMENT_SWEEP_DESCRIPTION = "Internal Transfer 2min";
+
     private final BusinessLinesApi businessLinesApi;
     private final BalanceAccountsApi balanceAccountsApi;
     private final PaymentInstrumentsApi paymentInstrumentsApi;
@@ -110,7 +115,7 @@ public class BankingProvisioningService {
                 .triggerAmount(new com.adyen.model.balanceplatform.Amount().currency(currencyCode).value(0L))
                 .currency(currencyCode)
                 .category(CreateSweepConfigurationV2.CategoryEnum.INTERNAL)
-                .description("Internal Transfer 2min")
+                .description(SETTLEMENT_SWEEP_DESCRIPTION)
                 .counterparty(new SweepCounterparty().balanceAccountId(businessBalanceAccountId))
                 .schedule(new SweepSchedule().type(SweepSchedule.TypeEnum.CRON).cronExpression("*/2 * * * *"));
 

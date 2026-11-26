@@ -35,6 +35,13 @@ public class BankTransferService {
         this.restTemplate = restTemplate;
     }
 
+    /** The transfers of the sweeps created before the settlement sweep was renamed show its current name. */
+    static String displayDescription(String description) {
+        return BankingProvisioningService.LEGACY_SETTLEMENT_SWEEP_DESCRIPTION.equals(description)
+                ? BankingProvisioningService.SETTLEMENT_SWEEP_DESCRIPTION
+                : description;
+    }
+
     // ---- SCA flow: initiate (step 1) ----
 
     public Map<String, Object> initiateBankTransfers(String accountHolderId, String balanceAccountId, String sdkOutput) {
@@ -131,7 +138,7 @@ public class BankTransferService {
         TransactionDTO dto = new TransactionDTO();
         dto.setId(getText(node, "id"));
         dto.setStatus(getText(node, "status"));
-        dto.setDescription(getText(node, "description"));
+        dto.setDescription(displayDescription(getText(node, "description")));
         dto.setCreationDate(getText(node, "creationDate"));
         dto.setBookingDate(getText(node, "bookingDate"));
         dto.setValueDate(getText(node, "valueDate"));
@@ -203,7 +210,7 @@ public class BankTransferService {
         dto.setType(getText(node, "type"));
         dto.setReason(getText(node, "reason"));
         dto.setReference(getText(node, "reference"));
-        dto.setDescription(getText(node, "description"));
+        dto.setDescription(displayDescription(getText(node, "description")));
         dto.setCreatedAt(getText(node, "createdAt"));
         dto.setUpdatedAt(getText(node, "updatedAt"));
         dto.setCategory(getText(node, "category"));

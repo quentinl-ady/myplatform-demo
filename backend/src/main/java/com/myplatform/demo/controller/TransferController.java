@@ -3,6 +3,7 @@ package com.myplatform.demo.controller;
 import com.adyen.model.balanceplatform.AssociationInitiateResponse;
 import com.adyen.model.balanceplatform.RegisterSCAFinalResponse;
 import com.myplatform.demo.configuration.ApiLogContext;
+import com.myplatform.demo.dto.SweepBreakdownDTO;
 import com.myplatform.demo.dto.TrustedDeviceDTO;
 import com.myplatform.demo.exception.BadRequestException;
 import com.myplatform.demo.exception.ResourceNotFoundException;
@@ -11,6 +12,7 @@ import com.myplatform.demo.repository.UserRepository;
 import com.myplatform.demo.service.BankAccountResolver;
 import com.myplatform.demo.service.BankTransferService;
 import com.myplatform.demo.service.OtpService;
+import com.myplatform.demo.service.SweepBreakdownService;
 import com.myplatform.demo.service.TransferRouteService;
 import com.myplatform.demo.service.TransferService;
 import com.myplatform.demo.service.TrustedDeviceService;
@@ -39,6 +41,7 @@ public class TransferController {
     private final BankAccountResolver bankAccounts;
     private final TrustedDeviceService trustedDevices;
     private final OtpService otpService;
+    private final SweepBreakdownService sweepBreakdowns;
 
     public TransferController(UserRepository userRepository,
                               TransferService transferService,
@@ -46,7 +49,8 @@ public class TransferController {
                               BankTransferService bankTransferService,
                               BankAccountResolver bankAccounts,
                               TrustedDeviceService trustedDevices,
-                              OtpService otpService) {
+                              OtpService otpService,
+                              SweepBreakdownService sweepBreakdowns) {
         this.userRepository = userRepository;
         this.transferService = transferService;
         this.transferRouteService = transferRouteService;
@@ -54,6 +58,7 @@ public class TransferController {
         this.bankAccounts = bankAccounts;
         this.trustedDevices = trustedDevices;
         this.otpService = otpService;
+        this.sweepBreakdowns = sweepBreakdowns;
     }
 
     @GetMapping("/{userId}/devices")
@@ -303,6 +308,13 @@ public class TransferController {
             @PathVariable String transferId) {
         findUser(userId); // validate user exists
         return ResponseEntity.ok(bankTransferService.getTransferDetail(transferId));
+    }
+
+    /** The movements of the account it comes from that an automatic sweep moved to the business account. */
+    @GetMapping("/{userId}/bank-transactions/detail/{transferId}/included-movements")
+    public ResponseEntity<SweepBreakdownDTO> getIncludedMovements(@PathVariable String userId,
+                                                                  @PathVariable String transferId) {
+        return ResponseEntity.ok(sweepBreakdowns.breakdown(findUser(userId), transferId));
     }
 
     private User findUser(String userId) {

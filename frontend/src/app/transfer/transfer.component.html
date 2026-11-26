@@ -289,6 +289,54 @@
           </ol>
         </section>
 
+        <!-- Movements an automatic transfer between balance accounts moved -->
+        <section class="detail-section" *ngIf="isSweep(transferDetail)">
+          <h3>Included movements</h3>
+          <div class="included-loading" *ngIf="includedState === 'loading'" role="status">
+            <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+            <span>Loading the movements of this transfer…</span>
+          </div>
+          <app-inline-alert *ngIf="includedState === 'error'" title="Unable to load the included movements"
+                            actionLabel="Try again" (action)="loadIncludedMovements()">{{ includedError }}</app-inline-alert>
+          <ng-container *ngIf="includedState === 'ready' && includedMovements as b">
+            <p class="included-empty" *ngIf="!b.items.length">No movements found for this transfer.</p>
+            <ul class="included-list" *ngIf="b.items.length">
+              <li class="included-item" *ngFor="let item of b.items; trackBy: trackIncluded">
+                <div class="included-main">
+                  <span class="included-label">
+                    <span class="kind-badge" [ngClass]="'kind-' + item.kind.toLowerCase()">{{ kindLabel(item.kind) }}</span>
+                    {{ item.label }}
+                  </span>
+                  <span class="included-meta">
+                    <span>{{ formatDateTime(item.availableAt || item.bookedAt) }}</span>
+                    <span class="mono" *ngIf="item.reference">{{ item.reference }}</span>
+                    <span class="mono" *ngIf="item.pspReference && item.pspReference !== item.reference">{{ item.pspReference }}</span>
+                  </span>
+                </div>
+                <span class="included-amount" [class.incoming-amount]="item.amount > 0">
+                  {{ item.amount | money:item.currency:'exceptZero' }}
+                </span>
+              </li>
+            </ul>
+            <dl class="included-totals">
+              <div>
+                <dt>Movements ({{ b.items.length }})</dt>
+                <dd>{{ b.itemsTotal | money:b.currency:'exceptZero' }}</dd>
+              </div>
+              <div *ngIf="b.carriedOver !== 0">
+                <dt>{{ b.carriedOver > 0 ? 'Earlier balance' : 'Kept on the account' }}</dt>
+                <dd>{{ b.carriedOver | money:b.currency:'exceptZero' }}</dd>
+              </div>
+              <div class="included-total">
+                <dt>Transferred</dt>
+                <dd>{{ b.amount | money:b.currency }}</dd>
+              </div>
+            </dl>
+            <app-inline-alert *ngIf="b.warnings.length" kind="warning" [live]="false">
+              <span *ngFor="let warning of b.warnings; let last = last">{{ warning }}<br *ngIf="!last"></span>
+            </app-inline-alert>
+          </ng-container>
+        </section>
       </div>
     </div>
   </div>

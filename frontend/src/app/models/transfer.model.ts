@@ -276,3 +276,38 @@ export interface TransferDetail {
   paymentType: string;
   events: TransferEvent[];
 }
+
+/** A movement that an automatic transfer between balance accounts moved. Amounts are in minor units. */
+export interface IncludedMovement {
+  transactionId: string;
+  transferId: string | null;
+  /** PAYMENT, FEE, REFUND, CHARGEBACK, TRANSFER or OTHER. */
+  kind: string;
+  label: string;
+  reference: string | null;
+  pspReference: string | null;
+  /** Signed: positive when it credited the account the transfer comes from. */
+  amount: number;
+  currency: string;
+  bookedAt: string | null;
+  availableAt: string | null;
+}
+
+/** The movements an automatic transfer moved: those that became available since the one before. */
+export interface IncludedMovements {
+  transferId: string;
+  balanceAccountId: string;
+  currency: string;
+  /** Unsigned, in minor units. */
+  amount: number;
+  sweptAt: string | null;
+  previousSweepAt: string | null;
+  previousTransferId: string | null;
+  items: IncludedMovement[];
+  itemsTotal: number;
+  /** What the transfer moved besides the listed movements. */
+  carriedOver: number;
+  /** False when movements may be missing from the list. */
+  complete: boolean;
+  warnings: string[];
+}

@@ -16,6 +16,7 @@ import {
   RegisterSCAFinalResponse,
   RegisterSCAResponse,
   TransferDetail,
+  IncludedMovements,
   TransferRouteOption,
   TransferRouteRequest,
   VerifyCounterpartyNameRequest,
@@ -133,6 +134,12 @@ export class TransferService {
 
   getTransferDetail(userId: string, transferId: string): Observable<TransferDetail> {
     return this.http.get<TransferDetail>(`${this.baseUrl}/api/transfers/${userId}/bank-transactions/detail/${transferId}`);
+  }
+
+  /** The movements an automatic transfer between balance accounts moved, rebuilt from the account it comes from. */
+  getIncludedMovements(userId: string, transferId: string): Observable<IncludedMovements> {
+    return this.http.get<IncludedMovements>(
+      `${this.baseUrl}/api/transfers/${userId}/bank-transactions/detail/${encodeURIComponent(transferId)}/included-movements`);
   }
 
   getPendingBatchTransfers(userId: string): Observable<any> {
